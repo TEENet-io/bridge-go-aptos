@@ -1,0 +1,1 @@
+Hosting common `interface`s and `struct` used accross the whole module.
