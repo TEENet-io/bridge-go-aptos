@@ -37,21 +37,21 @@ type ethereumClient interface {
 	bind.ContractBackend
 }
 
-type Client struct {
+type Etherman struct {
 	ethClient      ethereumClient
 	bridgeAddress  common.Address
 	bridgeContract *bridge.TEENetBtcBridge
 	twbtcContract  *TWBTC.TWBTC
 }
 
-func NewClient(cfg *Config) (*Client, error) {
+func NewEtherman(cfg *Config) (*Etherman, error) {
 	ethClient, err := ethclient.Dial(cfg.URL)
 	if err != nil {
 		log.Errorf("error connecting to %s: %+v", cfg.URL, err)
 		return nil, err
 	}
 
-	return &Client{
+	return &Etherman{
 		ethClient:      ethClient,
 		bridgeAddress:  common.HexToAddress(cfg.BridgeContractAddress),
 		bridgeContract: nil,
@@ -59,7 +59,17 @@ func NewClient(cfg *Config) (*Client, error) {
 	}, nil
 }
 
-func (etherman *Client) GetLatestFinalizedBlockNumber() (*big.Int, error) {
+func (etherman *Etherman) GetLatestFinalizedBlockNumber() (*big.Int, error) {
+	if debug {
+		log.Info("call GetLatestFinalizedBlockNumber in debug mode")
+		blk, err := etherman.ethClient.BlockByNumber(context.Background(), nil)
+		if err != nil {
+			log.Errorf("error getting latest block: %+v", err)
+			return nil, err
+		}
+		return blk.Number(), nil
+	}
+
 	blk, err := etherman.ethClient.BlockByNumber(context.Background(), big.NewInt(-3))
 	if err != nil {
 		log.Errorf("error getting latest finalized block: %+v", err)
@@ -68,7 +78,7 @@ func (etherman *Client) GetLatestFinalizedBlockNumber() (*big.Int, error) {
 	return blk.Number(), nil
 }
 
-func (etherman *Client) GetEventMinted(blockNum *big.Int) (
+func (etherman *Etherman) GetEventMinted(blockNum *big.Int) (
 	[]bridge.TEENetBtcBridgeMinted,
 	[]bridge.TEENetBtcBridgeRedeemRequested,
 	[]bridge.TEENetBtcBridgeRedeemPrepared,
@@ -134,7 +144,7 @@ func (etherman *Client) GetEventMinted(blockNum *big.Int) (
 	return minted, redeemRequested, redeemPrepared, nil
 }
 
-func (etherman *Client) Mint(params *MintParams) error {
+func (etherman *Etherman) Mint(params *MintParams) error {
 	contract, err := etherman.getBridgeContract()
 	if err != nil {
 		log.Errorf("failed to get bridge contract: %+v", err)
@@ -155,7 +165,7 @@ func (etherman *Client) Mint(params *MintParams) error {
 	return nil
 }
 
-func (etherman *Client) RedeemRequest(params *RequestParams) error {
+func (etherman *Etherman) RedeemRequest(params *RequestParams) error {
 	contract, err := etherman.getBridgeContract()
 	if err != nil {
 		log.Errorf("failed to get bridge contract: %+v", err)
@@ -173,7 +183,7 @@ func (etherman *Client) RedeemRequest(params *RequestParams) error {
 	return nil
 }
 
-func (etherman *Client) RedeemPrepare(params *PrepareParams) error {
+func (etherman *Etherman) RedeemPrepare(params *PrepareParams) error {
 	contract, err := etherman.getBridgeContract()
 	if err != nil {
 		log.Errorf("failed to get bridge contract: %+v", err)
@@ -209,7 +219,7 @@ func (etherman *Client) RedeemPrepare(params *PrepareParams) error {
 	return nil
 }
 
-func (etherman *Client) TWBTCAddress() (common.Address, error) {
+func (etherman *Etherman) TWBTCAddress() (common.Address, error) {
 	contract, err := etherman.getBridgeContract()
 	if err != nil {
 		log.Errorf("failed to get bridge contract: %+v", err)
@@ -225,7 +235,7 @@ func (etherman *Client) TWBTCAddress() (common.Address, error) {
 	return twbtcAddr, nil
 }
 
-func (etherman *Client) TWBTCBalanceOf(addr common.Address) (*big.Int, error) {
+func (etherman *Etherman) TWBTCBalanceOf(addr common.Address) (*big.Int, error) {
 	contract, err := etherman.getTWBTCContract()
 	if err != nil {
 		log.Errorf("failed to get TWBTC contract: %+v", err)
@@ -241,7 +251,7 @@ func (etherman *Client) TWBTCBalanceOf(addr common.Address) (*big.Int, error) {
 	return balance, nil
 }
 
-func (etherman *Client) TWBTCApprove(auth *bind.TransactOpts, amount *big.Int) error {
+func (etherman *Etherman) TWBTCApprove(auth *bind.TransactOpts, amount *big.Int) error {
 	contract, err := etherman.getTWBTCContract()
 	if err != nil {
 		log.Errorf("failed to get TWBTC contract: %+v", err)
@@ -257,7 +267,7 @@ func (etherman *Client) TWBTCApprove(auth *bind.TransactOpts, amount *big.Int) e
 	return nil
 }
 
-func (etherman *Client) TWBTCAllowance(owner common.Address) (*big.Int, error) {
+func (etherman *Etherman) TWBTCAllowance(owner common.Address) (*big.Int, error) {
 	contract, err := etherman.getTWBTCContract()
 	if err != nil {
 		log.Errorf("failed to get TWBTC contract: %+v", err)
@@ -273,7 +283,7 @@ func (etherman *Client) TWBTCAllowance(owner common.Address) (*big.Int, error) {
 	return allowance, nil
 }
 
-func (etherman *Client) getBridgeContract() (*bridge.TEENetBtcBridge, error) {
+func (etherman *Etherman) getBridgeContract() (*bridge.TEENetBtcBridge, error) {
 	if etherman.bridgeContract != nil {
 		return etherman.bridgeContract, nil
 	}
@@ -288,7 +298,7 @@ func (etherman *Client) getBridgeContract() (*bridge.TEENetBtcBridge, error) {
 	return contract, nil
 }
 
-func (etherman *Client) getTWBTCContract() (*TWBTC.TWBTC, error) {
+func (etherman *Etherman) getTWBTCContract() (*TWBTC.TWBTC, error) {
 	if etherman.twbtcContract != nil {
 		return etherman.twbtcContract, nil
 	}
