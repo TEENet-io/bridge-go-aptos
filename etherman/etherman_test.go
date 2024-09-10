@@ -76,7 +76,7 @@ func TestGetEventMinted(t *testing.T) {
 
 	num := curentBlockNum(t, env)
 
-	minted, requested, prepared, err := etherman.GetEventMinted(num)
+	minted, requested, prepared, err := etherman.GetEventLogs(num)
 	assert.NoError(t, err)
 	assert.Len(t, minted, 1)
 	assert.Len(t, requested, 0)
@@ -95,7 +95,7 @@ func TestGetEventMinted(t *testing.T) {
 	sim.Backend.Commit()
 
 	num = curentBlockNum(t, env)
-	minted, requested, prepared, err = etherman.GetEventMinted(num)
+	minted, requested, prepared, err = etherman.GetEventLogs(num)
 	assert.NoError(t, err)
 	assert.Len(t, minted, 0)
 	assert.Len(t, requested, 1)
