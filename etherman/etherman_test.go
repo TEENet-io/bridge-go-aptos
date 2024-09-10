@@ -155,7 +155,7 @@ func TestMint(t *testing.T) {
 	assert.NoError(t, err)
 	sim.Backend.Commit()
 
-	balance, err := etherman.TWBTCBalanceOf(common.HexToAddress(params.Receiver))
+	balance, err := etherman.TWBTCBalanceOf(common.HexToAddress(string(params.Receiver)))
 	assert.NoError(t, err)
 	assert.Equal(t, big.NewInt(100), balance)
 }
@@ -194,18 +194,18 @@ func prepareMintParams(t *testing.T, env *testEnv, cfg *paramConfig) *MintParams
 
 	return &MintParams{
 		Auth:     sim.Accounts[cfg.deployer],
-		BtcTxId:  btcTxId,
-		Amount:   amount,
-		Receiver: receiver,
-		Rx:       rx,
-		S:        s,
+		BtcTxId:  Bytes32Hex(btcTxId),
+		Amount:   uint32(cfg.amount),
+		Receiver: AddressHex(receiver),
+		Rx:       Bytes32Hex(rx),
+		S:        Bytes32Hex(s),
 	}
 }
 
 func prepareRequestParams(env *testEnv, cfg *paramConfig) *RequestParams {
 	return &RequestParams{
 		Auth:     env.sim.Accounts[cfg.sender],
-		Amount:   cfg.amount,
+		Amount:   uint32(cfg.amount),
 		Receiver: BTCAddress(btcAddrs[0]),
 	}
 }
@@ -213,21 +213,26 @@ func prepareRequestParams(env *testEnv, cfg *paramConfig) *RequestParams {
 func prepparePrepareParams(t *testing.T, env *testEnv, cfg *paramConfig) *PrepareParams {
 	txHash := randBytes32Hex(t)
 	requester := env.sim.Accounts[cfg.requester].From.String()
-	outpointTxIds := []string{randBytes32Hex(t), randBytes32Hex(t)}
+	outpointTxIdsStr := []string{randBytes32Hex(t), randBytes32Hex(t)}
 	outpointTxIndices := []*big.Int{big.NewInt(0), big.NewInt(1)}
 
 	amount := big.NewInt(int64(cfg.amount))
-	msg := crypto.Keccak256Hash(EncodePacked(txHash, requester, amount, outpointTxIds, outpointTxIndices)).Bytes()
+	msg := crypto.Keccak256Hash(EncodePacked(txHash, requester, amount, outpointTxIdsStr, outpointTxIndices)).Bytes()
 	rxBigInt, sBigInt, err := Sign(env.sk, msg[:])
 	assert.NoError(t, err)
 	rx := "0x" + rxBigInt.Text(16)
 	s := "0x" + sBigInt.Text(16)
 
+	var outpointTxIds []Bytes32Hex
+	for _, txId := range outpointTxIdsStr {
+		outpointTxIds = append(outpointTxIds, Bytes32Hex(txId))
+	}
+
 	return &PrepareParams{
 		Auth:          env.sim.Accounts[cfg.sender],
-		TxHash:        txHash,
-		Requester:     requester,
-		Amount:        cfg.amount,
+		TxHash:        Bytes32Hex(txHash),
+		Requester:     AddressHex(requester),
+		Amount:        uint32(cfg.amount),
 		OutpointTxIds: outpointTxIds,
 		OutpointIdxs:  []uint16{0, 1},
 		Rx:            rx,
@@ -250,17 +255,17 @@ func curentBlockNum(t *testing.T, env *testEnv) *big.Int {
 }
 
 func checkMintedEvent(t *testing.T, ev *bridge.TEENetBtcBridgeMinted, params *MintParams) {
-	assert.Equal(t, "0x"+common.Bytes2Hex(ev.BtcTxId[:]), params.BtcTxId)
-	assert.Equal(t, ev.Receiver.String(), params.Receiver)
-	assert.Equal(t, ev.Amount, params.Amount)
+	assert.Equal(t, "0x"+common.Bytes2Hex(ev.BtcTxId[:]), string(params.BtcTxId))
+	assert.Equal(t, ev.Receiver.String(), string(params.Receiver))
+	assert.Equal(t, ev.Amount, big.NewInt(int64(params.Amount)))
 }
 
 func checkPreparedEvent(t *testing.T, ev *bridge.TEENetBtcBridgeRedeemPrepared, params *PrepareParams) {
-	assert.Equal(t, "0x"+common.Bytes2Hex(ev.EthTxHash[:]), params.TxHash)
-	assert.Equal(t, ev.Requester.String(), params.Requester)
+	assert.Equal(t, "0x"+common.Bytes2Hex(ev.EthTxHash[:]), string(params.TxHash))
+	assert.Equal(t, ev.Requester.String(), string(params.Requester))
 	assert.Equal(t, ev.Amount, big.NewInt(int64(params.Amount)))
 	for i, txId := range ev.OutpointTxIds {
-		assert.Equal(t, "0x"+common.Bytes2Hex(txId[:]), params.OutpointTxIds[i])
+		assert.Equal(t, "0x"+common.Bytes2Hex(txId[:]), string(params.OutpointTxIds[i]))
 	}
 	for i, idx := range ev.OutpointIdxs {
 		assert.Equal(t, idx, params.OutpointIdxs[i])

@@ -141,12 +141,12 @@ func (etherman *Client) Mint(params *MintParams) error {
 		return err
 	}
 
-	btcTxId := HexStrToBytes32(params.BtcTxId)
-	receiver := common.HexToAddress(params.Receiver)
-	rx := HexStrToBigInt(params.Rx)
-	s := HexStrToBigInt(params.S)
+	btcTxId := HexStrToBytes32(string(params.BtcTxId))
+	receiver := common.HexToAddress(string(params.Receiver))
+	rx := HexStrToBigInt(string(params.Rx))
+	s := HexStrToBigInt(string(params.S))
 
-	_, err = contract.Mint(params.Auth, btcTxId, receiver, params.Amount, rx, s)
+	_, err = contract.Mint(params.Auth, btcTxId, receiver, big.NewInt(int64(params.Amount)), rx, s)
 	if err != nil {
 		log.Errorf("failed to mint: %+v", err)
 		return err
@@ -163,9 +163,8 @@ func (etherman *Client) RedeemRequest(params *RequestParams) error {
 	}
 
 	receiver := string(params.Receiver)
-	amount := big.NewInt(int64(params.Amount))
 
-	_, err = contract.RedeemRequest(params.Auth, amount, receiver)
+	_, err = contract.RedeemRequest(params.Auth, big.NewInt(int64(params.Amount)), receiver)
 	if err != nil {
 		log.Errorf("failed to redeem requested: %+v", err)
 		return err
@@ -183,11 +182,11 @@ func (etherman *Client) RedeemPrepare(params *PrepareParams) error {
 
 	var outpointTxIds [][32]byte
 	for _, txId := range params.OutpointTxIds {
-		outpointTxIds = append(outpointTxIds, HexStrToBytes32(txId))
+		outpointTxIds = append(outpointTxIds, HexStrToBytes32(string(txId)))
 	}
 
-	redeemRequestTxHash := HexStrToBytes32(params.TxHash)
-	requester := common.HexToAddress(params.Requester)
+	redeemRequestTxHash := HexStrToBytes32(string(params.TxHash))
+	requester := common.HexToAddress(string(params.Requester))
 	amount := big.NewInt(int64(params.Amount))
 	rx := HexStrToBigInt(params.Rx)
 	s := HexStrToBigInt(params.S)
