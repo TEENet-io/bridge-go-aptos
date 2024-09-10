@@ -61,7 +61,7 @@ func NewEtherman(cfg *Config) (*Etherman, error) {
 
 func (etherman *Etherman) GetLatestFinalizedBlockNumber() (*big.Int, error) {
 	if debug {
-		log.Info("call GetLatestFinalizedBlockNumber in debug mode")
+		log.Debug("call GetLatestFinalizedBlockNumber in DEBUG mode")
 		blk, err := etherman.ethClient.BlockByNumber(context.Background(), nil)
 		if err != nil {
 			log.Errorf("error getting latest block: %+v", err)
@@ -156,7 +156,7 @@ func (etherman *Etherman) Mint(params *MintParams) error {
 	rx := HexStrToBigInt(string(params.Rx))
 	s := HexStrToBigInt(string(params.S))
 
-	_, err = contract.Mint(params.Auth, btcTxId, receiver, big.NewInt(int64(params.Amount)), rx, s)
+	_, err = contract.Mint(params.Auth, btcTxId, receiver, params.Amount, rx, s)
 	if err != nil {
 		log.Errorf("failed to mint: %+v", err)
 		return err
@@ -174,7 +174,7 @@ func (etherman *Etherman) RedeemRequest(params *RequestParams) error {
 
 	receiver := string(params.Receiver)
 
-	_, err = contract.RedeemRequest(params.Auth, big.NewInt(int64(params.Amount)), receiver)
+	_, err = contract.RedeemRequest(params.Auth, params.Amount, receiver)
 	if err != nil {
 		log.Errorf("failed to redeem requested: %+v", err)
 		return err
@@ -197,7 +197,6 @@ func (etherman *Etherman) RedeemPrepare(params *PrepareParams) error {
 
 	redeemRequestTxHash := HexStrToBytes32(string(params.TxHash))
 	requester := common.HexToAddress(string(params.Requester))
-	amount := big.NewInt(int64(params.Amount))
 	rx := HexStrToBigInt(params.Rx)
 	s := HexStrToBigInt(params.S)
 
@@ -205,7 +204,7 @@ func (etherman *Etherman) RedeemPrepare(params *PrepareParams) error {
 		params.Auth,
 		redeemRequestTxHash,
 		requester,
-		amount,
+		params.Amount,
 		outpointTxIds,
 		params.OutpointIdxs,
 		rx,

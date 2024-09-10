@@ -1,6 +1,8 @@
 package etherman
 
 import (
+	"math/big"
+
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 )
 
@@ -10,7 +12,7 @@ type AddressHex string
 type MintParams struct {
 	Auth     *bind.TransactOpts
 	BtcTxId  Bytes32Hex
-	Amount   uint32
+	Amount   *big.Int
 	Receiver AddressHex
 	Rx       Bytes32Hex
 	S        Bytes32Hex
@@ -20,7 +22,7 @@ type BTCAddress string
 
 type RequestParams struct {
 	Auth     *bind.TransactOpts
-	Amount   uint32
+	Amount   *big.Int
 	Receiver BTCAddress
 }
 
@@ -28,7 +30,7 @@ type PrepareParams struct {
 	Auth          *bind.TransactOpts
 	TxHash        Bytes32Hex
 	Requester     AddressHex
-	Amount        uint32
+	Amount        *big.Int
 	OutpointTxIds []Bytes32Hex
 	OutpointIdxs  []uint16
 	Rx            string

@@ -29,8 +29,9 @@ type paramConfig struct {
 	deployer  int
 	receiver  int
 	sender    int
-	amount    int
 	requester int
+
+	amount *big.Int
 }
 
 func newTestEnv(t *testing.T) *testEnv {
@@ -64,11 +65,11 @@ func TestGetEventMinted(t *testing.T) {
 	sim := env.sim
 	etherman := env.etherman
 
-	mintParams := prepareMintParams(t, env, &paramConfig{deployer: 0, receiver: 1, amount: 100})
+	mintParams := prepareMintParams(t, env, &paramConfig{deployer: 0, receiver: 1, amount: big.NewInt(100)})
 	err := etherman.Mint(mintParams)
 	assert.NoError(t, err)
 
-	prepareParams := prepparePrepareParams(t, env, &paramConfig{sender: 3, requester: 4, amount: 400})
+	prepareParams := prepparePrepareParams(t, env, &paramConfig{sender: 3, requester: 4, amount: big.NewInt(400)})
 	err = etherman.RedeemPrepare(prepareParams)
 	assert.NoError(t, err)
 	sim.Backend.Commit()
@@ -88,7 +89,7 @@ func TestGetEventMinted(t *testing.T) {
 	assert.NoError(t, err)
 	sim.Backend.Commit()
 
-	requestParams := prepareRequestParams(env, &paramConfig{sender: 1, amount: 80})
+	requestParams := prepareRequestParams(env, &paramConfig{sender: 1, amount: big.NewInt(80)})
 	err = etherman.RedeemRequest(requestParams)
 	assert.NoError(t, err)
 	sim.Backend.Commit()
@@ -108,7 +109,7 @@ func TestRedeemPrepare(t *testing.T) {
 	sim := env.sim
 	etherman := env.etherman
 
-	params := prepparePrepareParams(t, env, &paramConfig{sender: 0, requester: 1, amount: 100})
+	params := prepparePrepareParams(t, env, &paramConfig{sender: 0, requester: 1, amount: big.NewInt(100)})
 	err := etherman.RedeemPrepare(params)
 	assert.NoError(t, err)
 	sim.Backend.Commit()
@@ -120,7 +121,7 @@ func TestRedeemRequest(t *testing.T) {
 	etherman := env.etherman
 
 	// Mint tokens
-	minParams := prepareMintParams(t, env, &paramConfig{deployer: 0, receiver: 1, amount: 100})
+	minParams := prepareMintParams(t, env, &paramConfig{deployer: 0, receiver: 1, amount: big.NewInt(100)})
 	err := etherman.Mint(minParams)
 	assert.NoError(t, err)
 	sim.Backend.Commit()
@@ -135,7 +136,7 @@ func TestRedeemRequest(t *testing.T) {
 	assert.Equal(t, big.NewInt(80), allowance)
 
 	// Request redeem
-	requestParams := prepareRequestParams(env, &paramConfig{sender: 1, amount: 80})
+	requestParams := prepareRequestParams(env, &paramConfig{sender: 1, amount: big.NewInt(80)})
 	err = etherman.RedeemRequest(requestParams)
 	assert.NoError(t, err)
 	sim.Backend.Commit()
@@ -150,7 +151,7 @@ func TestMint(t *testing.T) {
 	sim := env.sim
 	etherman := env.etherman
 
-	params := prepareMintParams(t, env, &paramConfig{deployer: 0, receiver: 1, amount: 100})
+	params := prepareMintParams(t, env, &paramConfig{deployer: 0, receiver: 1, amount: big.NewInt(100)})
 	err := etherman.Mint(params)
 	assert.NoError(t, err)
 	sim.Backend.Commit()
@@ -203,9 +204,8 @@ func prepareMintParams(t *testing.T, env *testEnv, cfg *paramConfig) *MintParams
 
 	btcTxId := "0x" + common.Bytes2Hex(btcTxIdBytes)
 	receiver := sim.Accounts[cfg.receiver].From.String()
-	amount := big.NewInt(int64(cfg.amount))
 
-	msg := crypto.Keccak256Hash(EncodePacked(btcTxId, receiver, amount)).Bytes()
+	msg := crypto.Keccak256Hash(EncodePacked(btcTxId, receiver, cfg.amount)).Bytes()
 	rxBigInt, sBigInt, err := Sign(sk, msg[:])
 	assert.NoError(t, err)
 	rx := "0x" + rxBigInt.Text(16)
@@ -214,7 +214,7 @@ func prepareMintParams(t *testing.T, env *testEnv, cfg *paramConfig) *MintParams
 	return &MintParams{
 		Auth:     sim.Accounts[cfg.deployer],
 		BtcTxId:  Bytes32Hex(btcTxId),
-		Amount:   uint32(cfg.amount),
+		Amount:   cfg.amount,
 		Receiver: AddressHex(receiver),
 		Rx:       Bytes32Hex(rx),
 		S:        Bytes32Hex(s),
@@ -224,7 +224,7 @@ func prepareMintParams(t *testing.T, env *testEnv, cfg *paramConfig) *MintParams
 func prepareRequestParams(env *testEnv, cfg *paramConfig) *RequestParams {
 	return &RequestParams{
 		Auth:     env.sim.Accounts[cfg.sender],
-		Amount:   uint32(cfg.amount),
+		Amount:   cfg.amount,
 		Receiver: BTCAddress(btcAddrs[0]),
 	}
 }
@@ -235,8 +235,7 @@ func prepparePrepareParams(t *testing.T, env *testEnv, cfg *paramConfig) *Prepar
 	outpointTxIdsStr := []string{randBytes32Hex(t), randBytes32Hex(t)}
 	outpointTxIndices := []*big.Int{big.NewInt(0), big.NewInt(1)}
 
-	amount := big.NewInt(int64(cfg.amount))
-	msg := crypto.Keccak256Hash(EncodePacked(txHash, requester, amount, outpointTxIdsStr, outpointTxIndices)).Bytes()
+	msg := crypto.Keccak256Hash(EncodePacked(txHash, requester, cfg.amount, outpointTxIdsStr, outpointTxIndices)).Bytes()
 	rxBigInt, sBigInt, err := Sign(env.sk, msg[:])
 	assert.NoError(t, err)
 	rx := "0x" + rxBigInt.Text(16)
@@ -251,7 +250,7 @@ func prepparePrepareParams(t *testing.T, env *testEnv, cfg *paramConfig) *Prepar
 		Auth:          env.sim.Accounts[cfg.sender],
 		TxHash:        Bytes32Hex(txHash),
 		Requester:     AddressHex(requester),
-		Amount:        uint32(cfg.amount),
+		Amount:        cfg.amount,
 		OutpointTxIds: outpointTxIds,
 		OutpointIdxs:  []uint16{0, 1},
 		Rx:            rx,
@@ -276,13 +275,13 @@ func curentBlockNum(t *testing.T, env *testEnv) *big.Int {
 func checkMintedEvent(t *testing.T, ev *bridge.TEENetBtcBridgeMinted, params *MintParams) {
 	assert.Equal(t, "0x"+common.Bytes2Hex(ev.BtcTxId[:]), string(params.BtcTxId))
 	assert.Equal(t, ev.Receiver.String(), string(params.Receiver))
-	assert.Equal(t, ev.Amount, big.NewInt(int64(params.Amount)))
+	assert.Equal(t, ev.Amount, params.Amount)
 }
 
 func checkPreparedEvent(t *testing.T, ev *bridge.TEENetBtcBridgeRedeemPrepared, params *PrepareParams) {
 	assert.Equal(t, "0x"+common.Bytes2Hex(ev.EthTxHash[:]), string(params.TxHash))
 	assert.Equal(t, ev.Requester.String(), string(params.Requester))
-	assert.Equal(t, ev.Amount, big.NewInt(int64(params.Amount)))
+	assert.Equal(t, ev.Amount, params.Amount)
 	for i, txId := range ev.OutpointTxIds {
 		assert.Equal(t, "0x"+common.Bytes2Hex(txId[:]), string(params.OutpointTxIds[i]))
 	}
@@ -293,6 +292,6 @@ func checkPreparedEvent(t *testing.T, ev *bridge.TEENetBtcBridgeRedeemPrepared, 
 
 func checkRequestedEvent(t *testing.T, ev *bridge.TEENetBtcBridgeRedeemRequested, params *RequestParams) {
 	assert.Equal(t, ev.Sender.String(), params.Auth.From.String())
-	assert.Equal(t, ev.Amount, big.NewInt(int64(params.Amount)))
+	assert.Equal(t, ev.Amount, params.Amount)
 	assert.Equal(t, ev.Receiver, string(params.Receiver))
 }
