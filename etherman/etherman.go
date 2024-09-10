@@ -2,6 +2,7 @@ package etherman
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"strings"
 
@@ -47,7 +48,6 @@ type Etherman struct {
 func NewEtherman(cfg *Config) (*Etherman, error) {
 	ethClient, err := ethclient.Dial(cfg.URL)
 	if err != nil {
-		log.Errorf("error connecting to %s: %+v", cfg.URL, err)
 		return nil, err
 	}
 
@@ -64,7 +64,6 @@ func (etherman *Etherman) GetLatestFinalizedBlockNumber() (*big.Int, error) {
 		log.Debug("call GetLatestFinalizedBlockNumber in DEBUG mode")
 		blk, err := etherman.ethClient.BlockByNumber(context.Background(), nil)
 		if err != nil {
-			log.Errorf("error getting latest block: %+v", err)
 			return nil, err
 		}
 		return blk.Number(), nil
@@ -72,8 +71,7 @@ func (etherman *Etherman) GetLatestFinalizedBlockNumber() (*big.Int, error) {
 
 	blk, err := etherman.ethClient.BlockByNumber(context.Background(), big.NewInt(-3))
 	if err != nil {
-		log.Errorf("error getting latest finalized block: %+v", err)
-		return &big.Int{}, nil
+		return nil, err
 	}
 	return blk.Number(), nil
 }
@@ -90,7 +88,6 @@ func (etherman *Etherman) GetEventMinted(blockNum *big.Int) (
 		Addresses: []common.Address{etherman.bridgeAddress},
 	})
 	if err != nil {
-		log.Errorf("error getting logs: %+v", err)
 		return nil, nil, nil, err
 	}
 
@@ -100,7 +97,6 @@ func (etherman *Etherman) GetEventMinted(blockNum *big.Int) (
 
 	bridgeABI, err := abi.JSON(strings.NewReader(bridge.TEENetBtcBridgeABI))
 	if err != nil {
-		log.Errorf("error parsing ABI: %+v", err)
 		return nil, nil, nil, err
 	}
 
@@ -114,7 +110,6 @@ func (etherman *Etherman) GetEventMinted(blockNum *big.Int) (
 			ev := new(bridge.TEENetBtcBridgeMinted)
 			err = bridgeABI.UnpackIntoInterface(ev, "Minted", vlog.Data)
 			if err != nil {
-				log.Errorf("error unpacking Minted event: %+v", err)
 				return nil, nil, nil, err
 			}
 			copy(ev.BtcTxId[:], vlog.Topics[1].Bytes())
@@ -123,7 +118,6 @@ func (etherman *Etherman) GetEventMinted(blockNum *big.Int) (
 			ev := new(bridge.TEENetBtcBridgeRedeemRequested)
 			err = bridgeABI.UnpackIntoInterface(ev, "RedeemRequested", vlog.Data)
 			if err != nil {
-				log.Errorf("error unpacking RedeemRequested event: %+v", err)
 				return nil, nil, nil, err
 			}
 			redeemRequested = append(redeemRequested, *ev)
@@ -131,13 +125,12 @@ func (etherman *Etherman) GetEventMinted(blockNum *big.Int) (
 			ev := new(bridge.TEENetBtcBridgeRedeemPrepared)
 			err = bridgeABI.UnpackIntoInterface(ev, "RedeemPrepared", vlog.Data)
 			if err != nil {
-				log.Errorf("error unpacking RedeemPrepared event: %+v", err)
 				return nil, nil, nil, err
 			}
 			copy(ev.EthTxHash[:], vlog.Topics[1].Bytes())
 			redeemPrepared = append(redeemPrepared, *ev)
 		default:
-			log.Errorf("unknown event: %+v", vlog.Topics[0])
+			return nil, nil, nil, fmt.Errorf("unknown event: %+v", vlog.Topics[0])
 		}
 	}
 
@@ -147,7 +140,6 @@ func (etherman *Etherman) GetEventMinted(blockNum *big.Int) (
 func (etherman *Etherman) Mint(params *MintParams) error {
 	contract, err := etherman.getBridgeContract()
 	if err != nil {
-		log.Errorf("failed to get bridge contract: %+v", err)
 		return err
 	}
 
@@ -158,7 +150,6 @@ func (etherman *Etherman) Mint(params *MintParams) error {
 
 	_, err = contract.Mint(params.Auth, btcTxId, receiver, params.Amount, rx, s)
 	if err != nil {
-		log.Errorf("failed to mint: %+v", err)
 		return err
 	}
 
@@ -168,7 +159,6 @@ func (etherman *Etherman) Mint(params *MintParams) error {
 func (etherman *Etherman) RedeemRequest(params *RequestParams) error {
 	contract, err := etherman.getBridgeContract()
 	if err != nil {
-		log.Errorf("failed to get bridge contract: %+v", err)
 		return err
 	}
 
@@ -176,7 +166,6 @@ func (etherman *Etherman) RedeemRequest(params *RequestParams) error {
 
 	_, err = contract.RedeemRequest(params.Auth, params.Amount, receiver)
 	if err != nil {
-		log.Errorf("failed to redeem requested: %+v", err)
 		return err
 	}
 
@@ -186,7 +175,6 @@ func (etherman *Etherman) RedeemRequest(params *RequestParams) error {
 func (etherman *Etherman) RedeemPrepare(params *PrepareParams) error {
 	contract, err := etherman.getBridgeContract()
 	if err != nil {
-		log.Errorf("failed to get bridge contract: %+v", err)
 		return err
 	}
 
@@ -211,7 +199,6 @@ func (etherman *Etherman) RedeemPrepare(params *PrepareParams) error {
 		s,
 	)
 	if err != nil {
-		log.Errorf("failed to redeem prepared: %+v", err)
 		return err
 	}
 
@@ -221,13 +208,11 @@ func (etherman *Etherman) RedeemPrepare(params *PrepareParams) error {
 func (etherman *Etherman) TWBTCAddress() (common.Address, error) {
 	contract, err := etherman.getBridgeContract()
 	if err != nil {
-		log.Errorf("failed to get bridge contract: %+v", err)
 		return common.Address{}, err
 	}
 
 	twbtcAddr, err := contract.Twbtc(nil)
 	if err != nil {
-		log.Errorf("failed to get TWBTC address: %+v", err)
 		return common.Address{}, err
 	}
 
@@ -237,13 +222,11 @@ func (etherman *Etherman) TWBTCAddress() (common.Address, error) {
 func (etherman *Etherman) TWBTCBalanceOf(addr common.Address) (*big.Int, error) {
 	contract, err := etherman.getTWBTCContract()
 	if err != nil {
-		log.Errorf("failed to get TWBTC contract: %+v", err)
 		return nil, err
 	}
 
 	balance, err := contract.BalanceOf(nil, addr)
 	if err != nil {
-		log.Errorf("failed to get TWBTC balance: %+v", err)
 		return nil, err
 	}
 
@@ -253,13 +236,11 @@ func (etherman *Etherman) TWBTCBalanceOf(addr common.Address) (*big.Int, error) 
 func (etherman *Etherman) TWBTCApprove(auth *bind.TransactOpts, amount *big.Int) error {
 	contract, err := etherman.getTWBTCContract()
 	if err != nil {
-		log.Errorf("failed to get TWBTC contract: %+v", err)
 		return err
 	}
 
 	_, err = contract.Approve(auth, etherman.bridgeAddress, amount)
 	if err != nil {
-		log.Errorf("failed to approve TWBTC: %+v", err)
 		return err
 	}
 
@@ -269,13 +250,11 @@ func (etherman *Etherman) TWBTCApprove(auth *bind.TransactOpts, amount *big.Int)
 func (etherman *Etherman) TWBTCAllowance(owner common.Address) (*big.Int, error) {
 	contract, err := etherman.getTWBTCContract()
 	if err != nil {
-		log.Errorf("failed to get TWBTC contract: %+v", err)
 		return nil, err
 	}
 
 	allowance, err := contract.Allowance(nil, owner, etherman.bridgeAddress)
 	if err != nil {
-		log.Errorf("failed to get TWBTC allowance: %+v", err)
 		return nil, err
 	}
 
