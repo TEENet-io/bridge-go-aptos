@@ -76,7 +76,7 @@ func (etherman *Etherman) GetLatestFinalizedBlockNumber() (*big.Int, error) {
 	return blk.Number(), nil
 }
 
-func (etherman *Etherman) GetEventMinted(blockNum *big.Int) (
+func (etherman *Etherman) GetEventLogs(blockNum *big.Int) (
 	[]bridge.TEENetBtcBridgeMinted,
 	[]bridge.TEENetBtcBridgeRedeemRequested,
 	[]bridge.TEENetBtcBridgeRedeemPrepared,
