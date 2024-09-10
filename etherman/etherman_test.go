@@ -22,7 +22,7 @@ var btcAddrs = []string{
 type testEnv struct {
 	sim      *SimulatedChain
 	sk       *btcec.PrivateKey
-	etherman *Client
+	etherman *Etherman
 }
 
 type paramConfig struct {
@@ -47,7 +47,7 @@ func newTestEnv(t *testing.T) *testEnv {
 	assert.NoError(t, err)
 	assert.Equal(t, pk, _pk)
 
-	etherman := &Client{
+	etherman := &Etherman{
 		ethClient:     sim.Backend.Client(),
 		bridgeAddress: address,
 	}
@@ -161,7 +161,7 @@ func TestMint(t *testing.T) {
 }
 
 func TestGetLatestFinalizedBlockNumber(t *testing.T) {
-	etherman, err := NewClient(&Config{
+	etherman, err := NewEtherman(&Config{
 		URL:                   "https://mainnet.infura.io/v3/f37af697a9dd4cbfa7e22aaacce33e50",
 		BridgeContractAddress: "0x0000000000000000000000000000000000000000",
 	})
@@ -171,6 +171,25 @@ func TestGetLatestFinalizedBlockNumber(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, b)
 	assert.NotZero(t, b)
+}
+
+func TestDebugGetLatestFinalizedBlockNumber(t *testing.T) {
+	env := newTestEnv(t)
+	etherman := env.etherman
+
+	debug = true
+
+	b, err := etherman.GetLatestFinalizedBlockNumber()
+	assert.NoError(t, err)
+	assert.Equal(t, b, big.NewInt(1))
+
+	env.sim.Backend.Commit()
+
+	b, err = etherman.GetLatestFinalizedBlockNumber()
+	assert.NoError(t, err)
+	assert.Equal(t, b, big.NewInt(2))
+
+	debug = false
 }
 
 func prepareMintParams(t *testing.T, env *testEnv, cfg *paramConfig) *MintParams {
