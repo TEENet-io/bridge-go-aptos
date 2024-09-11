@@ -1,7 +1,5 @@
 package etherman
 
-var debug = false
-
 type Config struct {
 	// URL is the URL of the Ethereum node
 	URL string
