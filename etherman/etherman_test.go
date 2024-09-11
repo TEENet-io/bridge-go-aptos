@@ -2,75 +2,35 @@ package etherman
 
 import (
 	"context"
-	"crypto/rand"
 	"math/big"
 	"testing"
 
+	logger "github.com/0xPolygonHermez/zkevm-node/log"
 	"github.com/TEENet-io/bridge-go/common"
 	bridge "github.com/TEENet-io/bridge-go/contracts/TEENetBtcBridge"
-	"github.com/btcsuite/btcd/btcec/v2"
 	ethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/assert"
 )
 
-var btcAddrs = []string{
-	"1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
-	"1HLoD9E4SDFFPDiYfNYnkBLQ85Y51J3Zb1",
-	"1FvzCLoTPGANNjLgEB5D7e4JZCZ3fK5cP1",
-}
-
-type testEnv struct {
-	sim      *SimulatedChain
-	sk       *btcec.PrivateKey
-	etherman *Etherman
-}
-
-type paramConfig struct {
-	deployer  int
-	receiver  int
-	sender    int
-	requester int
-
-	amount *big.Int
-}
-
-func newTestEnv(t *testing.T) *testEnv {
-	sim := NewSimulatedChain()
-	sk, err := btcec.NewPrivateKey()
-	assert.NoError(t, err)
-
-	pk := sk.PubKey().X()
-	address, _, contract, err := bridge.DeployTEENetBtcBridge(sim.Accounts[0], sim.Backend.Client(), pk)
-	assert.NoError(t, err)
-	sim.Backend.Commit()
-
-	_pk, err := contract.Pk(nil)
-	assert.NoError(t, err)
-	assert.Equal(t, pk, _pk)
-
-	etherman := &Etherman{
-		ethClient:     sim.Backend.Client(),
-		bridgeAddress: address,
+func TestGetEventLogs(t *testing.T) {
+	env := NewTestEnv()
+	if env == nil {
+		t.Fatal("failed to create test environment")
 	}
+	sim := env.Sim
+	etherman := env.Etherman
 
-	return &testEnv{
-		sim:      sim,
-		sk:       sk,
-		etherman: etherman,
+	mintParams := env.GenMintParams(&ParamConfig{Deployer: 0, Receiver: 1, Amount: big.NewInt(100)})
+	if mintParams == nil {
+		t.Fatal("failed to generate mint params")
 	}
-}
-
-func TestGetEventMinted(t *testing.T) {
-	env := newTestEnv(t)
-	sim := env.sim
-	etherman := env.etherman
-
-	mintParams := prepareMintParams(t, env, &paramConfig{deployer: 0, receiver: 1, amount: big.NewInt(100)})
 	err := etherman.Mint(mintParams)
 	assert.NoError(t, err)
 
-	prepareParams := prepparePrepareParams(t, env, &paramConfig{sender: 3, requester: 4, amount: big.NewInt(400)})
+	prepareParams := env.GenPrepareParams(&ParamConfig{Sender: 3, Requester: 4, Amount: big.NewInt(400)})
+	if prepareParams == nil {
+		t.Fatal("failed to generate prepare params")
+	}
 	err = etherman.RedeemPrepare(prepareParams)
 	assert.NoError(t, err)
 	sim.Backend.Commit()
@@ -90,7 +50,10 @@ func TestGetEventMinted(t *testing.T) {
 	assert.NoError(t, err)
 	sim.Backend.Commit()
 
-	requestParams := prepareRequestParams(env, &paramConfig{sender: 1, amount: big.NewInt(80)})
+	requestParams := env.GenRequestParams(&ParamConfig{Sender: 1, Amount: big.NewInt(80)})
+	if requestParams == nil {
+		t.Fatal("failed to generate request params")
+	}
 	err = etherman.RedeemRequest(requestParams)
 	assert.NoError(t, err)
 	sim.Backend.Commit()
@@ -106,23 +69,35 @@ func TestGetEventMinted(t *testing.T) {
 }
 
 func TestRedeemPrepare(t *testing.T) {
-	env := newTestEnv(t)
-	sim := env.sim
-	etherman := env.etherman
+	env := NewTestEnv()
+	if env == nil {
+		t.Fatal("failed to create test environment")
+	}
+	sim := env.Sim
+	etherman := env.Etherman
 
-	params := prepparePrepareParams(t, env, &paramConfig{sender: 0, requester: 1, amount: big.NewInt(100)})
+	params := env.GenPrepareParams(&ParamConfig{Sender: 0, Requester: 1, Amount: big.NewInt(100)})
+	if params == nil {
+		t.Fatal("failed to generate prepare params")
+	}
 	err := etherman.RedeemPrepare(params)
 	assert.NoError(t, err)
 	sim.Backend.Commit()
 }
 
 func TestRedeemRequest(t *testing.T) {
-	env := newTestEnv(t)
-	sim := env.sim
-	etherman := env.etherman
+	env := NewTestEnv()
+	if env == nil {
+		t.Fatal("failed to create test environment")
+	}
+	sim := env.Sim
+	etherman := env.Etherman
 
 	// Mint tokens
-	minParams := prepareMintParams(t, env, &paramConfig{deployer: 0, receiver: 1, amount: big.NewInt(100)})
+	minParams := env.GenMintParams(&ParamConfig{Deployer: 0, Receiver: 1, Amount: big.NewInt(100)})
+	if minParams == nil {
+		t.Fatal("failed to generate mint params")
+	}
 	err := etherman.Mint(minParams)
 	assert.NoError(t, err)
 	sim.Backend.Commit()
@@ -137,7 +112,10 @@ func TestRedeemRequest(t *testing.T) {
 	assert.Equal(t, big.NewInt(80), allowance)
 
 	// Request redeem
-	requestParams := prepareRequestParams(env, &paramConfig{sender: 1, amount: big.NewInt(80)})
+	requestParams := env.GenRequestParams(&ParamConfig{Sender: 1, Amount: big.NewInt(80)})
+	if requestParams == nil {
+		t.Fatal("failed to generate request params")
+	}
 	err = etherman.RedeemRequest(requestParams)
 	assert.NoError(t, err)
 	sim.Backend.Commit()
@@ -148,11 +126,17 @@ func TestRedeemRequest(t *testing.T) {
 }
 
 func TestMint(t *testing.T) {
-	env := newTestEnv(t)
-	sim := env.sim
-	etherman := env.etherman
+	env := NewTestEnv()
+	if env == nil {
+		t.Fatal("failed to create test environment")
+	}
+	sim := env.Sim
+	etherman := env.Etherman
 
-	params := prepareMintParams(t, env, &paramConfig{deployer: 0, receiver: 1, amount: big.NewInt(100)})
+	params := env.GenMintParams(&ParamConfig{Deployer: 0, Receiver: 1, Amount: big.NewInt(100)})
+	if params == nil {
+		t.Fatal("failed to generate mint params")
+	}
 	err := etherman.Mint(params)
 	assert.NoError(t, err)
 	sim.Backend.Commit()
@@ -176,99 +160,32 @@ func TestGetLatestFinalizedBlockNumber(t *testing.T) {
 }
 
 func TestDebugGetLatestFinalizedBlockNumber(t *testing.T) {
-	env := newTestEnv(t)
-	etherman := env.etherman
+	env := NewTestEnv()
+	if env == nil {
+		t.Fatal("failed to create test environment")
+	}
+	etherman := env.Etherman
 
-	debug = true
+	common.Debug = true
+	logger.Debug("DEBUG ON")
+	defer func() {
+		common.Debug = false
+		logger.Debug("DEBUG OFF")
+	}()
 
 	b, err := etherman.GetLatestFinalizedBlockNumber()
 	assert.NoError(t, err)
 	assert.Equal(t, b, big.NewInt(1))
 
-	env.sim.Backend.Commit()
+	env.Sim.Backend.Commit()
 
 	b, err = etherman.GetLatestFinalizedBlockNumber()
 	assert.NoError(t, err)
 	assert.Equal(t, b, big.NewInt(2))
-
-	debug = false
 }
 
-func prepareMintParams(t *testing.T, env *testEnv, cfg *paramConfig) *MintParams {
-	sim := env.sim
-	sk := env.sk
-
-	btcTxIdBytes := make([]byte, 32)
-	n, err := rand.Read(btcTxIdBytes)
-	assert.NoError(t, err)
-	assert.Equal(t, 32, n)
-
-	btcTxId := "0x" + ethcommon.Bytes2Hex(btcTxIdBytes)
-	receiver := sim.Accounts[cfg.receiver].From.String()
-
-	msg := crypto.Keccak256Hash(common.EncodePacked(btcTxId, receiver, cfg.amount)).Bytes()
-	rxBigInt, sBigInt, err := Sign(sk, msg[:])
-	assert.NoError(t, err)
-	rx := "0x" + rxBigInt.Text(16)
-	s := "0x" + sBigInt.Text(16)
-
-	return &MintParams{
-		Auth:     sim.Accounts[cfg.deployer],
-		BtcTxId:  Bytes32Hex(btcTxId),
-		Amount:   cfg.amount,
-		Receiver: AddressHex(receiver),
-		Rx:       Bytes32Hex(rx),
-		S:        Bytes32Hex(s),
-	}
-}
-
-func prepareRequestParams(env *testEnv, cfg *paramConfig) *RequestParams {
-	return &RequestParams{
-		Auth:     env.sim.Accounts[cfg.sender],
-		Amount:   cfg.amount,
-		Receiver: BTCAddress(btcAddrs[0]),
-	}
-}
-
-func prepparePrepareParams(t *testing.T, env *testEnv, cfg *paramConfig) *PrepareParams {
-	txHash := randBytes32Hex(t)
-	requester := env.sim.Accounts[cfg.requester].From.String()
-	outpointTxIdsStr := []string{randBytes32Hex(t), randBytes32Hex(t)}
-	outpointTxIndices := []*big.Int{big.NewInt(0), big.NewInt(1)}
-
-	msg := crypto.Keccak256Hash(common.EncodePacked(txHash, requester, cfg.amount, outpointTxIdsStr, outpointTxIndices)).Bytes()
-	rxBigInt, sBigInt, err := Sign(env.sk, msg[:])
-	assert.NoError(t, err)
-	rx := "0x" + rxBigInt.Text(16)
-	s := "0x" + sBigInt.Text(16)
-
-	var outpointTxIds []Bytes32Hex
-	for _, txId := range outpointTxIdsStr {
-		outpointTxIds = append(outpointTxIds, Bytes32Hex(txId))
-	}
-
-	return &PrepareParams{
-		Auth:          env.sim.Accounts[cfg.sender],
-		TxHash:        Bytes32Hex(txHash),
-		Requester:     AddressHex(requester),
-		Amount:        cfg.amount,
-		OutpointTxIds: outpointTxIds,
-		OutpointIdxs:  []uint16{0, 1},
-		Rx:            rx,
-		S:             s,
-	}
-}
-
-func randBytes32Hex(t *testing.T) string {
-	b := make([]byte, 32)
-	n, err := rand.Read(b)
-	assert.NoError(t, err)
-	assert.Equal(t, 32, n)
-	return "0x" + ethcommon.Bytes2Hex(b)
-}
-
-func curentBlockNum(t *testing.T, env *testEnv) *big.Int {
-	block, err := env.sim.Backend.Client().BlockNumber(context.Background())
+func curentBlockNum(t *testing.T, env *TestEnv) *big.Int {
+	block, err := env.Sim.Backend.Client().BlockNumber(context.Background())
 	assert.NoError(t, err)
 	return big.NewInt(int64(block))
 }
