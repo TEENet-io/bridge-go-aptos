@@ -1,10 +1,14 @@
 package etherman
 
 import (
+	"crypto/rand"
 	"math/big"
 
+	"github.com/TEENet-io/bridge-go/common"
+	bridge "github.com/TEENet-io/bridge-go/contracts/TEENetBtcBridge"
+	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/common"
+	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient/simulated"
@@ -13,6 +17,12 @@ import (
 var (
 	simulatedChainID = big.NewInt(1337)
 	blockGasLimit    = uint64(999999999999999999)
+
+	btcAddrs = []string{
+		"1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
+		"1HLoD9E4SDFFPDiYfNYnkBLQ85Y51J3Zb1",
+		"1FvzCLoTPGANNjLgEB5D7e4JZCZ3fK5cP1",
+	}
 )
 
 type SimulatedChain struct {
@@ -29,7 +39,7 @@ func NewSimulatedChain() *SimulatedChain {
 	}
 
 	// allocate funds to accounts
-	genesisAlloc := map[common.Address]types.Account{}
+	genesisAlloc := map[ethcommon.Address]types.Account{}
 	for _, account := range accounts {
 		balance, _ := new(big.Int).SetString("100000000000000000000", 10)
 		genesisAlloc[account.From] = types.Account{
@@ -50,4 +60,131 @@ func newAuth() *bind.TransactOpts {
 	sk, _ := crypto.GenerateKey()
 	auth, _ := bind.NewKeyedTransactorWithChainID(sk, simulatedChainID)
 	return auth
+}
+
+type ParamConfig struct {
+	Deployer  int
+	Receiver  int
+	Sender    int
+	Requester int
+
+	Amount *big.Int
+}
+type TestEnv struct {
+	Sim      *SimulatedChain
+	Sk       *btcec.PrivateKey
+	Etherman *Etherman
+}
+
+func NewTestEnv() *TestEnv {
+	sim := NewSimulatedChain()
+	sk, err := btcec.NewPrivateKey()
+	if err != nil {
+		return nil
+	}
+
+	pk := sk.PubKey().X()
+	address, _, contract, err := bridge.DeployTEENetBtcBridge(sim.Accounts[0], sim.Backend.Client(), pk)
+	if err != nil {
+		return nil
+	}
+	sim.Backend.Commit()
+
+	_pk, err := contract.Pk(nil)
+	if err != nil {
+		return nil
+	}
+	if pk.Cmp(_pk) != 0 {
+		return nil
+	}
+
+	etherman := &Etherman{
+		ethClient:     sim.Backend.Client(),
+		bridgeAddress: address,
+	}
+
+	return &TestEnv{
+		Sim:      sim,
+		Sk:       sk,
+		Etherman: etherman,
+	}
+}
+
+func (env *TestEnv) GenMintParams(cfg *ParamConfig) *MintParams {
+	sim := env.Sim
+	sk := env.Sk
+
+	btcTxIdBytes := make([]byte, 32)
+	n, err := rand.Read(btcTxIdBytes)
+	if err != nil {
+		return nil
+	}
+	if n != 32 {
+		return nil
+	}
+
+	btcTxId := "0x" + ethcommon.Bytes2Hex(btcTxIdBytes)
+	receiver := sim.Accounts[cfg.Receiver].From.String()
+
+	msg := crypto.Keccak256Hash(common.EncodePacked(btcTxId, receiver, cfg.Amount)).Bytes()
+	rxBigInt, sBigInt, err := Sign(sk, msg[:])
+	if err != nil {
+		return nil
+	}
+	rx := "0x" + rxBigInt.Text(16)
+	s := "0x" + sBigInt.Text(16)
+
+	return &MintParams{
+		Auth:     sim.Accounts[cfg.Deployer],
+		BtcTxId:  Bytes32Hex(btcTxId),
+		Amount:   cfg.Amount,
+		Receiver: AddressHex(receiver),
+		Rx:       Bytes32Hex(rx),
+		S:        Bytes32Hex(s),
+	}
+}
+
+func (env *TestEnv) GenRequestParams(cfg *ParamConfig) *RequestParams {
+	return &RequestParams{
+		Auth:     env.Sim.Accounts[cfg.Sender],
+		Amount:   cfg.Amount,
+		Receiver: BTCAddress(btcAddrs[0]),
+	}
+}
+
+func (env *TestEnv) GenPrepareParams(cfg *ParamConfig) *PrepareParams {
+	txHash := randBytes32Hex()
+	requester := env.Sim.Accounts[cfg.Requester].From.String()
+	outpointTxIdsStr := []string{randBytes32Hex(), randBytes32Hex()}
+	outpointTxIndices := []*big.Int{big.NewInt(0), big.NewInt(1)}
+
+	msg := crypto.Keccak256Hash(common.EncodePacked(txHash, requester, cfg.Amount, outpointTxIdsStr, outpointTxIndices)).Bytes()
+	rxBigInt, sBigInt, err := Sign(env.Sk, msg[:])
+	if err != nil {
+		return nil
+	}
+	rx := "0x" + rxBigInt.Text(16)
+	s := "0x" + sBigInt.Text(16)
+
+	var outpointTxIds []Bytes32Hex
+	for _, txId := range outpointTxIdsStr {
+		outpointTxIds = append(outpointTxIds, Bytes32Hex(txId))
+	}
+
+	return &PrepareParams{
+		Auth:          env.Sim.Accounts[cfg.Sender],
+		TxHash:        Bytes32Hex(txHash),
+		Requester:     AddressHex(requester),
+		Amount:        cfg.Amount,
+		OutpointTxIds: outpointTxIds,
+		OutpointIdxs:  []uint16{0, 1},
+		Rx:            rx,
+		S:             s,
+	}
+}
+
+func randBytes32Hex() string {
+	b := make([]byte, 32)
+	rand.Read(b)
+	return "0x" + ethcommon.Bytes2Hex(b)
 }

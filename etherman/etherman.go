@@ -6,13 +6,13 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/0xPolygonHermez/zkevm-node/log"
+	"github.com/TEENet-io/bridge-go/common"
 	bridge "github.com/TEENet-io/bridge-go/contracts/TEENetBtcBridge"
 	"github.com/TEENet-io/bridge-go/contracts/TWBTC"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/common"
+	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 )
@@ -40,7 +40,7 @@ type ethereumClient interface {
 
 type Etherman struct {
 	ethClient      ethereumClient
-	bridgeAddress  common.Address
+	bridgeAddress  ethcommon.Address
 	bridgeContract *bridge.TEENetBtcBridge
 	twbtcContract  *TWBTC.TWBTC
 }
@@ -53,15 +53,14 @@ func NewEtherman(cfg *Config) (*Etherman, error) {
 
 	return &Etherman{
 		ethClient:      ethClient,
-		bridgeAddress:  common.HexToAddress(cfg.BridgeContractAddress),
+		bridgeAddress:  ethcommon.HexToAddress(cfg.BridgeContractAddress),
 		bridgeContract: nil,
 		twbtcContract:  nil,
 	}, nil
 }
 
 func (etherman *Etherman) GetLatestFinalizedBlockNumber() (*big.Int, error) {
-	if debug {
-		log.Debug("call GetLatestFinalizedBlockNumber in DEBUG mode")
+	if common.Debug {
 		blk, err := etherman.ethClient.BlockByNumber(context.Background(), nil)
 		if err != nil {
 			return nil, err
@@ -85,7 +84,7 @@ func (etherman *Etherman) GetEventLogs(blockNum *big.Int) (
 	logs, err := etherman.ethClient.FilterLogs(context.Background(), ethereum.FilterQuery{
 		FromBlock: blockNum,
 		ToBlock:   blockNum,
-		Addresses: []common.Address{etherman.bridgeAddress},
+		Addresses: []ethcommon.Address{etherman.bridgeAddress},
 	})
 	if err != nil {
 		return nil, nil, nil, err
@@ -144,7 +143,7 @@ func (etherman *Etherman) Mint(params *MintParams) error {
 	}
 
 	btcTxId := HexStrToBytes32(string(params.BtcTxId))
-	receiver := common.HexToAddress(string(params.Receiver))
+	receiver := ethcommon.HexToAddress(string(params.Receiver))
 	rx := HexStrToBigInt(string(params.Rx))
 	s := HexStrToBigInt(string(params.S))
 
@@ -184,7 +183,7 @@ func (etherman *Etherman) RedeemPrepare(params *PrepareParams) error {
 	}
 
 	redeemRequestTxHash := HexStrToBytes32(string(params.TxHash))
-	requester := common.HexToAddress(string(params.Requester))
+	requester := ethcommon.HexToAddress(string(params.Requester))
 	rx := HexStrToBigInt(params.Rx)
 	s := HexStrToBigInt(params.S)
 
@@ -205,21 +204,21 @@ func (etherman *Etherman) RedeemPrepare(params *PrepareParams) error {
 	return nil
 }
 
-func (etherman *Etherman) TWBTCAddress() (common.Address, error) {
+func (etherman *Etherman) TWBTCAddress() (ethcommon.Address, error) {
 	contract, err := etherman.getBridgeContract()
 	if err != nil {
-		return common.Address{}, err
+		return ethcommon.Address{}, err
 	}
 
 	twbtcAddr, err := contract.Twbtc(nil)
 	if err != nil {
-		return common.Address{}, err
+		return ethcommon.Address{}, err
 	}
 
 	return twbtcAddr, nil
 }
 
-func (etherman *Etherman) TWBTCBalanceOf(addr common.Address) (*big.Int, error) {
+func (etherman *Etherman) TWBTCBalanceOf(addr ethcommon.Address) (*big.Int, error) {
 	contract, err := etherman.getTWBTCContract()
 	if err != nil {
 		return nil, err
@@ -247,7 +246,7 @@ func (etherman *Etherman) TWBTCApprove(auth *bind.TransactOpts, amount *big.Int)
 	return nil
 }
 
-func (etherman *Etherman) TWBTCAllowance(owner common.Address) (*big.Int, error) {
+func (etherman *Etherman) TWBTCAllowance(owner ethcommon.Address) (*big.Int, error) {
 	contract, err := etherman.getTWBTCContract()
 	if err != nil {
 		return nil, err
