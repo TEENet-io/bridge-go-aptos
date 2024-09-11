@@ -1,4 +1,4 @@
-package etherman
+package common
 
 import (
 	"math/big"
