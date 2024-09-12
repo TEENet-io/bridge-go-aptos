@@ -13,7 +13,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	ethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 )
@@ -77,9 +76,9 @@ func (etherman *Etherman) GetLatestFinalizedBlockNumber() (*big.Int, error) {
 }
 
 func (etherman *Etherman) GetEventLogs(blockNum *big.Int) (
-	map[string]*MintedEvent,
-	map[string]*RedeemRequestedEvent,
-	map[string]*RedeemPreparedEvent,
+	[]MintedEvent,
+	[]RedeemRequestedEvent,
+	[]RedeemPreparedEvent,
 	error,
 ) {
 	logs, err := etherman.ethClient.FilterLogs(context.Background(), ethereum.FilterQuery{
@@ -100,9 +99,9 @@ func (etherman *Etherman) GetEventLogs(blockNum *big.Int) (
 		return nil, nil, nil, err
 	}
 
-	minted := make(map[string]*MintedEvent)
-	redeemRequested := make(map[string]*RedeemRequestedEvent)
-	redeemPrepared := make(map[string]*RedeemPreparedEvent)
+	minted := make([]MintedEvent, 0, len(logs))
+	redeemRequested := make([]RedeemRequestedEvent, 0, len(logs))
+	redeemPrepared := make([]RedeemPreparedEvent, 0, len(logs))
 
 	for _, vlog := range logs {
 		switch vlog.Topics[0] {
@@ -113,15 +112,14 @@ func (etherman *Etherman) GetEventLogs(blockNum *big.Int) (
 				return nil, nil, nil, err
 			}
 			copy(ev.BtcTxId[:], vlog.Topics[1].Bytes())
-			minted[ethcommon.Bytes2Hex(ev.BtcTxId[:])] = ev
+			minted = append(minted, *ev)
 		case RedeemRequestedSignatureHash:
 			ev := new(RedeemRequestedEvent)
 			err = bridgeABI.UnpackIntoInterface(ev, "RedeemRequested", vlog.Data)
 			if err != nil {
 				return nil, nil, nil, err
 			}
-			copy(ev.TxHash[:], vlog.TxHash.Bytes())
-			redeemRequested[ethcommon.Bytes2Hex(vlog.TxHash.Bytes())] = ev
+			redeemRequested = append(redeemRequested, *ev)
 		case RedeemPreparedSignatureHash:
 			ev := new(RedeemPreparedEvent)
 			err = bridgeABI.UnpackIntoInterface(ev, "RedeemPrepared", vlog.Data)
@@ -129,7 +127,7 @@ func (etherman *Etherman) GetEventLogs(blockNum *big.Int) (
 				return nil, nil, nil, err
 			}
 			copy(ev.EthTxHash[:], vlog.Topics[1].Bytes())
-			redeemPrepared[ethcommon.Bytes2Hex(ev.EthTxHash[:])] = ev
+			redeemPrepared = append(redeemPrepared, *ev)
 		default:
 			return nil, nil, nil, fmt.Errorf("unknown event: %+v", vlog.Topics[0])
 		}
@@ -138,62 +136,60 @@ func (etherman *Etherman) GetEventLogs(blockNum *big.Int) (
 	return minted, redeemRequested, redeemPrepared, nil
 }
 
-func (etherman *Etherman) Mint(params *MintParams) (*types.Transaction, error) {
+func (etherman *Etherman) Mint(params *MintParams) error {
 	contract, err := etherman.getBridgeContract()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	tx, err := contract.Mint(
-		params.Auth,
-		params.BtcTxId,
-		params.Receiver,
-		params.Amount,
-		params.Rx,
-		params.S,
-	)
+	_, err = contract.Mint(params.Auth, params.BtcTxId, params.Receiver, params.Amount, params.Rx, params.S)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return tx, nil
+	return nil
 }
 
-func (etherman *Etherman) RedeemRequest(params *RequestParams) (*types.Transaction, error) {
+func (etherman *Etherman) RedeemRequest(params *RequestParams) error {
 	contract, err := etherman.getBridgeContract()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	tx, err := contract.RedeemRequest(params.Auth, params.Amount, string(params.Receiver))
+	_, err = contract.RedeemRequest(params.Auth, params.Amount, string(params.Receiver))
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return tx, nil
+	return nil
 }
 
-func (etherman *Etherman) RedeemPrepare(params *PrepareParams) (*types.Transaction, error) {
+func (etherman *Etherman) RedeemPrepare(params *PrepareParams) error {
 	contract, err := etherman.getBridgeContract()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	tx, err := contract.RedeemPrepare(
+	var outpointTxIds [][32]byte
+	for _, txId := range params.OutpointTxIds {
+		outpointTxIds = append(outpointTxIds, txId)
+	}
+
+	_, err = contract.RedeemPrepare(
 		params.Auth,
 		params.TxHash,
 		params.Requester,
 		params.Amount,
-		params.OutpointTxIds,
+		outpointTxIds,
 		params.OutpointIdxs,
 		params.Rx,
 		params.S,
 	)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return tx, nil
+	return nil
 }
 
 func (etherman *Etherman) TWBTCAddress() (ethcommon.Address, error) {
