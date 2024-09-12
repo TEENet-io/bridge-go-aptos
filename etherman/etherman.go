@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	ethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 )
@@ -119,6 +120,7 @@ func (etherman *Etherman) GetEventLogs(blockNum *big.Int) (
 			if err != nil {
 				return nil, nil, nil, err
 			}
+			copy(ev.TxHash[:], vlog.TxHash.Bytes())
 			redeemRequested = append(redeemRequested, *ev)
 		case RedeemPreparedSignatureHash:
 			ev := new(RedeemPreparedEvent)
@@ -136,60 +138,55 @@ func (etherman *Etherman) GetEventLogs(blockNum *big.Int) (
 	return minted, redeemRequested, redeemPrepared, nil
 }
 
-func (etherman *Etherman) Mint(params *MintParams) error {
+func (etherman *Etherman) Mint(params *MintParams) (*types.Transaction, error) {
 	contract, err := etherman.getBridgeContract()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	_, err = contract.Mint(params.Auth, params.BtcTxId, params.Receiver, params.Amount, params.Rx, params.S)
+	tx, err := contract.Mint(params.Auth, params.BtcTxId, params.Receiver, params.Amount, params.Rx, params.S)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return tx, nil
 }
 
-func (etherman *Etherman) RedeemRequest(params *RequestParams) error {
+func (etherman *Etherman) RedeemRequest(params *RequestParams) (*types.Transaction, error) {
 	contract, err := etherman.getBridgeContract()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	_, err = contract.RedeemRequest(params.Auth, params.Amount, string(params.Receiver))
+	tx, err := contract.RedeemRequest(params.Auth, params.Amount, string(params.Receiver))
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return tx, nil
 }
 
-func (etherman *Etherman) RedeemPrepare(params *PrepareParams) error {
+func (etherman *Etherman) RedeemPrepare(params *PrepareParams) (*types.Transaction, error) {
 	contract, err := etherman.getBridgeContract()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	var outpointTxIds [][32]byte
-	for _, txId := range params.OutpointTxIds {
-		outpointTxIds = append(outpointTxIds, txId)
-	}
-
-	_, err = contract.RedeemPrepare(
+	tx, err := contract.RedeemPrepare(
 		params.Auth,
 		params.TxHash,
 		params.Requester,
 		params.Amount,
-		outpointTxIds,
+		params.OutpointTxIds,
 		params.OutpointIdxs,
 		params.Rx,
 		params.S,
 	)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return tx, nil
 }
 
 func (etherman *Etherman) TWBTCAddress() (ethcommon.Address, error) {
