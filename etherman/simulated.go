@@ -114,33 +114,26 @@ func (env *TestEnv) GenMintParams(cfg *ParamConfig) *MintParams {
 	sim := env.Sim
 	sk := env.Sk
 
-	btcTxIdBytes := make([]byte, 32)
-	n, err := rand.Read(btcTxIdBytes)
+	btcTxId, err := randBytes32()
 	if err != nil {
 		return nil
 	}
-	if n != 32 {
-		return nil
-	}
 
-	btcTxId := "0x" + ethcommon.Bytes2Hex(btcTxIdBytes)
-	receiver := sim.Accounts[cfg.Receiver].From.String()
+	receiver := sim.Accounts[cfg.Receiver].From
 
-	msg := crypto.Keccak256Hash(common.EncodePacked(btcTxId, receiver, cfg.Amount)).Bytes()
-	rxBigInt, sBigInt, err := Sign(sk, msg[:])
+	msg := crypto.Keccak256Hash(common.EncodePacked(btcTxId, receiver.String(), cfg.Amount)).Bytes()
+	rx, s, err := Sign(sk, msg[:])
 	if err != nil {
 		return nil
 	}
-	rx := "0x" + rxBigInt.Text(16)
-	s := "0x" + sBigInt.Text(16)
 
 	return &MintParams{
 		Auth:     sim.Accounts[cfg.Deployer],
-		BtcTxId:  Bytes32Hex(btcTxId),
+		BtcTxId:  btcTxId,
 		Amount:   cfg.Amount,
-		Receiver: AddressHex(receiver),
-		Rx:       Bytes32Hex(rx),
-		S:        Bytes32Hex(s),
+		Receiver: receiver,
+		Rx:       rx,
+		S:        s,
 	}
 }
 
@@ -153,28 +146,31 @@ func (env *TestEnv) GenRequestParams(cfg *ParamConfig) *RequestParams {
 }
 
 func (env *TestEnv) GenPrepareParams(cfg *ParamConfig) *PrepareParams {
-	txHash := randBytes32Hex()
-	requester := env.Sim.Accounts[cfg.Requester].From.String()
-	outpointTxIdsStr := []string{randBytes32Hex(), randBytes32Hex()}
-	outpointTxIndices := []*big.Int{big.NewInt(0), big.NewInt(1)}
-
-	msg := crypto.Keccak256Hash(common.EncodePacked(txHash, requester, cfg.Amount, outpointTxIdsStr, outpointTxIndices)).Bytes()
-	rxBigInt, sBigInt, err := Sign(env.Sk, msg[:])
+	txHash, err := randBytes32()
 	if err != nil {
 		return nil
 	}
-	rx := "0x" + rxBigInt.Text(16)
-	s := "0x" + sBigInt.Text(16)
+	requester := env.Sim.Accounts[cfg.Requester].From
+	outpointTxIds := [][32]byte{}
+	for i := 0; i < 2; i++ {
+		txId, err := randBytes32()
+		if err != nil {
+			return nil
+		}
+		outpointTxIds = append(outpointTxIds, txId)
+	}
+	outpointTxIndices := []*big.Int{big.NewInt(0), big.NewInt(1)}
 
-	var outpointTxIds []Bytes32Hex
-	for _, txId := range outpointTxIdsStr {
-		outpointTxIds = append(outpointTxIds, Bytes32Hex(txId))
+	msg := crypto.Keccak256Hash(common.EncodePacked(txHash, requester.String(), cfg.Amount, outpointTxIds, outpointTxIndices)).Bytes()
+	rx, s, err := Sign(env.Sk, msg[:])
+	if err != nil {
+		return nil
 	}
 
 	return &PrepareParams{
 		Auth:          env.Sim.Accounts[cfg.Sender],
-		TxHash:        Bytes32Hex(txHash),
-		Requester:     AddressHex(requester),
+		TxHash:        txHash,
+		Requester:     requester,
 		Amount:        cfg.Amount,
 		OutpointTxIds: outpointTxIds,
 		OutpointIdxs:  []uint16{0, 1},
@@ -183,8 +179,16 @@ func (env *TestEnv) GenPrepareParams(cfg *ParamConfig) *PrepareParams {
 	}
 }
 
-func randBytes32Hex() string {
-	b := make([]byte, 32)
-	rand.Read(b)
-	return "0x" + ethcommon.Bytes2Hex(b)
+func randBytes32() ([32]byte, error) {
+	var b [32]byte
+	n, err := rand.Read(b[:])
+
+	if err != nil {
+		return [32]byte{}, err
+	}
+	if n != 32 {
+		return [32]byte{}, err
+	}
+
+	return b, nil
 }

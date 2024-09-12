@@ -17,6 +17,10 @@ func EncodePacked(values ...interface{}) []byte {
 			res = append(res, encodeString(v))
 		case []byte:
 			res = append(res, v)
+		case [32]byte:
+			res = append(res, v[:])
+		case [][32]byte:
+			res = append(res, encodeBytes32Array(v))
 		case *big.Int:
 			res = append(res, math.U256Bytes(v))
 		case []string:
@@ -25,6 +29,15 @@ func EncodePacked(values ...interface{}) []byte {
 			res = append(res, encodeBigIntArray(v))
 		}
 	}
+	return bytes.Join(res, nil)
+}
+
+func encodeBytes32Array(arr [][32]byte) []byte {
+	var res [][]byte
+	for _, v := range arr {
+		res = append(res, v[:])
+	}
+
 	return bytes.Join(res, nil)
 }
 
