@@ -7,6 +7,7 @@ import (
 
 	logger "github.com/0xPolygonHermez/zkevm-node/log"
 	"github.com/TEENet-io/bridge-go/common"
+	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -22,14 +23,14 @@ func TestGetEventLogs(t *testing.T) {
 	if mintParams == nil {
 		t.Fatal("failed to generate mint params")
 	}
-	err := etherman.Mint(mintParams)
+	_, err := etherman.Mint(mintParams)
 	assert.NoError(t, err)
 
 	prepareParams := env.GenPrepareParams(&ParamConfig{Sender: 3, Requester: 4, Amount: big.NewInt(400)})
 	if prepareParams == nil {
 		t.Fatal("failed to generate prepare params")
 	}
-	err = etherman.RedeemPrepare(prepareParams)
+	_, err = etherman.RedeemPrepare(prepareParams)
 	assert.NoError(t, err)
 	sim.Backend.Commit()
 
@@ -41,8 +42,13 @@ func TestGetEventLogs(t *testing.T) {
 	assert.Len(t, requested, 0)
 	assert.Len(t, prepared, 1)
 
-	checkMintedEvent(t, &minted[0], mintParams)
-	checkPreparedEvent(t, &prepared[0], prepareParams)
+	mintedKeys, mintedVals := getMapKeysValues(minted)
+	preparedKeys, preparedVals := getMapKeysValues(prepared)
+
+	assert.Equal(t, mintedKeys[0], ethcommon.Bytes2Hex(mintedVals[0].BtcTxId[:]))
+	assert.Equal(t, preparedKeys[0], ethcommon.Bytes2Hex(preparedVals[0].EthTxHash[:]))
+	checkMintedEvent(t, mintedVals[0], mintParams)
+	checkPreparedEvent(t, preparedVals[0], prepareParams)
 
 	err = etherman.TWBTCApprove(sim.Accounts[1], big.NewInt(80))
 	assert.NoError(t, err)
@@ -52,7 +58,7 @@ func TestGetEventLogs(t *testing.T) {
 	if requestParams == nil {
 		t.Fatal("failed to generate request params")
 	}
-	err = etherman.RedeemRequest(requestParams)
+	tx, err := etherman.RedeemRequest(requestParams)
 	assert.NoError(t, err)
 	sim.Backend.Commit()
 
@@ -63,7 +69,10 @@ func TestGetEventLogs(t *testing.T) {
 	assert.Len(t, requested, 1)
 	assert.Len(t, prepared, 0)
 
-	checkRequestedEvent(t, &requested[0], requestParams)
+	requestedKeys, requestedVals := getMapKeysValues(requested)
+
+	assert.Equal(t, requestedKeys[0], TrimHexPrefix(tx.Hash().String()))
+	checkRequestedEvent(t, requestedVals[0], requestParams, [32]byte(tx.Hash().Bytes()))
 }
 
 func TestRedeemPrepare(t *testing.T) {
@@ -78,7 +87,7 @@ func TestRedeemPrepare(t *testing.T) {
 	if params == nil {
 		t.Fatal("failed to generate prepare params")
 	}
-	err := etherman.RedeemPrepare(params)
+	_, err := etherman.RedeemPrepare(params)
 	assert.NoError(t, err)
 	sim.Backend.Commit()
 }
@@ -96,7 +105,7 @@ func TestRedeemRequest(t *testing.T) {
 	if minParams == nil {
 		t.Fatal("failed to generate mint params")
 	}
-	err := etherman.Mint(minParams)
+	_, err := etherman.Mint(minParams)
 	assert.NoError(t, err)
 	sim.Backend.Commit()
 
@@ -114,7 +123,7 @@ func TestRedeemRequest(t *testing.T) {
 	if requestParams == nil {
 		t.Fatal("failed to generate request params")
 	}
-	err = etherman.RedeemRequest(requestParams)
+	_, err = etherman.RedeemRequest(requestParams)
 	assert.NoError(t, err)
 	sim.Backend.Commit()
 
@@ -135,7 +144,7 @@ func TestMint(t *testing.T) {
 	if params == nil {
 		t.Fatal("failed to generate mint params")
 	}
-	err := etherman.Mint(params)
+	_, err := etherman.Mint(params)
 	assert.NoError(t, err)
 	sim.Backend.Commit()
 
@@ -206,8 +215,9 @@ func checkPreparedEvent(t *testing.T, ev *RedeemPreparedEvent, params *PreparePa
 	}
 }
 
-func checkRequestedEvent(t *testing.T, ev *RedeemRequestedEvent, params *RequestParams) {
+func checkRequestedEvent(t *testing.T, ev *RedeemRequestedEvent, params *RequestParams, txHash [32]byte) {
 	assert.Equal(t, ev.Sender.String(), params.Auth.From.String())
 	assert.Equal(t, ev.Amount, params.Amount)
 	assert.Equal(t, ev.Receiver, string(params.Receiver))
+	assert.Equal(t, ev.TxHash, txHash)
 }
