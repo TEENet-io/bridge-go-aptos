@@ -10,6 +10,48 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestIsPrepared(t *testing.T) {
+	env := NewTestEnv()
+	if env == nil {
+		t.Fatal("failed to create test environment")
+	}
+	sim := env.Sim
+	etherman := env.Etherman
+
+	params := env.GenPrepareParams(&ParamConfig{Sender: 0, Requester: 1, Amount: big.NewInt(100)})
+	if params == nil {
+		t.Fatal("failed to generate prepare params")
+	}
+	_, err := etherman.RedeemPrepare(params)
+	assert.NoError(t, err)
+	sim.Backend.Commit()
+
+	prepared, err := etherman.IsPrepared(params.TxHash)
+	assert.NoError(t, err)
+	assert.True(t, prepared)
+}
+
+func TestIsMinted(t *testing.T) {
+	env := NewTestEnv()
+	if env == nil {
+		t.Fatal("failed to create test environment")
+	}
+	sim := env.Sim
+	etherman := env.Etherman
+
+	params := env.GenMintParams(&ParamConfig{Deployer: 0, Receiver: 1, Amount: big.NewInt(100)})
+	if params == nil {
+		t.Fatal("failed to generate mint params")
+	}
+	_, err := etherman.Mint(params)
+	assert.NoError(t, err)
+	sim.Backend.Commit()
+
+	minted, err := etherman.IsMinted(params.BtcTxId)
+	assert.NoError(t, err)
+	assert.True(t, minted)
+}
+
 func TestGetEventLogs(t *testing.T) {
 	env := NewTestEnv()
 	if env == nil {

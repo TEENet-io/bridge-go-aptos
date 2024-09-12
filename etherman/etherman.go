@@ -277,3 +277,31 @@ func (etherman *Etherman) getTWBTCContract() (*TWBTC.TWBTC, error) {
 
 	return etherman.twbtcContract, nil
 }
+
+func (etherman *Etherman) IsPrepared(ethTxHash [32]byte) (bool, error) {
+	contract, err := etherman.getBridgeContract()
+	if err != nil {
+		return false, err
+	}
+
+	ok, err := contract.IsPrepared(nil, ethTxHash)
+	if err != nil {
+		return false, err
+	}
+
+	return ok, nil
+}
+
+func (etherman *Etherman) IsMinted(btcTxId [32]byte) (bool, error) {
+	contract, err := etherman.getBridgeContract()
+	if err != nil {
+		return false, err
+	}
+
+	ok, err := contract.IsMinted(nil, btcTxId)
+	if err != nil {
+		return false, err
+	}
+
+	return ok, nil
+}
