@@ -7,8 +7,6 @@ import (
 
 	logger "github.com/0xPolygonHermez/zkevm-node/log"
 	"github.com/TEENet-io/bridge-go/common"
-	bridge "github.com/TEENet-io/bridge-go/contracts/TEENetBtcBridge"
-	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -141,7 +139,7 @@ func TestMint(t *testing.T) {
 	assert.NoError(t, err)
 	sim.Backend.Commit()
 
-	balance, err := etherman.TWBTCBalanceOf(ethcommon.HexToAddress(string(params.Receiver)))
+	balance, err := etherman.TWBTCBalanceOf(params.Receiver)
 	assert.NoError(t, err)
 	assert.Equal(t, big.NewInt(100), balance)
 }
@@ -190,25 +188,25 @@ func curentBlockNum(t *testing.T, env *TestEnv) *big.Int {
 	return big.NewInt(int64(block))
 }
 
-func checkMintedEvent(t *testing.T, ev *bridge.TEENetBtcBridgeMinted, params *MintParams) {
-	assert.Equal(t, "0x"+ethcommon.Bytes2Hex(ev.BtcTxId[:]), string(params.BtcTxId))
-	assert.Equal(t, ev.Receiver.String(), string(params.Receiver))
+func checkMintedEvent(t *testing.T, ev *MintedEvent, params *MintParams) {
+	assert.Equal(t, ev.BtcTxId, params.BtcTxId)
+	assert.Equal(t, ev.Receiver.String(), params.Receiver.String())
 	assert.Equal(t, ev.Amount, params.Amount)
 }
 
-func checkPreparedEvent(t *testing.T, ev *bridge.TEENetBtcBridgeRedeemPrepared, params *PrepareParams) {
-	assert.Equal(t, "0x"+ethcommon.Bytes2Hex(ev.EthTxHash[:]), string(params.TxHash))
-	assert.Equal(t, ev.Requester.String(), string(params.Requester))
+func checkPreparedEvent(t *testing.T, ev *RedeemPreparedEvent, params *PrepareParams) {
+	assert.Equal(t, ev.EthTxHash, params.TxHash)
+	assert.Equal(t, ev.Requester.String(), params.Requester.String())
 	assert.Equal(t, ev.Amount, params.Amount)
 	for i, txId := range ev.OutpointTxIds {
-		assert.Equal(t, "0x"+ethcommon.Bytes2Hex(txId[:]), string(params.OutpointTxIds[i]))
+		assert.Equal(t, txId, params.OutpointTxIds[i])
 	}
 	for i, idx := range ev.OutpointIdxs {
 		assert.Equal(t, idx, params.OutpointIdxs[i])
 	}
 }
 
-func checkRequestedEvent(t *testing.T, ev *bridge.TEENetBtcBridgeRedeemRequested, params *RequestParams) {
+func checkRequestedEvent(t *testing.T, ev *RedeemRequestedEvent, params *RequestParams) {
 	assert.Equal(t, ev.Sender.String(), params.Auth.From.String())
 	assert.Equal(t, ev.Amount, params.Amount)
 	assert.Equal(t, ev.Receiver, string(params.Receiver))

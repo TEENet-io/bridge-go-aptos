@@ -3,19 +3,18 @@ package etherman
 import (
 	"math/big"
 
+	bridge "github.com/TEENet-io/bridge-go/contracts/TEENetBtcBridge"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
 )
-
-type Bytes32Hex string
-type AddressHex string
 
 type MintParams struct {
 	Auth     *bind.TransactOpts
-	BtcTxId  Bytes32Hex
+	BtcTxId  [32]byte
 	Amount   *big.Int
-	Receiver AddressHex
-	Rx       Bytes32Hex
-	S        Bytes32Hex
+	Receiver common.Address
+	Rx       *big.Int
+	S        *big.Int
 }
 
 type BTCAddress string
@@ -28,11 +27,24 @@ type RequestParams struct {
 
 type PrepareParams struct {
 	Auth          *bind.TransactOpts
-	TxHash        Bytes32Hex
-	Requester     AddressHex
+	TxHash        [32]byte
+	Requester     common.Address
 	Amount        *big.Int
-	OutpointTxIds []Bytes32Hex
+	OutpointTxIds [][32]byte
 	OutpointIdxs  []uint16
-	Rx            string
-	S             string
+	Rx            *big.Int
+	S             *big.Int
+}
+
+type RedeemRequestedEvent struct {
+	bridge.TEENetBtcBridgeRedeemRequested
+	TxHash [32]byte
+}
+
+type RedeemPreparedEvent struct {
+	bridge.TEENetBtcBridgeRedeemPrepared
+}
+
+type MintedEvent struct {
+	bridge.TEENetBtcBridgeMinted
 }

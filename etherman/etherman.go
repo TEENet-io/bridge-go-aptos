@@ -76,9 +76,9 @@ func (etherman *Etherman) GetLatestFinalizedBlockNumber() (*big.Int, error) {
 }
 
 func (etherman *Etherman) GetEventLogs(blockNum *big.Int) (
-	[]bridge.TEENetBtcBridgeMinted,
-	[]bridge.TEENetBtcBridgeRedeemRequested,
-	[]bridge.TEENetBtcBridgeRedeemPrepared,
+	[]MintedEvent,
+	[]RedeemRequestedEvent,
+	[]RedeemPreparedEvent,
 	error,
 ) {
 	logs, err := etherman.ethClient.FilterLogs(context.Background(), ethereum.FilterQuery{
@@ -99,14 +99,14 @@ func (etherman *Etherman) GetEventLogs(blockNum *big.Int) (
 		return nil, nil, nil, err
 	}
 
-	minted := make([]bridge.TEENetBtcBridgeMinted, 0, len(logs))
-	redeemRequested := make([]bridge.TEENetBtcBridgeRedeemRequested, 0, len(logs))
-	redeemPrepared := make([]bridge.TEENetBtcBridgeRedeemPrepared, 0, len(logs))
+	minted := make([]MintedEvent, 0, len(logs))
+	redeemRequested := make([]RedeemRequestedEvent, 0, len(logs))
+	redeemPrepared := make([]RedeemPreparedEvent, 0, len(logs))
 
 	for _, vlog := range logs {
 		switch vlog.Topics[0] {
 		case MintedSignatureHash:
-			ev := new(bridge.TEENetBtcBridgeMinted)
+			ev := new(MintedEvent)
 			err = bridgeABI.UnpackIntoInterface(ev, "Minted", vlog.Data)
 			if err != nil {
 				return nil, nil, nil, err
@@ -114,14 +114,14 @@ func (etherman *Etherman) GetEventLogs(blockNum *big.Int) (
 			copy(ev.BtcTxId[:], vlog.Topics[1].Bytes())
 			minted = append(minted, *ev)
 		case RedeemRequestedSignatureHash:
-			ev := new(bridge.TEENetBtcBridgeRedeemRequested)
+			ev := new(RedeemRequestedEvent)
 			err = bridgeABI.UnpackIntoInterface(ev, "RedeemRequested", vlog.Data)
 			if err != nil {
 				return nil, nil, nil, err
 			}
 			redeemRequested = append(redeemRequested, *ev)
 		case RedeemPreparedSignatureHash:
-			ev := new(bridge.TEENetBtcBridgeRedeemPrepared)
+			ev := new(RedeemPreparedEvent)
 			err = bridgeABI.UnpackIntoInterface(ev, "RedeemPrepared", vlog.Data)
 			if err != nil {
 				return nil, nil, nil, err
@@ -142,12 +142,7 @@ func (etherman *Etherman) Mint(params *MintParams) error {
 		return err
 	}
 
-	btcTxId := HexStrToBytes32(string(params.BtcTxId))
-	receiver := ethcommon.HexToAddress(string(params.Receiver))
-	rx := HexStrToBigInt(string(params.Rx))
-	s := HexStrToBigInt(string(params.S))
-
-	_, err = contract.Mint(params.Auth, btcTxId, receiver, params.Amount, rx, s)
+	_, err = contract.Mint(params.Auth, params.BtcTxId, params.Receiver, params.Amount, params.Rx, params.S)
 	if err != nil {
 		return err
 	}
@@ -161,9 +156,7 @@ func (etherman *Etherman) RedeemRequest(params *RequestParams) error {
 		return err
 	}
 
-	receiver := string(params.Receiver)
-
-	_, err = contract.RedeemRequest(params.Auth, params.Amount, receiver)
+	_, err = contract.RedeemRequest(params.Auth, params.Amount, string(params.Receiver))
 	if err != nil {
 		return err
 	}
@@ -179,23 +172,18 @@ func (etherman *Etherman) RedeemPrepare(params *PrepareParams) error {
 
 	var outpointTxIds [][32]byte
 	for _, txId := range params.OutpointTxIds {
-		outpointTxIds = append(outpointTxIds, HexStrToBytes32(string(txId)))
+		outpointTxIds = append(outpointTxIds, txId)
 	}
-
-	redeemRequestTxHash := HexStrToBytes32(string(params.TxHash))
-	requester := ethcommon.HexToAddress(string(params.Requester))
-	rx := HexStrToBigInt(params.Rx)
-	s := HexStrToBigInt(params.S)
 
 	_, err = contract.RedeemPrepare(
 		params.Auth,
-		redeemRequestTxHash,
-		requester,
+		params.TxHash,
+		params.Requester,
 		params.Amount,
 		outpointTxIds,
 		params.OutpointIdxs,
-		rx,
-		s,
+		params.Rx,
+		params.S,
 	)
 	if err != nil {
 		return err
