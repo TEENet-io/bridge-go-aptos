@@ -3,19 +3,30 @@ package state
 import (
 	"math/big"
 
-	bridge "github.com/TEENet-io/bridge-go/contracts/TEENetBtcBridge"
+	"github.com/TEENet-io/bridge-go/etherman"
 )
 
-type Eth2BtcStateConfig struct {
-	LastFinalizedBLock uint32
-}
-
 type Eth2BtcState interface {
-	GetLastEthFinalizedBlockNumberChannel() chan *big.Int
-	GetRedeemRequestedEventChannel() chan *bridge.TEENetBtcBridgeRedeemRequested
-	GetRedeemPreparedEventChannel() chan *bridge.TEENetBtcBridgeRedeemPrepared
+	GetLastEthFinalizedBlockNumberChannel() chan<- *big.Int
+	GetRedeemRequestedEventChannel() chan<- *etherman.RedeemRequestedEvent
+	GetRedeemPreparedEventChannel() chan<- *etherman.RedeemPreparedEvent
 }
 
 type Btc2EthState interface {
-	GetMintedEventChannel() chan *bridge.TEENetBtcBridgeMinted
+	GetMintedEventChannel() chan<- *etherman.MintedEvent
+}
+
+type JSONOutpoint struct {
+	TxId string `json:"txid"`
+	Idx  uint16 `json:"idx"`
+}
+
+type JSONRedeem struct {
+	RequestTxHash string         `json:"request_txid"`
+	PrepareTxHash string         `json:"prepare_txid"`
+	BtcTxId       string         `json:"btc_txid"`
+	Requester     string         `json:"requester"`
+	Amount        string         `json:"amount"`
+	Outpoints     []JSONOutpoint `json:"outpoints"`
+	Receiver      string         `json:"receiver"`
 }

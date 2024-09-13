@@ -7,6 +7,7 @@ require (
 	github.com/btcsuite/btcd/btcec/v2 v2.3.4
 	github.com/ethereum/go-ethereum v1.14.8
 	github.com/stretchr/testify v1.9.0
+	github.com/vechain/thor v1.7.4
 )
 
 require (
