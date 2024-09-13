@@ -5,6 +5,7 @@ import (
 	"math/big"
 	"time"
 
+	logger "github.com/0xPolygonHermez/zkevm-node/log"
 	"github.com/TEENet-io/bridge-go/common"
 	"github.com/TEENet-io/bridge-go/etherman"
 	"github.com/TEENet-io/bridge-go/state"
@@ -45,8 +46,12 @@ func NewEthSynchronizer(cfg *EthSyncConfig) *EthSynchronizer {
 }
 
 func (s *EthSynchronizer) Sync(ctx context.Context) error {
+	logger.Info("starting Eth synchronization")
 	ticker := time.NewTicker(s.checkFinalizedTickerInterval)
-	defer ticker.Stop()
+	defer func() {
+		logger.Info("stopping Eth synchronization")
+		ticker.Stop()
+	}()
 
 	for {
 		select {
@@ -65,8 +70,9 @@ func (s *EthSynchronizer) Sync(ctx context.Context) error {
 
 			s.e2bSt.GetLastEthFinalizedBlockNumberChannel() <- newFinalized
 
+			// starting from lastFinalized + 1 to newFinalized
 			blkNum := new(big.Int).Add(s.lastFinalized, big.NewInt(1))
-			for blkNum.Cmp(newFinalized) < 0 {
+			for blkNum.Cmp(newFinalized) != 1 {
 				minted, requested, prepared, err := s.etherman.GetEventLogs(blkNum)
 				if err != nil {
 					return err
@@ -86,6 +92,8 @@ func (s *EthSynchronizer) Sync(ctx context.Context) error {
 
 				blkNum.Add(blkNum, big.NewInt(1))
 			}
+
+			s.lastFinalized = new(big.Int).Set(newFinalized)
 		}
 	}
 }
