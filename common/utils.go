@@ -63,3 +63,10 @@ func RandAddress() common.Address {
 	}
 	return common.BytesToAddress(b[:])
 }
+
+func Shorten(hexStr string) string {
+	if len(hexStr) <= 6 {
+		return hexStr
+	}
+	return hexStr[:6] + "..." + hexStr[len(hexStr)-4:]
+}
