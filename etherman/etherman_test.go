@@ -71,7 +71,7 @@ func TestGetEventLogs(t *testing.T) {
 	if prepareParams == nil {
 		t.Fatal("failed to generate prepare params")
 	}
-	_, err = etherman.RedeemPrepare(prepareParams)
+	tx, err := etherman.RedeemPrepare(prepareParams)
 	assert.NoError(t, err)
 	sim.Backend.Commit()
 
@@ -83,6 +83,7 @@ func TestGetEventLogs(t *testing.T) {
 	assert.Len(t, requested, 0)
 	assert.Len(t, prepared, 1)
 
+	assert.Equal(t, [32]byte(tx.Hash().Bytes()), prepared[0].TxHash)
 	checkMintedEvent(t, &minted[0], mintParams)
 	checkPreparedEvent(t, &prepared[0], prepareParams)
 
@@ -94,7 +95,7 @@ func TestGetEventLogs(t *testing.T) {
 	if requestParams == nil {
 		t.Fatal("failed to generate request params")
 	}
-	tx, err := etherman.RedeemRequest(requestParams)
+	tx, err = etherman.RedeemRequest(requestParams)
 	assert.NoError(t, err)
 	sim.Backend.Commit()
 
