@@ -9,6 +9,8 @@ import (
 	logger "github.com/0xPolygonHermez/zkevm-node/log"
 	"github.com/TEENet-io/bridge-go/common"
 	"github.com/TEENet-io/bridge-go/etherman"
+	"github.com/stretchr/testify/assert"
+	"github.com/vechain/thor/co"
 )
 
 func TestSync(t *testing.T) {
@@ -28,8 +30,8 @@ func TestSync(t *testing.T) {
 		LastFinalizedBLock:           big.NewInt(0),
 	}
 
-	sync := NewEthSynchronizer(cfg)
-	if sync == nil {
+	synchronizer := NewEthSynchronizer(cfg)
+	if synchronizer == nil {
 		t.Fatal("failed to create synchronizer")
 	}
 
@@ -41,38 +43,57 @@ func TestSync(t *testing.T) {
 	}()
 
 	ctx, cancel := context.WithCancel(context.Background())
-	sync.Sync(ctx)
+
+	var goes co.Goes
+	goes.Go(func() { go mockB2EState.Start(ctx) })
+	goes.Go(func() { go mockE2BState.Start(ctx) })
+	goes.Go(func() { go synchronizer.Sync(ctx) })
+
+	sendTxs(t, env)
+
+	time.Sleep(200 * time.Millisecond)
 
 	cancel()
+
+	goes.Wait()
+
+	blk, err := env.Sim.Backend.Client().BlockByNumber(context.Background(), nil)
+	assert.NoError(t, err)
+
+	assert.Equal(t, blk.Number(), mockE2BState.lastFinalized)
+	assert.Equal(t, 1, len(mockE2BState.requestedEv))
+	assert.Equal(t, 1, len(mockE2BState.preparedEv))
+	assert.Equal(t, 1, len(mockB2EState.mintedEv))
 }
 
-// func sendTxs(t *testing.T, env *etherman.TestEnv) {
-// 	sim := env.Sim
-// 	etherman := env.Etherman
+func sendTxs(t *testing.T, env *etherman.TestEnv) {
+	mintParams := env.GenMintParams(&etherman.ParamConfig{Deployer: 0, Receiver: 1, Amount: big.NewInt(100)})
+	_, err := env.Etherman.Mint(mintParams)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-// 	mintParams := env.GenMintParams(&etherman.ParamConfig{Deployer: 0, Receiver: 1, Amount: big.NewInt(100)})
-// 	err := etherman.Mint(mintParams)
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
+	prepareParams := env.GenPrepareParams(&etherman.ParamConfig{Sender: 3, Requester: 4, Amount: big.NewInt(400)})
+	_, err = env.Etherman.RedeemPrepare(prepareParams)
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(200 * time.Millisecond)
+	env.Sim.Backend.Commit()
 
-// 	prepareParams := env.GenPrepareParams(&etherman.ParamConfig{sender: 3, requester: 4, amount: big.NewInt(400)})
-// 	err = etherman.RedeemPrepare(prepareParams)
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
-// 	sim.Backend.Commit()
+	err = env.Etherman.TWBTCApprove(env.Sim.Accounts[1], big.NewInt(80))
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(200 * time.Millisecond)
+	env.Sim.Backend.Commit()
 
-// 	err = etherman.TWBTCApprove(sim.Accounts[1], big.NewInt(80))
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
-
-// 	requestParams := env.GenRequestParams(&etherman.ParamConfig{Sender: 1, Amount: big.NewInt(80)})
-// 	if requestParams == nil {
-// 		t.Fatal("failed to generate request params")
-// 	}
-// 	err = etherman.RedeemRequest(requestParams)
-// 	assert.NoError(t, err)
-// 	sim.Backend.Commit()
-// }
+	requestParams := env.GenRequestParams(&etherman.ParamConfig{Sender: 1, Amount: big.NewInt(80)})
+	if requestParams == nil {
+		t.Fatal("failed to generate request params")
+	}
+	_, err = env.Etherman.RedeemRequest(requestParams)
+	assert.NoError(t, err)
+	time.Sleep(200 * time.Millisecond)
+	env.Sim.Backend.Commit()
+}
