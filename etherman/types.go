@@ -43,6 +43,7 @@ type RedeemRequestedEvent struct {
 
 type RedeemPreparedEvent struct {
 	bridge.TEENetBtcBridgeRedeemPrepared
+	TxHash [32]byte
 }
 
 type MintedEvent struct {

@@ -129,6 +129,7 @@ func (etherman *Etherman) GetEventLogs(blockNum *big.Int) (
 				return nil, nil, nil, err
 			}
 			copy(ev.EthTxHash[:], vlog.Topics[1].Bytes())
+			copy(ev.TxHash[:], vlog.TxHash.Bytes())
 			redeemPrepared = append(redeemPrepared, *ev)
 		default:
 			return nil, nil, nil, fmt.Errorf("unknown event: %+v", vlog.Topics[0])
