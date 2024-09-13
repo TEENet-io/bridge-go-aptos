@@ -1,7 +1,6 @@
 package etherman
 
 import (
-	"crypto/rand"
 	"math/big"
 
 	"github.com/TEENet-io/bridge-go/common"
@@ -114,11 +113,10 @@ func (env *TestEnv) GenMintParams(cfg *ParamConfig) *MintParams {
 	sim := env.Sim
 	sk := env.Sk
 
-	btcTxId, err := randBytes32()
-	if err != nil {
+	btcTxId := common.RandBytes32()
+	if len(btcTxId) == 0 {
 		return nil
 	}
-
 	receiver := sim.Accounts[cfg.Receiver].From
 
 	msg := crypto.Keccak256Hash(common.EncodePacked(btcTxId, receiver.String(), cfg.Amount)).Bytes()
@@ -146,15 +144,15 @@ func (env *TestEnv) GenRequestParams(cfg *ParamConfig) *RequestParams {
 }
 
 func (env *TestEnv) GenPrepareParams(cfg *ParamConfig) *PrepareParams {
-	txHash, err := randBytes32()
-	if err != nil {
+	txHash := common.RandBytes32()
+	if len(txHash) == 0 {
 		return nil
 	}
 	requester := env.Sim.Accounts[cfg.Requester].From
 	outpointTxIds := [][32]byte{}
 	for i := 0; i < 2; i++ {
-		txId, err := randBytes32()
-		if err != nil {
+		txId := common.RandBytes32()
+		if len(txId) == 0 {
 			return nil
 		}
 		outpointTxIds = append(outpointTxIds, txId)
@@ -177,18 +175,4 @@ func (env *TestEnv) GenPrepareParams(cfg *ParamConfig) *PrepareParams {
 		Rx:            rx,
 		S:             s,
 	}
-}
-
-func randBytes32() ([32]byte, error) {
-	var b [32]byte
-	n, err := rand.Read(b[:])
-
-	if err != nil {
-		return [32]byte{}, err
-	}
-	if n != 32 {
-		return [32]byte{}, err
-	}
-
-	return b, nil
 }
