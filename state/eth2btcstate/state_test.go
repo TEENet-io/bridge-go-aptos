@@ -40,7 +40,7 @@ func TestUpdateFinalizedBlockNumber(t *testing.T) {
 	go st.Start(ctx)
 
 	// test updating last finalized block number
-	ch := st.GetLastEthFinalizedBlockNumberChannel()
+	ch := st.GetNewFinalizedBlockChannel()
 	ch <- new(big.Int).Sub(common.EthStartingBlock, big.NewInt(1))
 	time.Sleep(100 * time.Millisecond)
 

@@ -20,7 +20,7 @@ type Synchronizer struct {
 	// number of the last finalized block that has been processed
 	lastProcessedBlockNum *big.Int
 
-	tickerDuration time.Duration
+	frequencyToCheckFinalizedBlock time.Duration
 }
 
 func New(cfg *Config) *Synchronizer {
@@ -31,27 +31,25 @@ func New(cfg *Config) *Synchronizer {
 	}
 
 	return &Synchronizer{
-		etherman:              cfg.Etherman,
-		lastProcessedBlockNum: n,
-		e2bSt:                 cfg.Eth2BtcState,
-		b2eSt:                 cfg.Btc2EthState,
-		tickerDuration:        cfg.CheckLatestFinalizedBlockInterval,
+		etherman:                       cfg.Etherman,
+		lastProcessedBlockNum:          n,
+		e2bSt:                          cfg.Eth2BtcState,
+		b2eSt:                          cfg.Btc2EthState,
+		frequencyToCheckFinalizedBlock: cfg.FrequencyToCheckFinalizedBlock,
 	}
 }
 
 func (s *Synchronizer) Sync(ctx context.Context) error {
 	logger.Info("starting Eth synchronization")
-	ticker := time.NewTicker(s.tickerDuration)
 	defer func() {
 		logger.Info("stopping Eth synchronization")
-		ticker.Stop()
 	}()
 
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-ticker.C:
+		case <-time.After(s.frequencyToCheckFinalizedBlock):
 			newFinalized, err := s.etherman.GetLatestFinalizedBlockNumber()
 			if err != nil {
 				return err
@@ -62,7 +60,7 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 				continue
 			}
 
-			s.e2bSt.GetLastEthFinalizedBlockNumberChannel() <- newFinalized
+			s.e2bSt.GetNewFinalizedBlockChannel() <- newFinalized
 
 			// For each block with height starting from lastFinalized + 1 to newFinalized,
 			// extract all the TWBTC minted, redeem request and redeem prepared events.
