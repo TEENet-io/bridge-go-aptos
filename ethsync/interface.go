@@ -10,6 +10,8 @@ type Eth2BtcState interface {
 	GetLastEthFinalizedBlockNumberChannel() chan<- *big.Int
 	GetRedeemRequestedEventChannel() chan<- *etherman.RedeemRequestedEvent
 	GetRedeemPreparedEventChannel() chan<- *etherman.RedeemPreparedEvent
+
+	GetFinalizedBlockNumber() (*big.Int, error)
 }
 
 type Btc2EthState interface {
