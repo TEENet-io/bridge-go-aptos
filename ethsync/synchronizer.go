@@ -6,47 +6,42 @@ import (
 	"time"
 
 	logger "github.com/0xPolygonHermez/zkevm-node/log"
-	"github.com/TEENet-io/bridge-go/common"
 	"github.com/TEENet-io/bridge-go/etherman"
 )
 
-const MinTickerInterval = 100 * time.Millisecond
+const MinTickerDuration = 100 * time.Millisecond
 
 type Synchronizer struct {
-	etherman                     *etherman.Etherman
-	lastFinalized                *big.Int
-	e2bSt                        Eth2BtcState
-	b2eSt                        Btc2EthState
-	checkFinalizedTickerInterval time.Duration
+	etherman *etherman.Etherman
+
+	e2bSt Eth2BtcState
+	b2eSt Btc2EthState
+
+	// number of the last finalized block that has been processed
+	lastProcessedBlockNum *big.Int
+
+	tickerDuration time.Duration
 }
 
 func New(cfg *Config) *Synchronizer {
-	if cfg.LastFinalizedBLock.Cmp(common.EthStartingBlock) == -1 ||
-		cfg.Etherman == nil ||
-		cfg.Eth2BtcState == nil ||
-		cfg.Btc2EthState == nil {
+	n, err := cfg.Eth2BtcState.GetFinalizedBlockNumber()
+	if err != nil {
+		logger.Error("failed to get finalized block number from database when initializing eth synchronizer")
 		return nil
 	}
 
-	var d time.Duration
-	if cfg.CheckFinalizedTickerInterval <= MinTickerInterval {
-		d = MinTickerInterval
-	} else {
-		d = cfg.CheckFinalizedTickerInterval
-	}
-
 	return &Synchronizer{
-		etherman:                     cfg.Etherman,
-		lastFinalized:                new(big.Int).Set(cfg.LastFinalizedBLock),
-		e2bSt:                        cfg.Eth2BtcState,
-		b2eSt:                        cfg.Btc2EthState,
-		checkFinalizedTickerInterval: d,
+		etherman:              cfg.Etherman,
+		lastProcessedBlockNum: n,
+		e2bSt:                 cfg.Eth2BtcState,
+		b2eSt:                 cfg.Btc2EthState,
+		tickerDuration:        cfg.CheckLatestFinalizedBlockInterval,
 	}
 }
 
 func (s *Synchronizer) Sync(ctx context.Context) error {
 	logger.Info("starting Eth synchronization")
-	ticker := time.NewTicker(s.checkFinalizedTickerInterval)
+	ticker := time.NewTicker(s.tickerDuration)
 	defer func() {
 		logger.Info("stopping Eth synchronization")
 		ticker.Stop()
@@ -63,7 +58,7 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 			}
 
 			// newFinalized <= lastFinalized
-			if newFinalized.Cmp(s.lastFinalized) != 1 {
+			if newFinalized.Cmp(s.lastProcessedBlockNum) != 1 {
 				continue
 			}
 
@@ -72,9 +67,9 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 			// For each block with height starting from lastFinalized + 1 to newFinalized,
 			// extract all the TWBTC minted, redeem request and redeem prepared events.
 			// Send all the events to the relevant states via channels.
-			blkNum := new(big.Int).Add(s.lastFinalized, big.NewInt(1))
-			for blkNum.Cmp(newFinalized) != 1 {
-				minted, requested, prepared, err := s.etherman.GetEventLogs(blkNum)
+			num := new(big.Int).Add(s.lastProcessedBlockNum, big.NewInt(1))
+			for num.Cmp(newFinalized) != 1 {
+				minted, requested, prepared, err := s.etherman.GetEventLogs(num)
 				if err != nil {
 					return err
 				}
@@ -91,10 +86,10 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 					s.e2bSt.GetRedeemPreparedEventChannel() <- &ev
 				}
 
-				blkNum.Add(blkNum, big.NewInt(1))
+				num.Add(num, big.NewInt(1))
 			}
 
-			s.lastFinalized = new(big.Int).Set(newFinalized)
+			s.lastProcessedBlockNum = new(big.Int).Set(newFinalized)
 		}
 	}
 }

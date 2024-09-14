@@ -5,6 +5,7 @@ import (
 	"math/big"
 
 	logger "github.com/0xPolygonHermez/zkevm-node/log"
+	"github.com/TEENet-io/bridge-go/common"
 	"github.com/TEENet-io/bridge-go/etherman"
 )
 
@@ -32,7 +33,7 @@ func NewMockEth2BtcState() *MockEth2BtcState {
 		requestedEvCh:   make(chan *etherman.RedeemRequestedEvent),
 		preparedEvCh:    make(chan *etherman.RedeemPreparedEvent),
 
-		lastFinalized: big.NewInt(0),
+		lastFinalized: new(big.Int).Set(common.EthStartingBlock),
 		requestedEv:   make([]*etherman.RedeemRequestedEvent, 0, MaxEvNum),
 		preparedEv:    make([]*etherman.RedeemPreparedEvent, 0, MaxEvNum),
 	}
@@ -44,6 +45,10 @@ func (st *MockEth2BtcState) GetRedeemRequestedEventChannel() chan<- *etherman.Re
 
 func (st *MockEth2BtcState) GetRedeemPreparedEventChannel() chan<- *etherman.RedeemPreparedEvent {
 	return st.preparedEvCh
+}
+
+func (st *MockEth2BtcState) GetFinalizedBlockNumber() (*big.Int, error) {
+	return st.lastFinalized, nil
 }
 
 func (st *MockEth2BtcState) Start(ctx context.Context) error {

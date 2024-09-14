@@ -23,11 +23,10 @@ func TestSync(t *testing.T) {
 	mockB2EState := NewMockBtc2EthState()
 
 	cfg := &Config{
-		Etherman:                     env.Etherman,
-		CheckFinalizedTickerInterval: 100 * time.Millisecond,
-		Btc2EthState:                 mockB2EState,
-		Eth2BtcState:                 mockE2BState,
-		LastFinalizedBLock:           big.NewInt(0),
+		Etherman:                          env.Etherman,
+		CheckLatestFinalizedBlockInterval: 100 * time.Millisecond,
+		Btc2EthState:                      mockB2EState,
+		Eth2BtcState:                      mockE2BState,
 	}
 
 	synchronizer := New(cfg)
