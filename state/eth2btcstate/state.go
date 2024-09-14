@@ -11,7 +11,6 @@ import (
 	"github.com/TEENet-io/bridge-go/etherman"
 	"github.com/ethereum/go-ethereum/common/lru"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/ethdb"
 )
 
 var (
@@ -27,7 +26,7 @@ type State struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	db ethdb.Database
+	db Database
 
 	finalizedCh   chan *big.Int
 	requestedEvCh chan *etherman.RedeemRequestedEvent
@@ -39,7 +38,7 @@ type State struct {
 	}
 }
 
-func New(db ethdb.Database) (*State, error) {
+func New(db Database) (*State, error) {
 	st := &State{
 		db:            db,
 		finalizedCh:   make(chan *big.Int, 1),
