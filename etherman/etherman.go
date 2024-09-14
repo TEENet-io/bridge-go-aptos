@@ -54,10 +54,14 @@ func NewEtherman(cfg *Config) (*Etherman, error) {
 
 	return &Etherman{
 		ethClient:      ethClient,
-		bridgeAddress:  ethcommon.HexToAddress(cfg.BridgeContractAddress),
+		bridgeAddress:  cfg.BridgeContractAddress,
 		bridgeContract: nil,
 		twbtcContract:  nil,
 	}, nil
+}
+
+func (etherman *Etherman) Client() ethereumClient {
+	return etherman.ethClient
 }
 
 func (etherman *Etherman) GetLatestFinalizedBlockNumber() (*big.Int, error) {

@@ -1,4 +1,4 @@
-package state
+package eth2btcstate
 
 const (
 	RedeemAlreadyPrepared = "redeem already prepared"

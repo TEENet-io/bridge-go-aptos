@@ -1,4 +1,4 @@
-package synchronizer
+package ethsync
 
 import (
 	"context"
@@ -22,7 +22,7 @@ func TestSync(t *testing.T) {
 	mockE2BState := NewMockEth2BtcState()
 	mockB2EState := NewMockBtc2EthState()
 
-	cfg := &EthSyncConfig{
+	cfg := &Config{
 		Etherman:                     env.Etherman,
 		CheckFinalizedTickerInterval: 100 * time.Millisecond,
 		Btc2EthState:                 mockB2EState,
@@ -30,7 +30,7 @@ func TestSync(t *testing.T) {
 		LastFinalizedBLock:           big.NewInt(0),
 	}
 
-	synchronizer := NewEthSynchronizer(cfg)
+	synchronizer := New(cfg)
 	if synchronizer == nil {
 		t.Fatal("failed to create synchronizer")
 	}

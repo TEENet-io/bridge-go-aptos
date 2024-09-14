@@ -1,4 +1,4 @@
-package synchronizer
+package ethsync
 
 import (
 	"context"

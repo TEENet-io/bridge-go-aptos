@@ -7,6 +7,7 @@ import (
 
 	logger "github.com/0xPolygonHermez/zkevm-node/log"
 	"github.com/TEENet-io/bridge-go/common"
+	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -191,7 +192,7 @@ func TestMint(t *testing.T) {
 func TestGetLatestFinalizedBlockNumber(t *testing.T) {
 	etherman, err := NewEtherman(&Config{
 		URL:                   "https://mainnet.infura.io/v3/f37af697a9dd4cbfa7e22aaacce33e50",
-		BridgeContractAddress: "0x0000000000000000000000000000000000000000",
+		BridgeContractAddress: ethcommon.Address([20]byte{}),
 	})
 	assert.NoError(t, err)
 

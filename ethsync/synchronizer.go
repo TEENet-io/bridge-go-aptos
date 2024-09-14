@@ -1,4 +1,4 @@
-package synchronizer
+package ethsync
 
 import (
 	"context"
@@ -8,20 +8,19 @@ import (
 	logger "github.com/0xPolygonHermez/zkevm-node/log"
 	"github.com/TEENet-io/bridge-go/common"
 	"github.com/TEENet-io/bridge-go/etherman"
-	"github.com/TEENet-io/bridge-go/state"
 )
 
 const MinTickerInterval = 100 * time.Millisecond
 
-type EthSynchronizer struct {
+type Synchronizer struct {
 	etherman                     *etherman.Etherman
 	lastFinalized                *big.Int
-	e2bSt                        state.Eth2BtcState
-	b2eSt                        state.Btc2EthState
+	e2bSt                        Eth2BtcState
+	b2eSt                        Btc2EthState
 	checkFinalizedTickerInterval time.Duration
 }
 
-func NewEthSynchronizer(cfg *EthSyncConfig) *EthSynchronizer {
+func New(cfg *Config) *Synchronizer {
 	if cfg.LastFinalizedBLock.Cmp(common.EthStartingBlock) == -1 ||
 		cfg.Etherman == nil ||
 		cfg.Eth2BtcState == nil ||
@@ -36,16 +35,16 @@ func NewEthSynchronizer(cfg *EthSyncConfig) *EthSynchronizer {
 		d = cfg.CheckFinalizedTickerInterval
 	}
 
-	return &EthSynchronizer{
+	return &Synchronizer{
 		etherman:                     cfg.Etherman,
-		lastFinalized:                cfg.LastFinalizedBLock,
+		lastFinalized:                new(big.Int).Set(cfg.LastFinalizedBLock),
 		e2bSt:                        cfg.Eth2BtcState,
 		b2eSt:                        cfg.Btc2EthState,
 		checkFinalizedTickerInterval: d,
 	}
 }
 
-func (s *EthSynchronizer) Sync(ctx context.Context) error {
+func (s *Synchronizer) Sync(ctx context.Context) error {
 	logger.Info("starting Eth synchronization")
 	ticker := time.NewTicker(s.checkFinalizedTickerInterval)
 	defer func() {
@@ -70,7 +69,9 @@ func (s *EthSynchronizer) Sync(ctx context.Context) error {
 
 			s.e2bSt.GetLastEthFinalizedBlockNumberChannel() <- newFinalized
 
-			// starting from lastFinalized + 1 to newFinalized
+			// For each block with height starting from lastFinalized + 1 to newFinalized,
+			// extract all the TWBTC minted, redeem request and redeem prepared events.
+			// Send all the events to the relevant states via channels.
 			blkNum := new(big.Int).Add(s.lastFinalized, big.NewInt(1))
 			for blkNum.Cmp(newFinalized) != 1 {
 				minted, requested, prepared, err := s.etherman.GetEventLogs(blkNum)
