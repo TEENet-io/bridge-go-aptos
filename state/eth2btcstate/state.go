@@ -1,9 +1,8 @@
-package state
+package eth2btcstate
 
 import (
 	"context"
 	"errors"
-	"fmt"
 	"math/big"
 	"sync/atomic"
 
@@ -24,12 +23,15 @@ var (
 	KeyLastFinalizedBlock = crypto.Keccak256Hash([]byte("lastFinalizedBlock")).Bytes()
 )
 
-type E2BState struct {
+type State struct {
+	ctx    context.Context
+	cancel context.CancelFunc
+
 	db ethdb.Database
 
-	lastFinalizedCh chan *big.Int
-	requestedEvCh   chan *etherman.RedeemRequestedEvent
-	preparedEvCh    chan *etherman.RedeemPreparedEvent
+	finalizedCh   chan *big.Int
+	requestedEvCh chan *etherman.RedeemRequestedEvent
+	preparedEvCh  chan *etherman.RedeemPreparedEvent
 
 	cache struct {
 		lastFinalized atomic.Value // uint4
@@ -37,12 +39,12 @@ type E2BState struct {
 	}
 }
 
-func NewEth2BtcState(db ethdb.Database) (*E2BState, error) {
-	st := &E2BState{
-		db:              db,
-		lastFinalizedCh: make(chan *big.Int, 1),
-		requestedEvCh:   make(chan *etherman.RedeemRequestedEvent, MaxPendingRequestedEv),
-		preparedEvCh:    make(chan *etherman.RedeemPreparedEvent, MaxPendingPreparedEv),
+func New(db ethdb.Database) (*State, error) {
+	st := &State{
+		db:            db,
+		finalizedCh:   make(chan *big.Int, 1),
+		requestedEvCh: make(chan *etherman.RedeemRequestedEvent, MaxPendingRequestedEv),
+		preparedEvCh:  make(chan *etherman.RedeemPreparedEvent, MaxPendingPreparedEv),
 	}
 
 	st.cache.redeems = lru.NewCache[string, *Redeem](CacheSize)
@@ -76,7 +78,9 @@ func NewEth2BtcState(db ethdb.Database) (*E2BState, error) {
 	return st, nil
 }
 
-func (st *E2BState) Start(ctx context.Context) error {
+func (st *State) Start(ctx context.Context) error {
+	st.ctx, st.cancel = context.WithCancel(context.Background())
+
 	logger.Info("starting eth2btc state")
 	defer logger.Info("stopping eth2btc state")
 
@@ -84,7 +88,7 @@ func (st *E2BState) Start(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case newFinalized := <-st.lastFinalizedCh:
+		case newFinalized := <-st.finalizedCh:
 			// Get the stored last finalized block number
 			lastFinalized, err := st.GetFinalizedBlockNumber()
 			if err != nil {
@@ -94,16 +98,19 @@ func (st *E2BState) Start(ctx context.Context) error {
 			// Update the last finalized block number if the new one is larger
 			if lastFinalized.Cmp(newFinalized) <= 0 {
 				if err := st.setFinalizedBlockNumber(newFinalized); err != nil {
-					logger.Infof("set new finalized block number %s", newFinalized.Text(10))
 					return err
 				}
 			} else {
 				logger.Warnf("new finalized block number %s less than the stored one %s",
 					newFinalized.Text(10), lastFinalized.Text(10))
 			}
+		// After receiving a redeem request event
+		// 1. 	Check the existence of the hash of the previous redeem requested tx.
+		// 		Skip if found
+		// 2.	Save a new redeem record in state db
 		case ev := <-st.requestedEvCh:
 			// Check if the redeem already exists
-			ok, err := st.hasRedeem(ev.TxHash)
+			ok, err := st.has(ev.TxHash)
 			if err != nil {
 				return err
 			}
@@ -116,11 +123,16 @@ func (st *E2BState) Start(ctx context.Context) error {
 
 			// Create a new redeem and save it to the database
 			redeem := (&Redeem{}).SetFromRequestedEvent(ev)
-			if err := st.setRedeem(redeem); err != nil {
+			if err := st.put(redeem); err != nil {
 				return err
 			}
+		// After receiving a redeem prepared event
+		// 1. 	Check the existence of the hash of the previous redeem requested tx.
+		// 		Return error if not found
+		// 2.	Check whether the redeem has been prepared. Skip if prepared
+		// 3. 	If not yet prepared, update the redeem record in state db
 		case ev := <-st.preparedEvCh:
-			ok, err := st.hasRedeem(ev.EthTxHash)
+			ok, err := st.has(ev.EthTxHash)
 			if err != nil {
 				return err
 			}
@@ -128,7 +140,7 @@ func (st *E2BState) Start(ctx context.Context) error {
 				return errors.New(RedeemNotFound)
 			}
 
-			redeem, err := st.getRedeem(ev.EthTxHash)
+			redeem, err := st.get(ev.EthTxHash)
 			if err != nil {
 				return err
 			}
@@ -138,7 +150,7 @@ func (st *E2BState) Start(ctx context.Context) error {
 				continue
 			}
 
-			err = st.setRedeem(redeem.SetFromPreparedEvent(ev))
+			err = st.put(redeem.SetFromPreparedEvent(ev))
 			if err != nil {
 				return err
 			}
@@ -146,7 +158,11 @@ func (st *E2BState) Start(ctx context.Context) error {
 	}
 }
 
-func (st *E2BState) GetFinalizedBlockNumber() (*big.Int, error) {
+func (st *State) Stop() {
+	st.cancel()
+}
+
+func (st *State) GetFinalizedBlockNumber() (*big.Int, error) {
 	if v := st.cache.lastFinalized.Load(); v != nil {
 		return new(big.Int).SetBytes(v.([]byte)), nil
 	}
@@ -160,19 +176,19 @@ func (st *E2BState) GetFinalizedBlockNumber() (*big.Int, error) {
 	return new(big.Int).SetBytes(b), nil
 }
 
-func (st *E2BState) GetLastEthFinalizedBlockNumberChannel() chan *big.Int {
-	return st.lastFinalizedCh
+func (st *State) GetLastEthFinalizedBlockNumberChannel() chan *big.Int {
+	return st.finalizedCh
 }
 
-func (st *E2BState) GetRedeemRequestedEventChannel() chan *etherman.RedeemRequestedEvent {
+func (st *State) GetRequestedEventChannel() chan *etherman.RedeemRequestedEvent {
 	return st.requestedEvCh
 }
 
-func (st *E2BState) GetRedeemPreparedEventChannel() chan *etherman.RedeemPreparedEvent {
+func (st *State) GetPreparedEventChannel() chan *etherman.RedeemPreparedEvent {
 	return st.preparedEvCh
 }
 
-func (st *E2BState) setFinalizedBlockNumber(blk *big.Int) error {
+func (st *State) setFinalizedBlockNumber(blk *big.Int) error {
 	if err := st.db.Put(KeyLastFinalizedBlock, blk.Bytes()); err != nil {
 		return err
 	}
@@ -181,7 +197,7 @@ func (st *E2BState) setFinalizedBlockNumber(blk *big.Int) error {
 	return nil
 }
 
-func (st *E2BState) setRedeem(r *Redeem) error {
+func (st *State) put(r *Redeem) error {
 	b, err := r.MarshalJSON()
 	if err != nil {
 		return err
@@ -191,15 +207,13 @@ func (st *E2BState) setRedeem(r *Redeem) error {
 		return err
 	}
 
-	fmt.Println(st.db.Has(r.RequestTxHash[:]))
-
 	st.cache.redeems.Add(common.Bytes32ToHexStr(r.RequestTxHash), r.Clone())
 
 	return nil
 }
 
-func (st *E2BState) getRedeem(ethTxHash [32]byte) (*Redeem, error) {
-	ok, err := st.hasRedeem(ethTxHash)
+func (st *State) get(ethTxHash [32]byte) (*Redeem, error) {
+	ok, err := st.has(ethTxHash)
 	if err != nil {
 		return nil, err
 	}
@@ -213,7 +227,7 @@ func (st *E2BState) getRedeem(ethTxHash [32]byte) (*Redeem, error) {
 	return nil, nil
 }
 
-func (st *E2BState) hasRedeem(ethTxHash [32]byte) (bool, error) {
+func (st *State) has(ethTxHash [32]byte) (bool, error) {
 	id := common.Bytes32ToHexStr(ethTxHash)
 
 	if st.cache.redeems.Contains(id) {

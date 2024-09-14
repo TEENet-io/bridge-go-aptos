@@ -1,17 +1,16 @@
-package synchronizer
+package ethsync
 
 import (
 	"math/big"
 	"time"
 
 	"github.com/TEENet-io/bridge-go/etherman"
-	"github.com/TEENet-io/bridge-go/state"
 )
 
-type EthSyncConfig struct {
+type Config struct {
 	Etherman                     *etherman.Etherman
 	CheckFinalizedTickerInterval time.Duration
-	Btc2EthState                 state.Btc2EthState
-	Eth2BtcState                 state.Eth2BtcState
+	Btc2EthState                 Btc2EthState
+	Eth2BtcState                 Eth2BtcState
 	LastFinalizedBLock           *big.Int
 }

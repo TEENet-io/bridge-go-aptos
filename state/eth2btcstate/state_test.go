@@ -1,4 +1,4 @@
-package state
+package eth2btcstate
 
 import (
 	"context"
@@ -14,7 +14,7 @@ import (
 
 func TestNewState(t *testing.T) {
 	db := rawdb.NewMemoryDatabase()
-	st, err := NewEth2BtcState(db)
+	st, err := New(db)
 	assert.NoError(t, err)
 	finalized, err := st.GetFinalizedBlockNumber()
 	assert.NoError(t, err)
@@ -23,7 +23,7 @@ func TestNewState(t *testing.T) {
 	finalized = big.NewInt(100)
 	db = rawdb.NewMemoryDatabase()
 	db.Put(KeyLastFinalizedBlock, finalized.Bytes())
-	st, err = NewEth2BtcState(db)
+	st, err = New(db)
 	assert.NoError(t, err)
 	finalized, err = st.GetFinalizedBlockNumber()
 	assert.NoError(t, err)
@@ -32,7 +32,7 @@ func TestNewState(t *testing.T) {
 
 func TestUpdateFinalizedBlockNumber(t *testing.T) {
 	db := rawdb.NewMemoryDatabase()
-	st, err := NewEth2BtcState(db)
+	st, err := New(db)
 	assert.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -60,38 +60,38 @@ func TestUpdateFinalizedBlockNumber(t *testing.T) {
 
 func TestDBOps(t *testing.T) {
 	db := rawdb.NewMemoryDatabase()
-	st, err := NewEth2BtcState(db)
+	st, err := New(db)
 	assert.NoError(t, err)
 
 	redeem := randRedeem()
-	err = st.setRedeem(redeem)
+	err = st.put(redeem)
 	assert.NoError(t, err)
 
-	ok, err := st.hasRedeem(redeem.RequestTxHash)
+	ok, err := st.has(redeem.RequestTxHash)
 	assert.NoError(t, err)
 	assert.True(t, ok)
 
-	ok, err = st.hasRedeem(common.RandBytes32())
+	ok, err = st.has(common.RandBytes32())
 	assert.NoError(t, err)
 	assert.False(t, ok)
 
-	redeem2, err := st.getRedeem(redeem.RequestTxHash)
+	redeem2, err := st.get(redeem.RequestTxHash)
 	assert.NoError(t, err)
 	assert.True(t, redeem.Equal(redeem2))
 
 	// make sure the returned is a copy, not a reference
 	redeem2.BtcTxId = common.RandBytes32()
-	redeem3, err := st.getRedeem(redeem.RequestTxHash)
+	redeem3, err := st.get(redeem.RequestTxHash)
 	assert.NoError(t, err)
 	assert.True(t, redeem.Equal(redeem3))
 }
 
 func TestUpdateFromRequestEvent(t *testing.T) {
 	db := rawdb.NewMemoryDatabase()
-	st, err := NewEth2BtcState(db)
+	st, err := New(db)
 	assert.NoError(t, err)
 
-	ch := st.GetRedeemRequestedEventChannel()
+	ch := st.GetRequestedEventChannel()
 
 	ev := &etherman.RedeemRequestedEvent{}
 	ev.TxHash = common.RandBytes32()
@@ -108,10 +108,10 @@ func TestUpdateFromRequestEvent(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	ok, err := st.hasRedeem(ev.TxHash)
+	ok, err := st.has(ev.TxHash)
 	assert.NoError(t, err)
 	assert.True(t, ok)
-	redeem, err := st.getRedeem(ev.TxHash)
+	redeem, err := st.get(ev.TxHash)
 	assert.NoError(t, err)
 	assert.Equal(t, ev.TxHash, redeem.RequestTxHash)
 	assert.Equal(t, ev.Sender, redeem.Requester)
@@ -123,10 +123,10 @@ func TestUpdateFromRequestEvent(t *testing.T) {
 
 func TestErrFromPrepareEvent(t *testing.T) {
 	db := rawdb.NewMemoryDatabase()
-	st, err := NewEth2BtcState(db)
+	st, err := New(db)
 	assert.NoError(t, err)
 
-	prepCh := st.GetRedeemPreparedEventChannel()
+	prepCh := st.GetPreparedEventChannel()
 
 	prepEv := &etherman.RedeemPreparedEvent{}
 	prepEv.TxHash = common.RandBytes32()
@@ -148,11 +148,11 @@ func TestErrFromPrepareEvent(t *testing.T) {
 
 func TestUpdateFromPrepareEvent(t *testing.T) {
 	db := rawdb.NewMemoryDatabase()
-	st, err := NewEth2BtcState(db)
+	st, err := New(db)
 	assert.NoError(t, err)
 
-	reqCh := st.GetRedeemRequestedEventChannel()
-	prepCh := st.GetRedeemPreparedEventChannel()
+	reqCh := st.GetRequestedEventChannel()
+	prepCh := st.GetPreparedEventChannel()
 
 	reqEv := &etherman.RedeemRequestedEvent{}
 	reqEv.TxHash = common.RandBytes32()
@@ -172,7 +172,7 @@ func TestUpdateFromPrepareEvent(t *testing.T) {
 	prepEv := &etherman.RedeemPreparedEvent{}
 	prepEv.TxHash = common.RandBytes32()
 	prepEv.EthTxHash = reqEv.TxHash
-	prepEv.Requester.SetBytes(reqEv.Sender.Bytes())
+	prepEv.Requester = reqEv.Sender
 	prepEv.Amount = new(big.Int).Set(reqEv.Amount)
 	prepEv.OutpointTxIds = [][32]byte{common.RandBytes32()}
 	prepEv.OutpointIdxs = []uint16{0}
@@ -181,7 +181,7 @@ func TestUpdateFromPrepareEvent(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	redeem, err := st.getRedeem(reqEv.TxHash)
+	redeem, err := st.get(reqEv.TxHash)
 	assert.NoError(t, err)
 	assert.Equal(t, prepEv.TxHash, redeem.PrepareTxHash)
 	for i, outpoint := range redeem.Outpoints {

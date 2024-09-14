@@ -1,4 +1,4 @@
-package state
+package eth2btcstate
 
 import (
 	"encoding/json"
@@ -101,7 +101,7 @@ func (r *Redeem) Clone() *Redeem {
 	clone.RequestTxHash = r.RequestTxHash
 	clone.PrepareTxHash = r.PrepareTxHash
 	clone.BtcTxId = r.BtcTxId
-	clone.Requester.SetBytes(r.Requester.Bytes())
+	clone.Requester = r.Requester
 	clone.Amount = new(big.Int).Set(r.Amount)
 	clone.Outpoints = make([]Outpoint, len(r.Outpoints))
 	clone.Receiver = r.Receiver
