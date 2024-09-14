@@ -12,9 +12,9 @@ import (
 const MaxEvNum = 32
 
 type MockEth2BtcState struct {
-	lastFinalizedCh chan *big.Int
-	requestedEvCh   chan *etherman.RedeemRequestedEvent
-	preparedEvCh    chan *etherman.RedeemPreparedEvent
+	newFinalizedCh chan *big.Int
+	requestedEvCh  chan *etherman.RedeemRequestedEvent
+	preparedEvCh   chan *etherman.RedeemPreparedEvent
 
 	lastFinalized *big.Int
 	requestedEv   []*etherman.RedeemRequestedEvent
@@ -29,9 +29,9 @@ type MockBtc2EthState struct {
 
 func NewMockEth2BtcState() *MockEth2BtcState {
 	return &MockEth2BtcState{
-		lastFinalizedCh: make(chan *big.Int, 1),
-		requestedEvCh:   make(chan *etherman.RedeemRequestedEvent),
-		preparedEvCh:    make(chan *etherman.RedeemPreparedEvent),
+		newFinalizedCh: make(chan *big.Int, 1),
+		requestedEvCh:  make(chan *etherman.RedeemRequestedEvent),
+		preparedEvCh:   make(chan *etherman.RedeemPreparedEvent),
 
 		lastFinalized: new(big.Int).Set(common.EthStartingBlock),
 		requestedEv:   make([]*etherman.RedeemRequestedEvent, 0, MaxEvNum),
@@ -59,7 +59,7 @@ func (st *MockEth2BtcState) Start(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			return (ctx).Err()
-		case n := <-st.lastFinalizedCh:
+		case n := <-st.newFinalizedCh:
 			st.lastFinalized = new(big.Int).Set(n)
 		case ev := <-st.requestedEvCh:
 			st.requestedEv = append(st.requestedEv, ev)
@@ -69,8 +69,8 @@ func (st *MockEth2BtcState) Start(ctx context.Context) error {
 	}
 }
 
-func (st *MockEth2BtcState) GetLastEthFinalizedBlockNumberChannel() chan<- *big.Int {
-	return st.lastFinalizedCh
+func (st *MockEth2BtcState) GetNewFinalizedBlockChannel() chan<- *big.Int {
+	return st.newFinalizedCh
 }
 
 func NewMockBtc2EthState() *MockBtc2EthState {

@@ -7,7 +7,7 @@ import (
 )
 
 type Eth2BtcState interface {
-	GetLastEthFinalizedBlockNumberChannel() chan<- *big.Int
+	GetNewFinalizedBlockChannel() chan<- *big.Int
 	GetRedeemRequestedEventChannel() chan<- *etherman.RedeemRequestedEvent
 	GetRedeemPreparedEventChannel() chan<- *etherman.RedeemPreparedEvent
 

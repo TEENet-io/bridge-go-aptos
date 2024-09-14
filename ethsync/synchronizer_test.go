@@ -10,7 +10,6 @@ import (
 	"github.com/TEENet-io/bridge-go/common"
 	"github.com/TEENet-io/bridge-go/etherman"
 	"github.com/stretchr/testify/assert"
-	"github.com/vechain/thor/co"
 )
 
 func TestSync(t *testing.T) {
@@ -23,10 +22,10 @@ func TestSync(t *testing.T) {
 	mockB2EState := NewMockBtc2EthState()
 
 	cfg := &Config{
-		Etherman:                          env.Etherman,
-		CheckLatestFinalizedBlockInterval: 100 * time.Millisecond,
-		Btc2EthState:                      mockB2EState,
-		Eth2BtcState:                      mockE2BState,
+		Etherman:                       env.Etherman,
+		FrequencyToCheckFinalizedBlock: 100 * time.Millisecond,
+		Btc2EthState:                   mockB2EState,
+		Eth2BtcState:                   mockE2BState,
 	}
 
 	synchronizer := New(cfg)
@@ -43,18 +42,15 @@ func TestSync(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	var goes co.Goes
-	goes.Go(func() { go mockB2EState.Start(ctx) })
-	goes.Go(func() { go mockE2BState.Start(ctx) })
-	goes.Go(func() { go synchronizer.Sync(ctx) })
+	go mockB2EState.Start(ctx)
+	go mockE2BState.Start(ctx)
+	go synchronizer.Sync(ctx)
 
 	sendTxs(t, env)
 
 	time.Sleep(200 * time.Millisecond)
 
 	cancel()
-
-	goes.Wait()
 
 	blk, err := env.Sim.Backend.Client().BlockByNumber(context.Background(), nil)
 	assert.NoError(t, err)

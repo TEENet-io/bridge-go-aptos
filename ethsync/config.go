@@ -7,8 +7,8 @@ import (
 )
 
 type Config struct {
-	Etherman                          *etherman.Etherman
-	CheckLatestFinalizedBlockInterval time.Duration
-	Btc2EthState                      Btc2EthState
-	Eth2BtcState                      Eth2BtcState
+	Etherman                       *etherman.Etherman
+	FrequencyToCheckFinalizedBlock time.Duration
+	Btc2EthState                   Btc2EthState
+	Eth2BtcState                   Eth2BtcState
 }

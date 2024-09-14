@@ -28,9 +28,9 @@ type State struct {
 
 	db Database
 
-	finalizedCh   chan *big.Int
-	requestedEvCh chan *etherman.RedeemRequestedEvent
-	preparedEvCh  chan *etherman.RedeemPreparedEvent
+	newFinalizedCh chan *big.Int
+	requestedEvCh  chan *etherman.RedeemRequestedEvent
+	preparedEvCh   chan *etherman.RedeemPreparedEvent
 
 	cache struct {
 		lastFinalized atomic.Value // uint4
@@ -40,10 +40,10 @@ type State struct {
 
 func New(db Database) (*State, error) {
 	st := &State{
-		db:            db,
-		finalizedCh:   make(chan *big.Int, 1),
-		requestedEvCh: make(chan *etherman.RedeemRequestedEvent, MaxPendingRequestedEv),
-		preparedEvCh:  make(chan *etherman.RedeemPreparedEvent, MaxPendingPreparedEv),
+		db:             db,
+		newFinalizedCh: make(chan *big.Int, 1),
+		requestedEvCh:  make(chan *etherman.RedeemRequestedEvent, MaxPendingRequestedEv),
+		preparedEvCh:   make(chan *etherman.RedeemPreparedEvent, MaxPendingPreparedEv),
 	}
 
 	st.cache.redeems = lru.NewCache[string, *Redeem](CacheSize)
@@ -87,7 +87,7 @@ func (st *State) Start(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case newFinalized := <-st.finalizedCh:
+		case newFinalized := <-st.newFinalizedCh:
 			// Get the stored last finalized block number
 			lastFinalized, err := st.GetFinalizedBlockNumber()
 			if err != nil {
@@ -175,8 +175,8 @@ func (st *State) GetFinalizedBlockNumber() (*big.Int, error) {
 	return new(big.Int).SetBytes(b), nil
 }
 
-func (st *State) GetLastEthFinalizedBlockNumberChannel() chan *big.Int {
-	return st.finalizedCh
+func (st *State) GetNewFinalizedBlockChannel() chan *big.Int {
+	return st.newFinalizedCh
 }
 
 func (st *State) GetRequestedEventChannel() chan *etherman.RedeemRequestedEvent {
