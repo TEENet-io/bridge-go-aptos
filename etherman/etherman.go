@@ -22,7 +22,7 @@ var (
 	// Events
 	MintedSignatureHash          = crypto.Keccak256Hash([]byte("Minted(bytes32,address,uint256)"))
 	RedeemRequestedSignatureHash = crypto.Keccak256Hash([]byte("RedeemRequested(address,uint256,string)"))
-	RedeemPreparedSignatureHash  = crypto.Keccak256Hash([]byte("RedeemPrepared(bytes32,address,uint256,bytes32[],uint16[])"))
+	RedeemPreparedSignatureHash  = crypto.Keccak256Hash([]byte("RedeemPrepared(bytes32,address,string,uint256,bytes32[],uint16[])"))
 )
 
 type ethereumClient interface {
@@ -181,6 +181,7 @@ func (etherman *Etherman) RedeemPrepare(params *PrepareParams) (*types.Transacti
 		params.Auth,
 		params.TxHash,
 		params.Requester,
+		string(params.Receiver),
 		params.Amount,
 		params.OutpointTxIds,
 		params.OutpointIdxs,
