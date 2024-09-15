@@ -117,6 +117,7 @@ func (etherman *Etherman) GetEventLogs(blockNum *big.Int) (
 				return nil, nil, nil, err
 			}
 			copy(ev.BtcTxId[:], vlog.Topics[1].Bytes())
+			copy(ev.TxHash[:], vlog.TxHash.Bytes())
 			minted = append(minted, *ev)
 		case RedeemRequestedSignatureHash:
 			ev := new(RedeemRequestedEvent)
@@ -179,7 +180,7 @@ func (etherman *Etherman) RedeemPrepare(params *PrepareParams) (*types.Transacti
 
 	tx, err := contract.RedeemPrepare(
 		params.Auth,
-		params.TxHash,
+		params.RedeemRequestTxHash,
 		params.Requester,
 		string(params.Receiver),
 		params.Amount,

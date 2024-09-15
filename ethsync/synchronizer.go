@@ -6,12 +6,15 @@ import (
 	"time"
 
 	logger "github.com/0xPolygonHermez/zkevm-node/log"
+	"github.com/TEENet-io/bridge-go/common"
 	"github.com/TEENet-io/bridge-go/etherman"
 )
 
 const MinTickerDuration = 100 * time.Millisecond
 
 type Synchronizer struct {
+	cfg *Config
+
 	etherman *etherman.Etherman
 
 	e2bSt Eth2BtcState
@@ -19,23 +22,21 @@ type Synchronizer struct {
 
 	// number of the last finalized block that has been processed
 	lastProcessedBlockNum *big.Int
-
-	frequencyToCheckFinalizedBlock time.Duration
 }
 
-func New(cfg *Config) *Synchronizer {
-	n, err := cfg.Eth2BtcState.GetFinalizedBlockNumber()
+func New(etherman *etherman.Etherman, e2bstate Eth2BtcState, b2estate Btc2EthState, cfg *Config) *Synchronizer {
+	n, err := e2bstate.GetFinalizedBlockNumber()
 	if err != nil {
-		logger.Error("failed to get finalized block number from database when initializing eth synchronizer")
+		logger.Error("failed to get eth finalized block number from database when initializing eth synchronizer")
 		return nil
 	}
 
 	return &Synchronizer{
-		etherman:                       cfg.Etherman,
-		lastProcessedBlockNum:          n,
-		e2bSt:                          cfg.Eth2BtcState,
-		b2eSt:                          cfg.Btc2EthState,
-		frequencyToCheckFinalizedBlock: cfg.FrequencyToCheckFinalizedBlock,
+		etherman:              etherman,
+		lastProcessedBlockNum: n,
+		e2bSt:                 e2bstate,
+		b2eSt:                 b2estate,
+		cfg:                   cfg,
 	}
 }
 
@@ -49,7 +50,7 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-time.After(s.frequencyToCheckFinalizedBlock):
+		case <-time.After(s.cfg.FrequencyToCheckFinalizedBlock):
 			newFinalized, err := s.etherman.GetLatestFinalizedBlockNumber()
 			if err != nil {
 				return err
@@ -73,15 +74,34 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 				}
 
 				for _, ev := range minted {
-					s.b2eSt.GetMintedEventChannel() <- &ev
+					s.b2eSt.GetNewMintedEventChannel() <- &MintedEvent{
+						MintedTxHash: ev.TxHash,
+						BtcTxId:      ev.BtcTxId,
+						Amount:       new(big.Int).Set(ev.Amount),
+						Receiver:     ev.Receiver,
+					}
 				}
 
 				for _, ev := range requested {
-					s.e2bSt.GetRedeemRequestedEventChannel() <- &ev
+					s.e2bSt.GetNewRedeemRequestedEventChannel() <- &RedeemRequestedEvent{
+						RedeemRequestTxHash: ev.TxHash,
+						Requester:           ev.Sender,
+						Amount:              new(big.Int).Set(ev.Amount),
+						Receiver:            ev.Receiver,
+						IsValidReceiver:     common.IsValidBtcAddress(ev.Receiver, s.cfg.BtcChainConfig),
+					}
 				}
 
 				for _, ev := range prepared {
-					s.e2bSt.GetRedeemPreparedEventChannel() <- &ev
+					s.e2bSt.GetNewRedeemPreparedEventChannel() <- &RedeemPreparedEvent{
+						RedeemPrepareTxHash: ev.TxHash,
+						RedeemRequestTxHash: ev.EthTxHash,
+						Requester:           ev.Requester,
+						Receiver:            ev.Receiver,
+						Amount:              new(big.Int).Set(ev.Amount),
+						OutpointTxIds:       ev.OutpointTxIds,
+						OutpointIdxs:        ev.OutpointIdxs,
+					}
 				}
 
 				num.Add(num, big.NewInt(1))

@@ -6,44 +6,43 @@ import (
 
 	logger "github.com/0xPolygonHermez/zkevm-node/log"
 	"github.com/TEENet-io/bridge-go/common"
-	"github.com/TEENet-io/bridge-go/etherman"
 )
 
 const MaxEvNum = 32
 
 type MockEth2BtcState struct {
 	newFinalizedCh chan *big.Int
-	requestedEvCh  chan *etherman.RedeemRequestedEvent
-	preparedEvCh   chan *etherman.RedeemPreparedEvent
+	requestedEvCh  chan *RedeemRequestedEvent
+	preparedEvCh   chan *RedeemPreparedEvent
 
 	lastFinalized *big.Int
-	requestedEv   []*etherman.RedeemRequestedEvent
-	preparedEv    []*etherman.RedeemPreparedEvent
+	requestedEv   []*RedeemRequestedEvent
+	preparedEv    []*RedeemPreparedEvent
 }
 
 type MockBtc2EthState struct {
-	mintedEvCh chan *etherman.MintedEvent
+	mintedEvCh chan *MintedEvent
 
-	mintedEv []*etherman.MintedEvent
+	mintedEv []*MintedEvent
 }
 
 func NewMockEth2BtcState() *MockEth2BtcState {
 	return &MockEth2BtcState{
 		newFinalizedCh: make(chan *big.Int, 1),
-		requestedEvCh:  make(chan *etherman.RedeemRequestedEvent),
-		preparedEvCh:   make(chan *etherman.RedeemPreparedEvent),
+		requestedEvCh:  make(chan *RedeemRequestedEvent),
+		preparedEvCh:   make(chan *RedeemPreparedEvent),
 
 		lastFinalized: new(big.Int).Set(common.EthStartingBlock),
-		requestedEv:   make([]*etherman.RedeemRequestedEvent, 0, MaxEvNum),
-		preparedEv:    make([]*etherman.RedeemPreparedEvent, 0, MaxEvNum),
+		requestedEv:   make([]*RedeemRequestedEvent, 0, MaxEvNum),
+		preparedEv:    make([]*RedeemPreparedEvent, 0, MaxEvNum),
 	}
 }
 
-func (st *MockEth2BtcState) GetRedeemRequestedEventChannel() chan<- *etherman.RedeemRequestedEvent {
+func (st *MockEth2BtcState) GetNewRedeemRequestedEventChannel() chan<- *RedeemRequestedEvent {
 	return st.requestedEvCh
 }
 
-func (st *MockEth2BtcState) GetRedeemPreparedEventChannel() chan<- *etherman.RedeemPreparedEvent {
+func (st *MockEth2BtcState) GetNewRedeemPreparedEventChannel() chan<- *RedeemPreparedEvent {
 	return st.preparedEvCh
 }
 
@@ -75,9 +74,9 @@ func (st *MockEth2BtcState) GetNewFinalizedBlockChannel() chan<- *big.Int {
 
 func NewMockBtc2EthState() *MockBtc2EthState {
 	return &MockBtc2EthState{
-		mintedEvCh: make(chan *etherman.MintedEvent),
+		mintedEvCh: make(chan *MintedEvent),
 
-		mintedEv: make([]*etherman.MintedEvent, 0, MaxEvNum),
+		mintedEv: make([]*MintedEvent, 0, MaxEvNum),
 	}
 }
 
@@ -95,6 +94,6 @@ func (st *MockBtc2EthState) Start(ctx context.Context) error {
 	}
 }
 
-func (st *MockBtc2EthState) GetMintedEventChannel() chan<- *etherman.MintedEvent {
+func (st *MockBtc2EthState) GetNewMintedEventChannel() chan<- *MintedEvent {
 	return st.mintedEvCh
 }
