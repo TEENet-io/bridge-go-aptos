@@ -25,6 +25,16 @@ type Synchronizer struct {
 }
 
 func New(etherman *etherman.Etherman, e2bstate Eth2BtcState, b2estate Btc2EthState, cfg *Config) *Synchronizer {
+	chainID, err := etherman.Client().ChainID(context.Background())
+	if err != nil {
+		logger.Error("failed to get eth chain ID")
+		return nil
+	}
+	if chainID.Cmp(cfg.EthChainID) != 0 {
+		logger.Error("chain ID mismatch")
+		return nil
+	}
+
 	n, err := e2bstate.GetFinalizedBlockNumber()
 	if err != nil {
 		logger.Error("failed to get eth finalized block number from database when initializing eth synchronizer")
