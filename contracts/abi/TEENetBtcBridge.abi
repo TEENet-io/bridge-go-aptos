@@ -33,6 +33,21 @@
     "type": "error"
   },
   {
+    "inputs": [],
+    "name": "EmptyOutpointIdxs",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "EmptyOutpointTxIds",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "EmptyString",
+    "type": "error"
+  },
+  {
     "inputs": [
       {
         "internalType": "bytes32",
@@ -90,17 +105,7 @@
   },
   {
     "inputs": [],
-    "name": "ZeroOutpointIdxsArrayLength",
-    "type": "error"
-  },
-  {
-    "inputs": [],
     "name": "ZeroOutpointTxId",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "ZeroOutpointTxIdsArrayLength",
     "type": "error"
   },
   {
@@ -142,6 +147,12 @@
         "internalType": "address",
         "name": "requester",
         "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "receiver",
+        "type": "string"
       },
       {
         "indexed": false,
@@ -298,6 +309,11 @@
         "internalType": "address",
         "name": "requester",
         "type": "address"
+      },
+      {
+        "internalType": "string",
+        "name": "receiver",
+        "type": "string"
       },
       {
         "internalType": "uint256",

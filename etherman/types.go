@@ -29,6 +29,7 @@ type PrepareParams struct {
 	Auth          *bind.TransactOpts
 	TxHash        [32]byte
 	Requester     common.Address
+	Receiver      BTCAddress
 	Amount        *big.Int
 	OutpointTxIds [][32]byte
 	OutpointIdxs  []uint16

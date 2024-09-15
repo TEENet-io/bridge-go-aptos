@@ -149,6 +149,7 @@ func (env *TestEnv) GenPrepareParams(cfg *ParamConfig) *PrepareParams {
 		return nil
 	}
 	requester := env.Sim.Accounts[cfg.Requester].From
+	receiver := BTCAddress(btcAddrs[0])
 	outpointTxIds := [][32]byte{}
 	for i := 0; i < 2; i++ {
 		txId := common.RandBytes32()
@@ -159,7 +160,8 @@ func (env *TestEnv) GenPrepareParams(cfg *ParamConfig) *PrepareParams {
 	}
 	outpointTxIndices := []*big.Int{big.NewInt(0), big.NewInt(1)}
 
-	msg := crypto.Keccak256Hash(common.EncodePacked(txHash, requester.String(), cfg.Amount, outpointTxIds, outpointTxIndices)).Bytes()
+	msg := crypto.Keccak256Hash(common.EncodePacked(
+		txHash, requester.String(), string(receiver), cfg.Amount, outpointTxIds, outpointTxIndices)).Bytes()
 	rx, s, err := Sign(env.Sk, msg[:])
 	if err != nil {
 		return nil
@@ -169,6 +171,7 @@ func (env *TestEnv) GenPrepareParams(cfg *ParamConfig) *PrepareParams {
 		Auth:          env.Sim.Accounts[cfg.Sender],
 		TxHash:        txHash,
 		Requester:     requester,
+		Receiver:      receiver,
 		Amount:        cfg.Amount,
 		OutpointTxIds: outpointTxIds,
 		OutpointIdxs:  []uint16{0, 1},
