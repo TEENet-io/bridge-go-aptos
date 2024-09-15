@@ -18,12 +18,17 @@ func TestSync(t *testing.T) {
 		t.Fatal("failed to create test environment")
 	}
 
+	chainID, err := env.Etherman.Client().ChainID(context.Background())
+	assert.NoError(t, err)
+	assert.Equal(t, chainID, big.NewInt(1337))
+
 	mockE2BState := NewMockEth2BtcState()
 	mockB2EState := NewMockBtc2EthState()
 
 	cfg := &Config{
 		FrequencyToCheckFinalizedBlock: 100 * time.Millisecond,
 		BtcChainConfig:                 common.MainNetParams(),
+		EthChainID:                     chainID,
 	}
 
 	synchronizer := New(env.Etherman, mockE2BState, mockB2EState, cfg)

@@ -37,6 +37,8 @@ type ethereumClient interface {
 
 	bind.DeployBackend
 	bind.ContractBackend
+
+	ChainID(context.Context) (*big.Int, error)
 }
 
 type Etherman struct {
