@@ -17,24 +17,22 @@ type MintParams struct {
 	S        *big.Int
 }
 
-type BTCAddress string
-
 type RequestParams struct {
 	Auth     *bind.TransactOpts
 	Amount   *big.Int
-	Receiver BTCAddress
+	Receiver string
 }
 
 type PrepareParams struct {
-	Auth          *bind.TransactOpts
-	TxHash        [32]byte
-	Requester     common.Address
-	Receiver      BTCAddress
-	Amount        *big.Int
-	OutpointTxIds [][32]byte
-	OutpointIdxs  []uint16
-	Rx            *big.Int
-	S             *big.Int
+	Auth                *bind.TransactOpts
+	RedeemRequestTxHash [32]byte
+	Requester           common.Address
+	Receiver            string
+	Amount              *big.Int
+	OutpointTxIds       [][32]byte
+	OutpointIdxs        []uint16
+	Rx                  *big.Int
+	S                   *big.Int
 }
 
 type RedeemRequestedEvent struct {
@@ -49,4 +47,5 @@ type RedeemPreparedEvent struct {
 
 type MintedEvent struct {
 	bridge.TEENetBtcBridgeMinted
+	TxHash [32]byte
 }

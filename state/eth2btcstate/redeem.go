@@ -5,7 +5,7 @@ import (
 	"math/big"
 
 	"github.com/TEENet-io/bridge-go/common"
-	"github.com/TEENet-io/bridge-go/etherman"
+	"github.com/TEENet-io/bridge-go/ethsync"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
@@ -24,17 +24,17 @@ type Redeem struct {
 	Receiver      string // receiver btc address
 }
 
-func (r *Redeem) SetFromRequestedEvent(ev *etherman.RedeemRequestedEvent) *Redeem {
-	r.RequestTxHash = ev.TxHash
-	r.Requester.SetBytes(ev.Sender.Bytes())
+func (r *Redeem) SetFromRequestedEvent(ev *ethsync.RedeemRequestedEvent) *Redeem {
+	r.RequestTxHash = ev.RedeemRequestTxHash
+	r.Requester = ev.Requester
 	r.Amount = new(big.Int).Set(ev.Amount)
 	r.Receiver = ev.Receiver
 
 	return r
 }
 
-func (r *Redeem) SetFromPreparedEvent(ev *etherman.RedeemPreparedEvent) *Redeem {
-	r.PrepareTxHash = ev.TxHash
+func (r *Redeem) SetFromPreparedEvent(ev *ethsync.RedeemPreparedEvent) *Redeem {
+	r.PrepareTxHash = ev.RedeemPrepareTxHash
 	for i := range ev.OutpointIdxs {
 		r.Outpoints = append(r.Outpoints, Outpoint{
 			TxId: ev.OutpointTxIds[i],

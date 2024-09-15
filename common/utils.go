@@ -56,14 +56,6 @@ func RandBytes32() [32]byte {
 	return b
 }
 
-func RandAddress() common.Address {
-	b := make([]byte, 20)
-	if _, err := rand.Read(b); err != nil {
-		return common.Address{}
-	}
-	return common.BytesToAddress(b[:])
-}
-
 func Shorten(hexStr string) string {
 	if len(hexStr) <= 6 {
 		return hexStr

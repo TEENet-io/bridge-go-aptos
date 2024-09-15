@@ -139,7 +139,7 @@ func (env *TestEnv) GenRequestParams(cfg *ParamConfig) *RequestParams {
 	return &RequestParams{
 		Auth:     env.Sim.Accounts[cfg.Sender],
 		Amount:   cfg.Amount,
-		Receiver: BTCAddress(btcAddrs[0]),
+		Receiver: btcAddrs[0],
 	}
 }
 
@@ -149,7 +149,7 @@ func (env *TestEnv) GenPrepareParams(cfg *ParamConfig) *PrepareParams {
 		return nil
 	}
 	requester := env.Sim.Accounts[cfg.Requester].From
-	receiver := BTCAddress(btcAddrs[0])
+	receiver := btcAddrs[0]
 	outpointTxIds := [][32]byte{}
 	for i := 0; i < 2; i++ {
 		txId := common.RandBytes32()
@@ -168,14 +168,14 @@ func (env *TestEnv) GenPrepareParams(cfg *ParamConfig) *PrepareParams {
 	}
 
 	return &PrepareParams{
-		Auth:          env.Sim.Accounts[cfg.Sender],
-		TxHash:        txHash,
-		Requester:     requester,
-		Receiver:      receiver,
-		Amount:        cfg.Amount,
-		OutpointTxIds: outpointTxIds,
-		OutpointIdxs:  []uint16{0, 1},
-		Rx:            rx,
-		S:             s,
+		Auth:                env.Sim.Accounts[cfg.Sender],
+		RedeemRequestTxHash: txHash,
+		Requester:           requester,
+		Receiver:            receiver,
+		Amount:              cfg.Amount,
+		OutpointTxIds:       outpointTxIds,
+		OutpointIdxs:        []uint16{0, 1},
+		Rx:                  rx,
+		S:                   s,
 	}
 }

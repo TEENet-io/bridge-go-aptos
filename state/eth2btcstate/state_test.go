@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/TEENet-io/bridge-go/common"
-	"github.com/TEENet-io/bridge-go/etherman"
+	"github.com/TEENet-io/bridge-go/ethsync"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/stretchr/testify/assert"
 )
@@ -91,11 +91,11 @@ func TestUpdateFromRequestEvent(t *testing.T) {
 	st, err := New(db)
 	assert.NoError(t, err)
 
-	ch := st.GetRequestedEventChannel()
+	ch := st.GetNewRedeemRequestedEventChannel()
 
-	ev := &etherman.RedeemRequestedEvent{}
-	ev.TxHash = common.RandBytes32()
-	ev.Sender = common.RandAddress()
+	ev := &ethsync.RedeemRequestedEvent{}
+	ev.RedeemRequestTxHash = common.RandBytes32()
+	ev.Requester = common.RandEthAddress()
 	ev.Amount = big.NewInt(100)
 	ev.Receiver = "abcd"
 
@@ -108,13 +108,13 @@ func TestUpdateFromRequestEvent(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	ok, err := st.has(ev.TxHash)
+	ok, err := st.has(ev.RedeemRequestTxHash)
 	assert.NoError(t, err)
 	assert.True(t, ok)
-	redeem, err := st.get(ev.TxHash)
+	redeem, err := st.get(ev.RedeemRequestTxHash)
 	assert.NoError(t, err)
-	assert.Equal(t, ev.TxHash, redeem.RequestTxHash)
-	assert.Equal(t, ev.Sender, redeem.Requester)
+	assert.Equal(t, ev.RedeemRequestTxHash, redeem.RequestTxHash)
+	assert.Equal(t, ev.Requester, redeem.Requester)
 	assert.Equal(t, ev.Amount, redeem.Amount)
 	assert.Equal(t, ev.Receiver, redeem.Receiver)
 
@@ -126,12 +126,12 @@ func TestErrFromPrepareEvent(t *testing.T) {
 	st, err := New(db)
 	assert.NoError(t, err)
 
-	prepCh := st.GetPreparedEventChannel()
+	prepCh := st.GetNewRedeemPreparedEventChannel()
 
-	prepEv := &etherman.RedeemPreparedEvent{}
-	prepEv.TxHash = common.RandBytes32()
-	prepEv.EthTxHash = common.RandBytes32()
-	prepEv.Requester = common.RandAddress()
+	prepEv := &ethsync.RedeemPreparedEvent{}
+	prepEv.RedeemPrepareTxHash = common.RandBytes32()
+	prepEv.RedeemRequestTxHash = common.RandBytes32()
+	prepEv.Requester = common.RandEthAddress()
 	prepEv.Amount = big.NewInt(100)
 	prepEv.OutpointTxIds = [][32]byte{common.RandBytes32()}
 	prepEv.OutpointIdxs = []uint16{0}
@@ -151,12 +151,12 @@ func TestUpdateFromPrepareEvent(t *testing.T) {
 	st, err := New(db)
 	assert.NoError(t, err)
 
-	reqCh := st.GetRequestedEventChannel()
-	prepCh := st.GetPreparedEventChannel()
+	reqCh := st.GetNewRedeemRequestedEventChannel()
+	prepCh := st.GetNewRedeemPreparedEventChannel()
 
-	reqEv := &etherman.RedeemRequestedEvent{}
-	reqEv.TxHash = common.RandBytes32()
-	reqEv.Sender = common.RandAddress()
+	reqEv := &ethsync.RedeemRequestedEvent{}
+	reqEv.RedeemRequestTxHash = common.RandBytes32()
+	reqEv.Requester = common.RandEthAddress()
 	reqEv.Amount = big.NewInt(100)
 	reqEv.Receiver = "abcd"
 
@@ -169,10 +169,10 @@ func TestUpdateFromPrepareEvent(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	prepEv := &etherman.RedeemPreparedEvent{}
-	prepEv.TxHash = common.RandBytes32()
-	prepEv.EthTxHash = reqEv.TxHash
-	prepEv.Requester = reqEv.Sender
+	prepEv := &ethsync.RedeemPreparedEvent{}
+	prepEv.RedeemPrepareTxHash = common.RandBytes32()
+	prepEv.RedeemRequestTxHash = reqEv.RedeemRequestTxHash
+	prepEv.Requester = reqEv.Requester
 	prepEv.Amount = new(big.Int).Set(reqEv.Amount)
 	prepEv.OutpointTxIds = [][32]byte{common.RandBytes32()}
 	prepEv.OutpointIdxs = []uint16{0}
@@ -181,9 +181,9 @@ func TestUpdateFromPrepareEvent(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	redeem, err := st.get(reqEv.TxHash)
+	redeem, err := st.get(reqEv.RedeemRequestTxHash)
 	assert.NoError(t, err)
-	assert.Equal(t, prepEv.TxHash, redeem.PrepareTxHash)
+	assert.Equal(t, prepEv.RedeemPrepareTxHash, redeem.PrepareTxHash)
 	for i, outpoint := range redeem.Outpoints {
 		assert.Equal(t, prepEv.OutpointTxIds[i], outpoint.TxId)
 		assert.Equal(t, prepEv.OutpointIdxs[i], outpoint.Idx)

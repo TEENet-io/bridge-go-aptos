@@ -8,7 +8,7 @@ import (
 
 	logger "github.com/0xPolygonHermez/zkevm-node/log"
 	"github.com/TEENet-io/bridge-go/common"
-	"github.com/TEENet-io/bridge-go/etherman"
+	"github.com/TEENet-io/bridge-go/ethsync"
 	"github.com/ethereum/go-ethereum/common/lru"
 	"github.com/ethereum/go-ethereum/crypto"
 )
@@ -28,9 +28,9 @@ type State struct {
 
 	db Database
 
-	newFinalizedCh chan *big.Int
-	requestedEvCh  chan *etherman.RedeemRequestedEvent
-	preparedEvCh   chan *etherman.RedeemPreparedEvent
+	newFinalizedCh         chan *big.Int
+	newRedeemRequestedEvCh chan *ethsync.RedeemRequestedEvent
+	newRedeemPreparedEvCh  chan *ethsync.RedeemPreparedEvent
 
 	cache struct {
 		lastFinalized atomic.Value // uint4
@@ -40,10 +40,10 @@ type State struct {
 
 func New(db Database) (*State, error) {
 	st := &State{
-		db:             db,
-		newFinalizedCh: make(chan *big.Int, 1),
-		requestedEvCh:  make(chan *etherman.RedeemRequestedEvent, MaxPendingRequestedEv),
-		preparedEvCh:   make(chan *etherman.RedeemPreparedEvent, MaxPendingPreparedEv),
+		db:                     db,
+		newFinalizedCh:         make(chan *big.Int, 1),
+		newRedeemRequestedEvCh: make(chan *ethsync.RedeemRequestedEvent, MaxPendingRequestedEv),
+		newRedeemPreparedEvCh:  make(chan *ethsync.RedeemPreparedEvent, MaxPendingPreparedEv),
 	}
 
 	st.cache.redeems = lru.NewCache[string, *Redeem](CacheSize)
@@ -106,19 +106,22 @@ func (st *State) Start(ctx context.Context) error {
 		// After receiving a redeem request event
 		// 1. 	Check the existence of the hash of the previous redeem requested tx.
 		// 		Skip if found
+		// 2. 	Check the validity of the btc address of the receiver
 		// 2.	Save a new redeem record in state db
-		case ev := <-st.requestedEvCh:
+		case ev := <-st.newRedeemRequestedEvCh:
 			// Check if the redeem already exists
-			ok, err := st.has(ev.TxHash)
+			ok, err := st.has(ev.RedeemRequestTxHash)
 			if err != nil {
 				return err
 			}
 
 			// If the redeem already exists, log a warning and continue
 			if ok {
-				logger.Warnf("redeem %s already exists", common.Shorten(common.Bytes32ToHexStr(ev.TxHash)))
+				logger.Warnf("redeem %s already exists", common.Shorten(common.Bytes32ToHexStr(ev.RedeemRequestTxHash)))
 				continue
 			}
+
+			// Check the validity of the btc address of the receiver
 
 			// Create a new redeem and save it to the database
 			redeem := (&Redeem{}).SetFromRequestedEvent(ev)
@@ -130,8 +133,8 @@ func (st *State) Start(ctx context.Context) error {
 		// 		Return error if not found
 		// 2.	Check whether the redeem has been prepared. Skip if prepared
 		// 3. 	If not yet prepared, update the redeem record in state db
-		case ev := <-st.preparedEvCh:
-			ok, err := st.has(ev.EthTxHash)
+		case ev := <-st.newRedeemPreparedEvCh:
+			ok, err := st.has(ev.RedeemRequestTxHash)
 			if err != nil {
 				return err
 			}
@@ -139,13 +142,14 @@ func (st *State) Start(ctx context.Context) error {
 				return errors.New(RedeemNotFound)
 			}
 
-			redeem, err := st.get(ev.EthTxHash)
+			redeem, err := st.get(ev.RedeemRequestTxHash)
 			if err != nil {
 				return err
 			}
 
 			if redeem.HasPrepared() {
-				logger.Warnf("redeem %s already prepared", common.Shorten(common.Bytes32ToHexStr(ev.EthTxHash)))
+				logger.Warnf("redeem %s already prepared",
+					common.Shorten(common.Bytes32ToHexStr(ev.RedeemRequestTxHash)))
 				continue
 			}
 
@@ -179,12 +183,12 @@ func (st *State) GetNewFinalizedBlockChannel() chan *big.Int {
 	return st.newFinalizedCh
 }
 
-func (st *State) GetRequestedEventChannel() chan *etherman.RedeemRequestedEvent {
-	return st.requestedEvCh
+func (st *State) GetNewRedeemRequestedEventChannel() chan *ethsync.RedeemRequestedEvent {
+	return st.newRedeemRequestedEvCh
 }
 
-func (st *State) GetPreparedEventChannel() chan *etherman.RedeemPreparedEvent {
-	return st.preparedEvCh
+func (st *State) GetNewRedeemPreparedEventChannel() chan *ethsync.RedeemPreparedEvent {
+	return st.newRedeemPreparedEvCh
 }
 
 func (st *State) setFinalizedBlockNumber(blk *big.Int) error {

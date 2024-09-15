@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/TEENet-io/bridge-go/common"
-	"github.com/TEENet-io/bridge-go/etherman"
+	"github.com/TEENet-io/bridge-go/ethsync"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -68,15 +68,15 @@ func TestHasCompleted(t *testing.T) {
 
 func TestSet(t *testing.T) {
 	redeem := &Redeem{}
-	reqEv := &etherman.RedeemRequestedEvent{}
-	reqEv.TxHash = common.RandBytes32()
-	reqEv.Sender = common.RandAddress()
+	reqEv := &ethsync.RedeemRequestedEvent{}
+	reqEv.RedeemRequestTxHash = common.RandBytes32()
+	reqEv.Requester = common.RandEthAddress()
 	reqEv.Amount = big.NewInt(100)
 	reqEv.Receiver = "abcd"
 
 	redeem.SetFromRequestedEvent(reqEv)
-	assert.Equal(t, reqEv.TxHash, redeem.RequestTxHash)
-	assert.Equal(t, reqEv.Sender, redeem.Requester)
+	assert.Equal(t, reqEv.RedeemRequestTxHash, redeem.RequestTxHash)
+	assert.Equal(t, reqEv.Requester, redeem.Requester)
 	assert.Equal(t, reqEv.Amount, redeem.Amount)
 	assert.Equal(t, reqEv.Receiver, redeem.Receiver)
 }
@@ -86,7 +86,7 @@ func randRedeem() *Redeem {
 		RequestTxHash: common.RandBytes32(),
 		PrepareTxHash: common.RandBytes32(),
 		BtcTxId:       common.RandBytes32(),
-		Requester:     common.RandAddress(),
+		Requester:     common.RandEthAddress(),
 		Amount:        big.NewInt(100),
 		Outpoints: []Outpoint{
 			{

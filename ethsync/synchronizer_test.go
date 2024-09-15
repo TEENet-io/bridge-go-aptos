@@ -22,13 +22,11 @@ func TestSync(t *testing.T) {
 	mockB2EState := NewMockBtc2EthState()
 
 	cfg := &Config{
-		Etherman:                       env.Etherman,
 		FrequencyToCheckFinalizedBlock: 100 * time.Millisecond,
-		Btc2EthState:                   mockB2EState,
-		Eth2BtcState:                   mockE2BState,
+		BtcChainConfig:                 common.MainNetParams(),
 	}
 
-	synchronizer := New(cfg)
+	synchronizer := New(env.Etherman, mockE2BState, mockB2EState, cfg)
 	if synchronizer == nil {
 		t.Fatal("failed to create synchronizer")
 	}
@@ -46,7 +44,7 @@ func TestSync(t *testing.T) {
 	go mockE2BState.Start(ctx)
 	go synchronizer.Sync(ctx)
 
-	sendTxs(t, env)
+	mintedEvs, reqeustedEvs, preparedEvs := sendTxs(t, env)
 
 	time.Sleep(200 * time.Millisecond)
 
@@ -56,27 +54,53 @@ func TestSync(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, blk.Number(), mockE2BState.lastFinalized)
-	assert.Equal(t, 1, len(mockE2BState.requestedEv))
+	assert.Equal(t, 2, len(mockE2BState.requestedEv))
 	assert.Equal(t, 1, len(mockE2BState.preparedEv))
 	assert.Equal(t, 1, len(mockB2EState.mintedEv))
+
+	assert.Equal(t, mintedEvs[0], mockB2EState.mintedEv[0])
+	assert.Equal(t, reqeustedEvs[0], mockE2BState.requestedEv[0])
+	assert.Equal(t, reqeustedEvs[1], mockE2BState.requestedEv[1])
+	assert.Equal(t, preparedEvs[0], mockE2BState.preparedEv[0])
 }
 
-func sendTxs(t *testing.T, env *etherman.TestEnv) {
+func sendTxs(t *testing.T, env *etherman.TestEnv) (
+	mintedEvs []*MintedEvent,
+	requestedEvs []*RedeemRequestedEvent,
+	preparedEvs []*RedeemPreparedEvent,
+) {
 	mintParams := env.GenMintParams(&etherman.ParamConfig{Deployer: 0, Receiver: 1, Amount: big.NewInt(100)})
-	_, err := env.Etherman.Mint(mintParams)
+	tx, err := env.Etherman.Mint(mintParams)
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	mintedEvs = append(mintedEvs, &MintedEvent{
+		MintedTxHash: [32]byte(tx.Hash().Bytes()),
+		BtcTxId:      mintParams.BtcTxId,
+		Amount:       new(big.Int).Set(mintParams.Amount),
+		Receiver:     mintParams.Receiver,
+	})
+
 	prepareParams := env.GenPrepareParams(&etherman.ParamConfig{Sender: 3, Requester: 4, Amount: big.NewInt(400)})
-	_, err = env.Etherman.RedeemPrepare(prepareParams)
+	tx, err = env.Etherman.RedeemPrepare(prepareParams)
 	if err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(200 * time.Millisecond)
 	env.Sim.Backend.Commit()
 
-	err = env.Etherman.TWBTCApprove(env.Sim.Accounts[1], big.NewInt(80))
+	preparedEvs = append(preparedEvs, &RedeemPreparedEvent{
+		RedeemPrepareTxHash: [32]byte(tx.Hash().Bytes()),
+		RedeemRequestTxHash: prepareParams.RedeemRequestTxHash,
+		Amount:              new(big.Int).Set(prepareParams.Amount),
+		Requester:           prepareParams.Requester,
+		Receiver:            string(prepareParams.Receiver),
+		OutpointTxIds:       prepareParams.OutpointTxIds,
+		OutpointIdxs:        prepareParams.OutpointIdxs,
+	})
+
+	err = env.Etherman.TWBTCApprove(env.Sim.Accounts[1], big.NewInt(100))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,8 +111,37 @@ func sendTxs(t *testing.T, env *etherman.TestEnv) {
 	if requestParams == nil {
 		t.Fatal("failed to generate request params")
 	}
-	_, err = env.Etherman.RedeemRequest(requestParams)
+	tx, err = env.Etherman.RedeemRequest(requestParams)
 	assert.NoError(t, err)
 	time.Sleep(200 * time.Millisecond)
 	env.Sim.Backend.Commit()
+
+	requestedEvs = append(requestedEvs, &RedeemRequestedEvent{
+		RedeemRequestTxHash: [32]byte(tx.Hash().Bytes()),
+		Requester:           requestParams.Auth.From,
+		Amount:              new(big.Int).Set(requestParams.Amount),
+		Receiver:            string(requestParams.Receiver),
+		IsValidReceiver:     true,
+	})
+
+	requestParams = env.GenRequestParams(&etherman.ParamConfig{Sender: 1, Amount: big.NewInt(20)})
+	if requestParams == nil {
+		t.Fatal("failed to generate request params")
+	}
+	// set invalid btc address
+	requestParams.Receiver = "abcd"
+	tx, err = env.Etherman.RedeemRequest(requestParams)
+	assert.NoError(t, err)
+	time.Sleep(200 * time.Millisecond)
+	env.Sim.Backend.Commit()
+
+	requestedEvs = append(requestedEvs, &RedeemRequestedEvent{
+		RedeemRequestTxHash: [32]byte(tx.Hash().Bytes()),
+		Requester:           requestParams.Auth.From,
+		Amount:              new(big.Int).Set(requestParams.Amount),
+		Receiver:            requestParams.Receiver,
+		IsValidReceiver:     false,
+	})
+
+	return
 }
