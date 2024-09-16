@@ -1,6 +1,7 @@
 package eth2btcstate
 
 const (
-	RedeemAlreadyPrepared = "redeem already prepared"
-	RedeemNotFound        = "redeem not found"
+	WarningRedeemAlreadyPrepared = "redeem already prepared"
+	ErrorRedeemNotFound          = "redeem not found"
+	ErrorRedeemInvalid           = "redeem invalid"
 )

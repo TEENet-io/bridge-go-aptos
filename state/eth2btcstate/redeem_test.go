@@ -55,6 +55,7 @@ func TestHasPrepared(t *testing.T) {
 	assert.False(t, redeem.HasPrepared())
 
 	redeem.PrepareTxHash = common.RandBytes32()
+	redeem.Status = RedeemStatusPrepared
 	assert.True(t, redeem.HasPrepared())
 }
 
@@ -63,6 +64,7 @@ func TestHasCompleted(t *testing.T) {
 	assert.False(t, redeem.HasCompleted())
 
 	redeem.BtcTxId = common.RandBytes32()
+	redeem.Status = RedeemStatusCompleted
 	assert.True(t, redeem.HasCompleted())
 }
 

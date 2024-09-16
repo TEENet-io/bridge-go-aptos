@@ -143,7 +143,7 @@ func TestErrFromPrepareEvent(t *testing.T) {
 	prepCh <- prepEv
 	time.Sleep(100 * time.Millisecond)
 
-	assert.Equal(t, RedeemNotFound, err.Error())
+	assert.Equal(t, ErrorRedeemNotFound, err.Error())
 }
 
 func TestUpdateFromPrepareEvent(t *testing.T) {
@@ -158,7 +158,8 @@ func TestUpdateFromPrepareEvent(t *testing.T) {
 	reqEv.RedeemRequestTxHash = common.RandBytes32()
 	reqEv.Requester = common.RandEthAddress()
 	reqEv.Amount = big.NewInt(100)
-	reqEv.Receiver = "abcd"
+	reqEv.Receiver = "valid_btc_address"
+	reqEv.IsValidReceiver = true
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

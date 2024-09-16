@@ -14,6 +14,15 @@ type Outpoint struct {
 	Idx  uint16
 }
 
+type RedeemStatus string
+
+const (
+	RedeemStatusRequested RedeemStatus = "requested"
+	RedeemStatusPrepared  RedeemStatus = "prepared"
+	RedeemStatusCompleted RedeemStatus = "completed"
+	RedeemStatusInvalid   RedeemStatus = "invalid"
+)
+
 type Redeem struct {
 	RequestTxHash [32]byte
 	PrepareTxHash [32]byte
@@ -22,6 +31,7 @@ type Redeem struct {
 	Amount        *big.Int
 	Outpoints     []Outpoint
 	Receiver      string // receiver btc address
+	Status        RedeemStatus
 }
 
 func (r *Redeem) SetFromRequestedEvent(ev *ethsync.RedeemRequestedEvent) *Redeem {
@@ -29,6 +39,11 @@ func (r *Redeem) SetFromRequestedEvent(ev *ethsync.RedeemRequestedEvent) *Redeem
 	r.Requester = ev.Requester
 	r.Amount = new(big.Int).Set(ev.Amount)
 	r.Receiver = ev.Receiver
+	if ev.IsValidReceiver {
+		r.Status = RedeemStatusRequested
+	} else {
+		r.Status = RedeemStatusInvalid
+	}
 
 	return r
 }
@@ -41,6 +56,8 @@ func (r *Redeem) SetFromPreparedEvent(ev *ethsync.RedeemPreparedEvent) *Redeem {
 			Idx:  ev.OutpointIdxs[i],
 		})
 	}
+
+	r.Status = RedeemStatusPrepared
 
 	return r
 }
@@ -89,11 +106,15 @@ func (r *Redeem) UnmarshalJSON(data []byte) error {
 }
 
 func (r *Redeem) HasPrepared() bool {
-	return r.PrepareTxHash != [32]byte{}
+	return r.PrepareTxHash != [32]byte{} && r.Status == RedeemStatusPrepared
 }
 
 func (r *Redeem) HasCompleted() bool {
-	return r.BtcTxId != [32]byte{}
+	return r.BtcTxId != [32]byte{} && r.Status == RedeemStatusCompleted
+}
+
+func (r *Redeem) IsValid() bool {
+	return r.Status != RedeemStatusInvalid
 }
 
 func (r *Redeem) Clone() *Redeem {

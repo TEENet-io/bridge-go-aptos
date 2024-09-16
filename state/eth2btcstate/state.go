@@ -33,8 +33,8 @@ type State struct {
 	newRedeemPreparedEvCh  chan *ethsync.RedeemPreparedEvent
 
 	cache struct {
-		lastFinalized atomic.Value // uint4
-		redeems       *lru.Cache[string, *Redeem]
+		lastFinalized atomic.Value // uint64
+		redeems       *lru.Cache[[32]byte, *Redeem]
 	}
 }
 
@@ -46,7 +46,7 @@ func New(db Database) (*State, error) {
 		newRedeemPreparedEvCh:  make(chan *ethsync.RedeemPreparedEvent, MaxPendingPreparedEv),
 	}
 
-	st.cache.redeems = lru.NewCache[string, *Redeem](CacheSize)
+	st.cache.redeems = lru.NewCache[[32]byte, *Redeem](CacheSize)
 
 	ok, err := st.db.Has(KeyLastFinalizedBlock)
 	if err != nil {
@@ -106,7 +106,6 @@ func (st *State) Start(ctx context.Context) error {
 		// After receiving a redeem request event
 		// 1. 	Check the existence of the hash of the previous redeem requested tx.
 		// 		Skip if found
-		// 2. 	Check the validity of the btc address of the receiver
 		// 2.	Save a new redeem record in state db
 		case ev := <-st.newRedeemRequestedEvCh:
 			// Check if the redeem already exists
@@ -115,13 +114,10 @@ func (st *State) Start(ctx context.Context) error {
 				return err
 			}
 
-			// If the redeem already exists, log a warning and continue
 			if ok {
 				logger.Warnf("redeem %s already exists", common.Shorten(common.Bytes32ToHexStr(ev.RedeemRequestTxHash)))
 				continue
 			}
-
-			// Check the validity of the btc address of the receiver
 
 			// Create a new redeem and save it to the database
 			redeem := (&Redeem{}).SetFromRequestedEvent(ev)
@@ -129,27 +125,26 @@ func (st *State) Start(ctx context.Context) error {
 				return err
 			}
 		// After receiving a redeem prepared event
-		// 1. 	Check the existence of the hash of the previous redeem requested tx.
-		// 		Return error if not found
-		// 2.	Check whether the redeem has been prepared. Skip if prepared
-		// 3. 	If not yet prepared, update the redeem record in state db
+		// 1. 	Extract redeem from db using ev.RedeemRequestTxHash
+		// 2. 	Return error if not existing
+		// 3.   Return error if invalid
+		// 4.   Skip if already prepared
+		// 4.   Update redeem accordingly and save it to db
 		case ev := <-st.newRedeemPreparedEvCh:
-			ok, err := st.has(ev.RedeemRequestTxHash)
-			if err != nil {
-				return err
-			}
-			if !ok {
-				return errors.New(RedeemNotFound)
-			}
-
 			redeem, err := st.get(ev.RedeemRequestTxHash)
 			if err != nil {
 				return err
 			}
 
-			if redeem.HasPrepared() {
-				logger.Warnf("redeem %s already prepared",
-					common.Shorten(common.Bytes32ToHexStr(ev.RedeemRequestTxHash)))
+			if redeem == nil {
+				return errors.New(ErrorRedeemNotFound)
+			}
+
+			if redeem.Status == RedeemStatusInvalid {
+				return errors.New(ErrorRedeemInvalid)
+			}
+
+			if redeem.Status != RedeemStatusRequested {
 				continue
 			}
 
@@ -210,7 +205,7 @@ func (st *State) put(r *Redeem) error {
 		return err
 	}
 
-	st.cache.redeems.Add(common.Bytes32ToHexStr(r.RequestTxHash), r.Clone())
+	st.cache.redeems.Add(r.RequestTxHash, r.Clone())
 
 	return nil
 }
@@ -222,7 +217,7 @@ func (st *State) get(ethTxHash [32]byte) (*Redeem, error) {
 	}
 
 	if ok {
-		if r, ok := st.cache.redeems.Get(common.Bytes32ToHexStr(ethTxHash)); ok {
+		if r, ok := st.cache.redeems.Get(ethTxHash); ok {
 			return r.Clone(), nil
 		}
 	}
@@ -231,9 +226,7 @@ func (st *State) get(ethTxHash [32]byte) (*Redeem, error) {
 }
 
 func (st *State) has(ethTxHash [32]byte) (bool, error) {
-	id := common.Bytes32ToHexStr(ethTxHash)
-
-	if st.cache.redeems.Contains(id) {
+	if st.cache.redeems.Contains(ethTxHash) {
 		return true, nil
 	}
 
@@ -253,7 +246,7 @@ func (st *State) has(ethTxHash [32]byte) (bool, error) {
 			return false, err
 		}
 
-		st.cache.redeems.Add(id, redeem)
+		st.cache.redeems.Add(ethTxHash, redeem)
 
 		return true, nil
 	}
