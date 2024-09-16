@@ -20,14 +20,12 @@ func TestNewState(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, finalized, common.EthStartingBlock)
 
-	finalized = big.NewInt(100)
+	// return error when stored finalized block number less than the default starting block number
+	finalized = new(big.Int).Sub(common.EthStartingBlock, big.NewInt(1))
 	db = rawdb.NewMemoryDatabase()
 	db.Put(KeyLastFinalizedBlock, finalized.Bytes())
-	st, err = New(db)
-	assert.NoError(t, err)
-	finalized, err = st.GetFinalizedBlockNumber()
-	assert.NoError(t, err)
-	assert.Equal(t, finalized, big.NewInt(100))
+	_, err = New(db)
+	assert.Equal(t, err.Error(), ErrorFinalizedBlockNumberInvalid)
 }
 
 func TestUpdateFinalizedBlockNumber(t *testing.T) {
@@ -36,8 +34,8 @@ func TestUpdateFinalizedBlockNumber(t *testing.T) {
 	assert.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
-
 	go st.Start(ctx)
+	defer cancel()
 
 	// test updating last finalized block number
 	ch := st.GetNewFinalizedBlockChannel()
@@ -54,8 +52,6 @@ func TestUpdateFinalizedBlockNumber(t *testing.T) {
 	finalized, err = st.GetFinalizedBlockNumber()
 	assert.NoError(t, err)
 	assert.Equal(t, finalized, common.EthStartingBlock.Add(common.EthStartingBlock, big.NewInt(1)))
-
-	cancel()
 }
 
 func TestDBOps(t *testing.T) {
@@ -77,16 +73,16 @@ func TestDBOps(t *testing.T) {
 
 	redeem2, err := st.get(redeem.RequestTxHash)
 	assert.NoError(t, err)
-	assert.True(t, redeem.Equal(redeem2))
+	assert.Equal(t, redeem, redeem2)
 
 	// make sure the returned is a copy, not a reference
 	redeem2.BtcTxId = common.RandBytes32()
 	redeem3, err := st.get(redeem.RequestTxHash)
 	assert.NoError(t, err)
-	assert.True(t, redeem.Equal(redeem3))
+	assert.Equal(t, redeem, redeem3)
 }
 
-func TestUpdateFromRequestEvent(t *testing.T) {
+func TestNewRedeemRequestedEvent(t *testing.T) {
 	db := rawdb.NewMemoryDatabase()
 	st, err := New(db)
 	assert.NoError(t, err)
@@ -97,98 +93,86 @@ func TestUpdateFromRequestEvent(t *testing.T) {
 	ev.RedeemRequestTxHash = common.RandBytes32()
 	ev.Requester = common.RandEthAddress()
 	ev.Amount = big.NewInt(100)
-	ev.Receiver = "abcd"
+	ev.Receiver = "valid_btc_address"
+	ev.IsValidReceiver = true
 
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	go func() { err = st.Start(ctx) }()
+	defer cancel()
 
 	ch <- ev
 
 	time.Sleep(100 * time.Millisecond)
-
-	ok, err := st.has(ev.RedeemRequestTxHash)
 	assert.NoError(t, err)
-	assert.True(t, ok)
-	redeem, err := st.get(ev.RedeemRequestTxHash)
-	assert.NoError(t, err)
-	assert.Equal(t, ev.RedeemRequestTxHash, redeem.RequestTxHash)
-	assert.Equal(t, ev.Requester, redeem.Requester)
-	assert.Equal(t, ev.Amount, redeem.Amount)
-	assert.Equal(t, ev.Receiver, redeem.Receiver)
+	redeem1, err := st.get(ev.RedeemRequestTxHash)
+	redeem2 := &Redeem{}
+	redeem2, err = redeem2.SetFromRequestedEvent(ev)
+	assert.Equal(t, redeem1, redeem2)
 
+	ev.Requester = common.RandEthAddress()
+	ev.Amount = big.NewInt(200)
 	ch <- ev // warning should be printed
+	time.Sleep(100 * time.Millisecond)
+
+	// redeem not changed
+	redeem3, err := st.get(ev.RedeemRequestTxHash)
+	assert.NoError(t, err)
+	assert.Equal(t, redeem1, redeem3)
 }
 
-func TestErrFromPrepareEvent(t *testing.T) {
+func TestNewRedeemPreparedEvent(t *testing.T) {
 	db := rawdb.NewMemoryDatabase()
 	st, err := New(db)
 	assert.NoError(t, err)
 
-	prepCh := st.GetNewRedeemPreparedEventChannel()
+	redeem := randRedeem()
+	ch := st.GetNewRedeemPreparedEventChannel()
 
-	prepEv := &ethsync.RedeemPreparedEvent{}
-	prepEv.RedeemPrepareTxHash = common.RandBytes32()
-	prepEv.RedeemRequestTxHash = common.RandBytes32()
-	prepEv.Requester = common.RandEthAddress()
-	prepEv.Amount = big.NewInt(100)
-	prepEv.OutpointTxIds = [][32]byte{common.RandBytes32()}
-	prepEv.OutpointIdxs = []uint16{0}
+	ev := &ethsync.RedeemPreparedEvent{}
+	ev.RedeemPrepareTxHash = common.RandBytes32()
+	ev.RedeemRequestTxHash = redeem.RequestTxHash
+	ev.Requester = redeem.Requester
+	ev.Receiver = redeem.Receiver
+	ev.Amount = new(big.Int).Set(redeem.Amount)
+	ev.OutpointTxIds = [][32]byte{common.RandBytes32(), common.RandBytes32()}
+	ev.OutpointIdxs = []uint16{1, 2}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	go func() { err = st.Start(ctx) }()
-	prepCh <- prepEv
-	time.Sleep(100 * time.Millisecond)
-
-	assert.Equal(t, ErrorRedeemNotFound, err.Error())
-}
-
-func TestUpdateFromPrepareEvent(t *testing.T) {
-	db := rawdb.NewMemoryDatabase()
-	st, err := New(db)
-	assert.NoError(t, err)
-
-	reqCh := st.GetNewRedeemRequestedEventChannel()
-	prepCh := st.GetNewRedeemPreparedEventChannel()
-
-	reqEv := &ethsync.RedeemRequestedEvent{}
-	reqEv.RedeemRequestTxHash = common.RandBytes32()
-	reqEv.Requester = common.RandEthAddress()
-	reqEv.Amount = big.NewInt(100)
-	reqEv.Receiver = "valid_btc_address"
-	reqEv.IsValidReceiver = true
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	go func() { err = st.Start(ctx) }()
-
-	reqCh <- reqEv
-
-	time.Sleep(100 * time.Millisecond)
-
-	prepEv := &ethsync.RedeemPreparedEvent{}
-	prepEv.RedeemPrepareTxHash = common.RandBytes32()
-	prepEv.RedeemRequestTxHash = reqEv.RedeemRequestTxHash
-	prepEv.Requester = reqEv.Requester
-	prepEv.Amount = new(big.Int).Set(reqEv.Amount)
-	prepEv.OutpointTxIds = [][32]byte{common.RandBytes32()}
-	prepEv.OutpointIdxs = []uint16{0}
-
-	prepCh <- prepEv
-
-	time.Sleep(100 * time.Millisecond)
-
-	redeem, err := st.get(reqEv.RedeemRequestTxHash)
-	assert.NoError(t, err)
-	assert.Equal(t, prepEv.RedeemPrepareTxHash, redeem.PrepareTxHash)
-	for i, outpoint := range redeem.Outpoints {
-		assert.Equal(t, prepEv.OutpointTxIds[i], outpoint.TxId)
-		assert.Equal(t, prepEv.OutpointIdxs[i], outpoint.Idx)
+	run := func() {
+		ctx, cancel := context.WithCancel(context.Background())
+		go func() { err = st.Start(ctx) }()
+		defer cancel()
+		ch <- ev
+		time.Sleep(100 * time.Millisecond)
 	}
 
-	prepCh <- prepEv // warning should be printed
+	// redeem not found
+	run()
+	assert.Equal(t, ErrorRedeemNotFound, err.Error())
+
+	// redeem invalid
+	redeem.Status = RedeemStatusInvalid
+	err = st.put(redeem)
+	assert.NoError(t, err)
+	run()
+	assert.Equal(t, ErrorRedeemInvalid, err.Error())
+
+	// do nothing
+	redeem.Status = RedeemStatusCompleted
+	err = st.put(redeem)
+	assert.NoError(t, err)
+	run()
+	redeem2, err := st.get(redeem.RequestTxHash)
+	assert.Equal(t, redeem, redeem2)
+
+	// success
+	redeem.Status = RedeemStatusRequested
+	err = st.put(redeem)
+	assert.NoError(t, err)
+	run()
+	redeem3, err := st.get(redeem.RequestTxHash)
+	assert.NoError(t, err)
+	assert.Equal(t, RedeemStatusPrepared, redeem3.Status)
+	redeem4, err := redeem.SetFromPreparedEvent(ev)
+	assert.NoError(t, err)
+	assert.Equal(t, redeem3, redeem4)
 }

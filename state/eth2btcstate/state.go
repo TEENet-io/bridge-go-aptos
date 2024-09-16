@@ -22,10 +22,15 @@ var (
 	KeyLastFinalizedBlock = crypto.Keccak256Hash([]byte("lastFinalizedBlock")).Bytes()
 )
 
-type State struct {
-	ctx    context.Context
-	cancel context.CancelFunc
+const (
+	WarningRedeemAlreadyPrepared = "redeem already prepared"
 
+	ErrorRedeemNotFound              = "redeem not found"
+	ErrorRedeemInvalid               = "redeem invalid"
+	ErrorFinalizedBlockNumberInvalid = "finalized block number invalid"
+)
+
+type State struct {
 	db Database
 
 	newFinalizedCh         chan *big.Int
@@ -54,6 +59,7 @@ func New(db Database) (*State, error) {
 	}
 
 	if !ok {
+		logger.Warnf("no stored last finalized block number found, using the default value %v", common.EthStartingBlock)
 		// save the default value
 		db.Put(KeyLastFinalizedBlock, common.EthStartingBlock.Bytes())
 		st.cache.lastFinalized.Store(common.EthStartingBlock.Bytes())
@@ -69,7 +75,7 @@ func New(db Database) (*State, error) {
 		if lastFinalized.Cmp(common.EthStartingBlock) == -1 {
 			logger.Errorf("stored value %s less than the starting block number %s",
 				lastFinalized.Text(10), common.EthStartingBlock.Text(10))
-			st.cache.lastFinalized.Store(common.EthStartingBlock.Bytes())
+			return nil, errors.New(ErrorFinalizedBlockNumberInvalid)
 		}
 		st.cache.lastFinalized.Store(lastFinalizedBytes)
 	}
@@ -78,8 +84,6 @@ func New(db Database) (*State, error) {
 }
 
 func (st *State) Start(ctx context.Context) error {
-	st.ctx, st.cancel = context.WithCancel(context.Background())
-
 	logger.Info("starting eth2btc state")
 	defer logger.Info("stopping eth2btc state")
 
@@ -120,7 +124,10 @@ func (st *State) Start(ctx context.Context) error {
 			}
 
 			// Create a new redeem and save it to the database
-			redeem := (&Redeem{}).SetFromRequestedEvent(ev)
+			redeem, err := (&Redeem{}).SetFromRequestedEvent(ev)
+			if err != nil {
+				return err
+			}
 			if err := st.put(redeem); err != nil {
 				return err
 			}
@@ -148,16 +155,15 @@ func (st *State) Start(ctx context.Context) error {
 				continue
 			}
 
-			err = st.put(redeem.SetFromPreparedEvent(ev))
+			redeem, err = redeem.SetFromPreparedEvent(ev)
 			if err != nil {
+				return err
+			}
+			if err = st.put(redeem); err != nil {
 				return err
 			}
 		}
 	}
-}
-
-func (st *State) Stop() {
-	st.cancel()
 }
 
 func (st *State) GetFinalizedBlockNumber() (*big.Int, error) {

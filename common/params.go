@@ -3,5 +3,5 @@ package common
 import "math/big"
 
 var (
-	EthStartingBlock = big.NewInt(0)
+	EthStartingBlock = big.NewInt(100)
 )
