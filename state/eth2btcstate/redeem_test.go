@@ -47,7 +47,7 @@ func TestClone(t *testing.T) {
 	redeem := randRedeem()
 
 	clone := redeem.Clone()
-	assert.True(t, redeem.Equal(clone))
+	assert.Equal(t, redeem, clone)
 }
 
 func TestHasPrepared(t *testing.T) {
@@ -68,19 +68,84 @@ func TestHasCompleted(t *testing.T) {
 	assert.True(t, redeem.HasCompleted())
 }
 
-func TestSet(t *testing.T) {
+func TestSetFromRequestEvent(t *testing.T) {
+	ev := &ethsync.RedeemRequestedEvent{}
 	redeem := &Redeem{}
-	reqEv := &ethsync.RedeemRequestedEvent{}
-	reqEv.RedeemRequestTxHash = common.RandBytes32()
-	reqEv.Requester = common.RandEthAddress()
-	reqEv.Amount = big.NewInt(100)
-	reqEv.Receiver = "abcd"
 
-	redeem.SetFromRequestedEvent(reqEv)
-	assert.Equal(t, reqEv.RedeemRequestTxHash, redeem.RequestTxHash)
-	assert.Equal(t, reqEv.Requester, redeem.Requester)
-	assert.Equal(t, reqEv.Amount, redeem.Amount)
-	assert.Equal(t, reqEv.Receiver, redeem.Receiver)
+	_, err := redeem.SetFromRequestedEvent(ev)
+	assert.Equal(t, ErrorRedeemRequestTxHashInvalid, err.Error())
+
+	// invalid requester
+	ev.RedeemRequestTxHash = common.RandBytes32()
+	_, err = redeem.SetFromRequestedEvent(ev)
+	assert.Equal(t, ErrorRequesterInvalid, err.Error())
+
+	// nil amount
+	ev.Requester = common.RandEthAddress()
+	_, err = redeem.SetFromRequestedEvent(ev)
+	assert.Equal(t, ErrorAmountInvalid, err.Error())
+
+	// zero amount
+	ev.Amount = big.NewInt(0)
+	_, err = redeem.SetFromRequestedEvent(ev)
+	assert.Equal(t, ErrorAmountInvalid, err.Error())
+
+	// success
+	ev.Amount = big.NewInt(100)
+	ev.Receiver = "valid_btc_address"
+	ev.IsValidReceiver = true
+
+	_, err = redeem.SetFromRequestedEvent(ev)
+	assert.NoError(t, err)
+}
+
+func TestUpdateFromPrepareEvent(t *testing.T) {
+	redeem := randRedeem()
+	ev := &ethsync.RedeemPreparedEvent{}
+
+	// invalid request tx hash
+	_, err := redeem.SetFromPreparedEvent(ev)
+	assert.Equal(t, ErrorRedeemPrepareTxHashInvalid, err.Error())
+
+	// unmatch request tx hash
+	ev.RedeemPrepareTxHash = common.RandBytes32()
+	ev.RedeemRequestTxHash = common.RandBytes32()
+	_, err = redeem.SetFromPreparedEvent(ev)
+	assert.Equal(t, ErrorRedeemRequestTxHashUnmatched, err.Error())
+
+	// unmatched requester
+	ev.RedeemRequestTxHash = redeem.RequestTxHash
+	ev.Requester = common.RandEthAddress()
+	_, err = redeem.SetFromPreparedEvent(ev)
+	assert.Equal(t, ErrorRequesterUnmatched, err.Error())
+
+	// nil amount
+	ev.Requester = redeem.Requester
+	_, err = redeem.SetFromPreparedEvent(ev)
+	assert.Equal(t, ErrorAmountInvalid, err.Error())
+
+	// unmatch amount
+	ev.Amount = new(big.Int).Add(redeem.Amount, big.NewInt(1))
+	_, err = redeem.SetFromPreparedEvent(ev)
+	assert.Equal(t, ErrorAmountUnmatched, err.Error())
+
+	// receiver unmatched
+	ev.Amount = new(big.Int).Set(redeem.Amount)
+	_, err = redeem.SetFromPreparedEvent(ev)
+	assert.Equal(t, ErrorReceiverUnmatched, err.Error())
+
+	// empty outpoints
+	ev.Receiver = redeem.Receiver
+	_, err = redeem.SetFromPreparedEvent(ev)
+	assert.Equal(t, ErrorOutpointsEmpty, err.Error())
+	ev.OutpointTxIds = [][32]byte{common.RandBytes32()}
+	_, err = redeem.SetFromPreparedEvent(ev)
+	assert.Equal(t, ErrorOutpointsEmpty, err.Error())
+
+	// success
+	ev.OutpointIdxs = []uint16{0}
+	_, err = redeem.SetFromPreparedEvent(ev)
+	assert.NoError(t, err)
 }
 
 func randRedeem() *Redeem {

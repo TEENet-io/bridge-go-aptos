@@ -2,6 +2,7 @@ package eth2btcstate
 
 import (
 	"encoding/json"
+	"errors"
 	"math/big"
 
 	"github.com/TEENet-io/bridge-go/common"
@@ -21,6 +22,17 @@ const (
 	RedeemStatusPrepared  RedeemStatus = "prepared"
 	RedeemStatusCompleted RedeemStatus = "completed"
 	RedeemStatusInvalid   RedeemStatus = "invalid"
+
+	ErrorAmountInvalid                = "amount invalid"
+	ErrorRequesterInvalid             = "requester address invalid"
+	ErrorRedeemRequestTxHashInvalid   = "redeem request tx hash invalid"
+	ErrorRedeemPrepareTxHashInvalid   = "redeem prepare tx hash invalid"
+	ErrorRedeemRequestTxHashUnmatched = "redeem request tx hash unmatched"
+	ErrorRequesterUnmatched           = "requester unmatched"
+	ErrorAmountUnmatched              = "amount unmatched"
+	ErrorReceiverUnmatched            = "receiver unmatched"
+	ErrorOutpointsEmpty               = "outpoints empty"
+	ErrorOutpointTxIdInvalid          = "outpoint tx id invalid"
 )
 
 type Redeem struct {
@@ -34,7 +46,19 @@ type Redeem struct {
 	Status        RedeemStatus
 }
 
-func (r *Redeem) SetFromRequestedEvent(ev *ethsync.RedeemRequestedEvent) *Redeem {
+func (r *Redeem) SetFromRequestedEvent(ev *ethsync.RedeemRequestedEvent) (*Redeem, error) {
+	if ev.RedeemRequestTxHash == [32]byte{} {
+		return nil, errors.New(ErrorRedeemRequestTxHashInvalid)
+	}
+
+	if ev.Requester == [20]byte{} {
+		return nil, errors.New(ErrorRequesterInvalid)
+	}
+
+	if ev.Amount == nil || ev.Amount.Sign() <= 0 {
+		return nil, errors.New(ErrorAmountInvalid)
+	}
+
 	r.RequestTxHash = ev.RedeemRequestTxHash
 	r.Requester = ev.Requester
 	r.Amount = new(big.Int).Set(ev.Amount)
@@ -45,12 +69,44 @@ func (r *Redeem) SetFromRequestedEvent(ev *ethsync.RedeemRequestedEvent) *Redeem
 		r.Status = RedeemStatusInvalid
 	}
 
-	return r
+	return r, nil
 }
 
-func (r *Redeem) SetFromPreparedEvent(ev *ethsync.RedeemPreparedEvent) *Redeem {
+func (r *Redeem) SetFromPreparedEvent(ev *ethsync.RedeemPreparedEvent) (*Redeem, error) {
+	if ev.RedeemPrepareTxHash == [32]byte{} {
+		return nil, errors.New(ErrorRedeemPrepareTxHashInvalid)
+	}
+
+	if ev.RedeemRequestTxHash != r.RequestTxHash {
+		return nil, errors.New(ErrorRedeemRequestTxHashUnmatched)
+	}
+
+	if ev.Requester != r.Requester {
+		return nil, errors.New(ErrorRequesterUnmatched)
+	}
+
+	if ev.Amount == nil {
+		return nil, errors.New(ErrorAmountInvalid)
+	}
+
+	if ev.Amount.Cmp(r.Amount) != 0 {
+		return nil, errors.New(ErrorAmountUnmatched)
+	}
+
+	if ev.Receiver != r.Receiver {
+		return nil, errors.New(ErrorReceiverUnmatched)
+	}
+
+	if len(ev.OutpointTxIds) == 0 || len(ev.OutpointIdxs) == 0 {
+		return nil, errors.New(ErrorOutpointsEmpty)
+	}
+
 	r.PrepareTxHash = ev.RedeemPrepareTxHash
 	for i := range ev.OutpointIdxs {
+		if ev.OutpointTxIds[i] == [32]byte{} {
+			return nil, errors.New(ErrorOutpointTxIdInvalid)
+		}
+
 		r.Outpoints = append(r.Outpoints, Outpoint{
 			TxId: ev.OutpointTxIds[i],
 			Idx:  ev.OutpointIdxs[i],
@@ -59,7 +115,7 @@ func (r *Redeem) SetFromPreparedEvent(ev *ethsync.RedeemPreparedEvent) *Redeem {
 
 	r.Status = RedeemStatusPrepared
 
-	return r
+	return r, nil
 }
 
 func (r *Redeem) MarshalJSON() ([]byte, error) {
@@ -118,53 +174,8 @@ func (r *Redeem) IsValid() bool {
 }
 
 func (r *Redeem) Clone() *Redeem {
-	clone := &Redeem{}
-	clone.RequestTxHash = r.RequestTxHash
-	clone.PrepareTxHash = r.PrepareTxHash
-	clone.BtcTxId = r.BtcTxId
-	clone.Requester = r.Requester
+	clone := *r
 	clone.Amount = new(big.Int).Set(r.Amount)
-	clone.Outpoints = make([]Outpoint, len(r.Outpoints))
-	clone.Receiver = r.Receiver
-	copy(clone.Outpoints, r.Outpoints)
 
-	return clone
-}
-
-func (r *Redeem) Equal(other *Redeem) bool {
-	if r.RequestTxHash != other.RequestTxHash {
-		return false
-	}
-
-	if r.PrepareTxHash != other.PrepareTxHash {
-		return false
-	}
-
-	if r.BtcTxId != other.BtcTxId {
-		return false
-	}
-
-	if r.Requester.Hex() != other.Requester.Hex() {
-		return false
-	}
-
-	if r.Amount.Cmp(other.Amount) != 0 {
-		return false
-	}
-
-	if len(r.Outpoints) != len(other.Outpoints) {
-		return false
-	}
-
-	for i := range r.Outpoints {
-		if r.Outpoints[i].TxId != other.Outpoints[i].TxId {
-			return false
-		}
-
-		if r.Outpoints[i].Idx != other.Outpoints[i].Idx {
-			return false
-		}
-	}
-
-	return true
+	return &clone
 }
