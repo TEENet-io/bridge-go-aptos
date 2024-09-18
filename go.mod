@@ -8,6 +8,7 @@ require (
 	github.com/btcsuite/btcd/btcec/v2 v2.3.4
 	github.com/btcsuite/btcd/btcutil v1.1.6
 	github.com/ethereum/go-ethereum v1.14.8
+	github.com/mattn/go-sqlite3 v1.14.23
 	github.com/stretchr/testify v1.9.0
 )
 

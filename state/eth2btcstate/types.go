@@ -13,4 +13,5 @@ type JSONRedeem struct {
 	Amount        string         `json:"amount"`
 	Outpoints     []JSONOutpoint `json:"outpoints"`
 	Receiver      string         `json:"receiver"`
+	Status        string         `json:"status"`
 }
