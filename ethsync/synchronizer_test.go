@@ -31,7 +31,8 @@ func TestSync(t *testing.T) {
 		EthChainID:                     chainID,
 	}
 
-	synchronizer := New(env.Etherman, mockE2BState, mockB2EState, cfg)
+	synchronizer, err := New(env.Etherman, mockE2BState, mockB2EState, cfg)
+	assert.NoError(t, err)
 	if synchronizer == nil {
 		t.Fatal("failed to create synchronizer")
 	}
