@@ -13,7 +13,7 @@ type StateDB struct {
 
 var stateDBErrors StateDBError
 
-func NewStateDB(driverName, dataSourceName string) (*StateDB, error) {
+func newStateDB(driverName, dataSourceName string) (*StateDB, error) {
 	db, err := sql.Open(driverName, dataSourceName)
 	if err != nil {
 		return nil, err
@@ -43,7 +43,7 @@ func (st *StateDB) Close() error {
 	return nil
 }
 
-func (st *StateDB) InsertAfterRequested(redeem *Redeem) error {
+func (st *StateDB) insertAfterRequested(redeem *Redeem) error {
 	if redeem.Status != RedeemStatusRequested && redeem.Status != RedeemStatusInvalid {
 		return stateDBErrors.CannotInsertDueToInvalidStatus(redeem)
 	}
@@ -78,7 +78,7 @@ func (st *StateDB) InsertAfterRequested(redeem *Redeem) error {
 	return nil
 }
 
-func (st *StateDB) UpdateAfterPrepared(redeem *Redeem) error {
+func (st *StateDB) updateAfterPrepared(redeem *Redeem) error {
 	if redeem.Status != RedeemStatusPrepared {
 		return stateDBErrors.CannotUpdateDueToInvalidStatus(redeem)
 	}
@@ -101,7 +101,7 @@ func (st *StateDB) UpdateAfterPrepared(redeem *Redeem) error {
 	return nil
 }
 
-func (st *StateDB) GetByStatus(status RedeemStatus) ([]*Redeem, error) {
+func (st *StateDB) getByStatus(status RedeemStatus) ([]*Redeem, error) {
 	var query string
 	if status == RedeemStatusRequested || status == RedeemStatusInvalid {
 		query = `SELECT requestTxHash, requester, receiver, amount, status FROM redeem WHERE status = ?`
@@ -171,7 +171,7 @@ func (st *StateDB) GetByStatus(status RedeemStatus) ([]*Redeem, error) {
 	return redeems, nil
 }
 
-func (st *StateDB) Get(requestTxHash []byte, status RedeemStatus) (redeem *Redeem, err error) {
+func (st *StateDB) get(requestTxHash []byte, status RedeemStatus) (redeem *Redeem, err error) {
 	var query string
 	if status == RedeemStatusRequested || status == RedeemStatusInvalid {
 		query = `SELECT 
@@ -245,17 +245,20 @@ func (st *StateDB) Get(requestTxHash []byte, status RedeemStatus) (redeem *Redee
 	return
 }
 
-func (st *StateDB) Has(requestTxHash []byte) (bool, error) {
-	query := `SELECT EXISTS(SELECT 1 FROM redeem WHERE requestTxHash = ?)`
+func (st *StateDB) has(requestTxHash []byte) (bool, RedeemStatus, error) {
+	query := `SELECT status FROM redeem WHERE requestTxHash = ?`
 	stmt := st.stmtCache.MustPrepare(query)
 
 	hash := ethcommon.Bytes2Hex(requestTxHash)
-	var exists bool
-	if err := stmt.QueryRow(hash).Scan(&exists); err != nil {
-		return false, err
+	var status string
+	if err := stmt.QueryRow(hash).Scan(&status); err != nil {
+		if err == sql.ErrNoRows {
+			return false, "", nil
+		}
+		return false, "", err
 	}
 
-	return exists, nil
+	return true, RedeemStatus(status), nil
 }
 
 func (st *StateDB) KVGet(key []byte) ([]byte, error) {
