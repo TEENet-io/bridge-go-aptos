@@ -12,18 +12,15 @@ import (
 )
 
 func TestIsPrepared(t *testing.T) {
-	env := NewTestEnv()
-	if env == nil {
-		t.Fatal("failed to create test environment")
-	}
+	env, err := NewSimEtherman()
+	assert.NoError(t, err)
 	sim := env.Sim
 	etherman := env.Etherman
 
 	params := env.GenPrepareParams(&ParamConfig{Sender: 0, Requester: 1, Amount: big.NewInt(100)})
-	if params == nil {
-		t.Fatal("failed to generate prepare params")
-	}
-	_, err := etherman.RedeemPrepare(params)
+	assert.NotNil(t, params)
+
+	_, err = etherman.RedeemPrepare(params)
 	assert.NoError(t, err)
 	sim.Backend.Commit()
 
@@ -33,18 +30,14 @@ func TestIsPrepared(t *testing.T) {
 }
 
 func TestIsMinted(t *testing.T) {
-	env := NewTestEnv()
-	if env == nil {
-		t.Fatal("failed to create test environment")
-	}
+	env, err := NewSimEtherman()
+	assert.NoError(t, err)
 	sim := env.Sim
 	etherman := env.Etherman
 
 	params := env.GenMintParams(&ParamConfig{Deployer: 0, Receiver: 1, Amount: big.NewInt(100)})
-	if params == nil {
-		t.Fatal("failed to generate mint params")
-	}
-	_, err := etherman.Mint(params)
+	assert.NotNil(t, params)
+	_, err = etherman.Mint(params)
 	assert.NoError(t, err)
 	sim.Backend.Commit()
 
@@ -54,24 +47,18 @@ func TestIsMinted(t *testing.T) {
 }
 
 func TestGetEventLogs(t *testing.T) {
-	env := NewTestEnv()
-	if env == nil {
-		t.Fatal("failed to create test environment")
-	}
+	env, err := NewSimEtherman()
+	assert.NoError(t, err)
 	sim := env.Sim
 	etherman := env.Etherman
 
 	mintParams := env.GenMintParams(&ParamConfig{Deployer: 0, Receiver: 1, Amount: big.NewInt(100)})
-	if mintParams == nil {
-		t.Fatal("failed to generate mint params")
-	}
-	_, err := etherman.Mint(mintParams)
+	assert.NotNil(t, mintParams)
+	_, err = etherman.Mint(mintParams)
 	assert.NoError(t, err)
 
 	prepareParams := env.GenPrepareParams(&ParamConfig{Sender: 3, Requester: 4, Amount: big.NewInt(400)})
-	if prepareParams == nil {
-		t.Fatal("failed to generate prepare params")
-	}
+	assert.NotNil(t, prepareParams)
 	tx, err := etherman.RedeemPrepare(prepareParams)
 	assert.NoError(t, err)
 	sim.Backend.Commit()
@@ -93,9 +80,7 @@ func TestGetEventLogs(t *testing.T) {
 	sim.Backend.Commit()
 
 	requestParams := env.GenRequestParams(&ParamConfig{Sender: 1, Amount: big.NewInt(80)})
-	if requestParams == nil {
-		t.Fatal("failed to generate request params")
-	}
+	assert.NotNil(t, requestParams)
 	tx, err = etherman.RedeemRequest(requestParams)
 	assert.NoError(t, err)
 	sim.Backend.Commit()
@@ -112,36 +97,28 @@ func TestGetEventLogs(t *testing.T) {
 }
 
 func TestRedeemPrepare(t *testing.T) {
-	env := NewTestEnv()
-	if env == nil {
-		t.Fatal("failed to create test environment")
-	}
+	env, err := NewSimEtherman()
+	assert.NoError(t, err)
 	sim := env.Sim
 	etherman := env.Etherman
 
 	params := env.GenPrepareParams(&ParamConfig{Sender: 0, Requester: 1, Amount: big.NewInt(100)})
-	if params == nil {
-		t.Fatal("failed to generate prepare params")
-	}
-	_, err := etherman.RedeemPrepare(params)
+	assert.NotNil(t, params)
+	_, err = etherman.RedeemPrepare(params)
 	assert.NoError(t, err)
 	sim.Backend.Commit()
 }
 
 func TestRedeemRequest(t *testing.T) {
-	env := NewTestEnv()
-	if env == nil {
-		t.Fatal("failed to create test environment")
-	}
+	env, err := NewSimEtherman()
+	assert.NoError(t, err)
 	sim := env.Sim
 	etherman := env.Etherman
 
 	// Mint tokens
-	minParams := env.GenMintParams(&ParamConfig{Deployer: 0, Receiver: 1, Amount: big.NewInt(100)})
-	if minParams == nil {
-		t.Fatal("failed to generate mint params")
-	}
-	_, err := etherman.Mint(minParams)
+	mintParams := env.GenMintParams(&ParamConfig{Deployer: 0, Receiver: 1, Amount: big.NewInt(100)})
+	assert.NotNil(t, mintParams)
+	_, err = etherman.Mint(mintParams)
 	assert.NoError(t, err)
 	sim.Backend.Commit()
 
@@ -169,18 +146,14 @@ func TestRedeemRequest(t *testing.T) {
 }
 
 func TestMint(t *testing.T) {
-	env := NewTestEnv()
-	if env == nil {
-		t.Fatal("failed to create test environment")
-	}
+	env, err := NewSimEtherman()
+	assert.NoError(t, err)
 	sim := env.Sim
 	etherman := env.Etherman
 
 	params := env.GenMintParams(&ParamConfig{Deployer: 0, Receiver: 1, Amount: big.NewInt(100)})
-	if params == nil {
-		t.Fatal("failed to generate mint params")
-	}
-	_, err := etherman.Mint(params)
+	assert.NotNil(t, params)
+	_, err = etherman.Mint(params)
 	assert.NoError(t, err)
 	sim.Backend.Commit()
 
@@ -203,10 +176,8 @@ func TestGetLatestFinalizedBlockNumber(t *testing.T) {
 }
 
 func TestDebugGetLatestFinalizedBlockNumber(t *testing.T) {
-	env := NewTestEnv()
-	if env == nil {
-		t.Fatal("failed to create test environment")
-	}
+	env, err := NewSimEtherman()
+	assert.NoError(t, err)
 	etherman := env.Etherman
 
 	common.Debug = true
@@ -227,7 +198,7 @@ func TestDebugGetLatestFinalizedBlockNumber(t *testing.T) {
 	assert.Equal(t, b, big.NewInt(2))
 }
 
-func curentBlockNum(t *testing.T, env *TestEnv) *big.Int {
+func curentBlockNum(t *testing.T, env *SimEtherman) *big.Int {
 	block, err := env.Sim.Backend.Client().BlockNumber(context.Background())
 	assert.NoError(t, err)
 	return big.NewInt(int64(block))

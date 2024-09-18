@@ -69,60 +69,32 @@ type ParamConfig struct {
 
 	Amount *big.Int
 }
-type TestEnv struct {
+type SimEtherman struct {
 	Sim      *SimulatedChain
 	Sk       *btcec.PrivateKey
 	Etherman *Etherman
 }
 
-func NewSimEtherman() (*Etherman, *SimulatedChain, *btcec.PrivateKey, error) {
+func NewSimEtherman() (*SimEtherman, error) {
 	sim := NewSimulatedChain()
 	sk, err := btcec.NewPrivateKey()
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
 
 	pk := sk.PubKey().X()
 	address, _, contract, err := bridge.DeployTEENetBtcBridge(sim.Accounts[0], sim.Backend.Client(), pk)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
 	sim.Backend.Commit()
 
 	_pk, err := contract.Pk(nil)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
 	if pk.Cmp(_pk) != 0 {
-		return nil, nil, nil, err
-	}
-
-	return &Etherman{
-		ethClient:     sim.Backend.Client(),
-		bridgeAddress: address,
-	}, sim, sk, nil
-}
-
-func NewTestEnv() *TestEnv {
-	sim := NewSimulatedChain()
-	sk, err := btcec.NewPrivateKey()
-	if err != nil {
-		return nil
-	}
-
-	pk := sk.PubKey().X()
-	address, _, contract, err := bridge.DeployTEENetBtcBridge(sim.Accounts[0], sim.Backend.Client(), pk)
-	if err != nil {
-		return nil
-	}
-	sim.Backend.Commit()
-
-	_pk, err := contract.Pk(nil)
-	if err != nil {
-		return nil
-	}
-	if pk.Cmp(_pk) != 0 {
-		return nil
+		return nil, err
 	}
 
 	etherman := &Etherman{
@@ -130,14 +102,14 @@ func NewTestEnv() *TestEnv {
 		bridgeAddress: address,
 	}
 
-	return &TestEnv{
-		Sim:      sim,
-		Sk:       sk,
+	return &SimEtherman{
 		Etherman: etherman,
-	}
+		Sk:       sk,
+		Sim:      sim,
+	}, nil
 }
 
-func (env *TestEnv) GenMintParams(cfg *ParamConfig) *MintParams {
+func (env *SimEtherman) GenMintParams(cfg *ParamConfig) *MintParams {
 	sim := env.Sim
 	sk := env.Sk
 
@@ -163,7 +135,7 @@ func (env *TestEnv) GenMintParams(cfg *ParamConfig) *MintParams {
 	}
 }
 
-func (env *TestEnv) GenRequestParams(cfg *ParamConfig) *RequestParams {
+func (env *SimEtherman) GenRequestParams(cfg *ParamConfig) *RequestParams {
 	return &RequestParams{
 		Auth:     env.Sim.Accounts[cfg.Sender],
 		Amount:   cfg.Amount,
@@ -171,7 +143,7 @@ func (env *TestEnv) GenRequestParams(cfg *ParamConfig) *RequestParams {
 	}
 }
 
-func (env *TestEnv) GenPrepareParams(cfg *ParamConfig) *PrepareParams {
+func (env *SimEtherman) GenPrepareParams(cfg *ParamConfig) *PrepareParams {
 	txHash := common.RandBytes32()
 	if len(txHash) == 0 {
 		return nil
