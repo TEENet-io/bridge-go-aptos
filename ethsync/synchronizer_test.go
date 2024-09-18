@@ -38,12 +38,6 @@ func TestSync(t *testing.T) {
 		EthChainID:                     chainID,
 	}
 
-	// test when stored finalized block number is less than the starting block number
-	mockE2BState.lastFinalized = new(big.Int).Sub(common.EthStartingBlock, big.NewInt(1))
-	_, err = New(env.Etherman, mockE2BState, mockB2EState, cfg)
-	assert.Equal(t, err, ErrStoredFinalizedBlockNumberInvalid(mockE2BState.lastFinalized, common.EthStartingBlock))
-
-	mockE2BState.lastFinalized = new(big.Int).Set(common.EthStartingBlock)
 	synchronizer, err := New(env.Etherman, mockE2BState, mockB2EState, cfg)
 	assert.NoError(t, err)
 
@@ -64,12 +58,12 @@ func TestSync(t *testing.T) {
 	blk, _ := env.Sim.Backend.Client().BlockByNumber(context.Background(), nil)
 	start := blk.Number()
 	assert.NoError(t, err)
-	for start.Cmp(synchronizer.lastProcessedBlockNum) != 1 {
+	for start.Cmp(synchronizer.lastFinalizedBlockNumber) != 1 {
 		env.Sim.Backend.Commit()
 		start.Add(start, big.NewInt(1))
 	}
 	blk, _ = env.Sim.Backend.Client().BlockByNumber(context.Background(), nil)
-	assert.Equal(t, blk.Number(), synchronizer.lastProcessedBlockNum.Add(synchronizer.lastProcessedBlockNum, big.NewInt(1)))
+	assert.Equal(t, blk.Number(), synchronizer.lastFinalizedBlockNumber.Add(synchronizer.lastFinalizedBlockNumber, big.NewInt(1)))
 
 	go mockB2EState.Start(ctx2)
 	go mockE2BState.Start(ctx2)

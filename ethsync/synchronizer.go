@@ -20,8 +20,7 @@ type Synchronizer struct {
 	e2bSt Eth2BtcState
 	b2eSt Btc2EthState
 
-	// number of the last finalized block that has been processed
-	lastProcessedBlockNum *big.Int
+	lastFinalizedBlockNumber *big.Int
 }
 
 func New(
@@ -40,22 +39,19 @@ func New(
 		return nil, ErrChainIDUnmatched(cfg.EthChainID, chainID)
 	}
 
+	// get the last finalized block number stored in state db
 	stored, err := e2bstate.GetFinalizedBlockNumber()
 	if err != nil {
 		logger.Error("failed to get eth finalized block number from database when initializing eth synchronizer")
 		return nil, err
 	}
 
-	if stored.Cmp(common.EthStartingBlock) == -1 {
-		return nil, ErrStoredFinalizedBlockNumberInvalid(stored, common.EthStartingBlock)
-	}
-
 	return &Synchronizer{
-		etherman:              etherman,
-		lastProcessedBlockNum: stored,
-		e2bSt:                 e2bstate,
-		b2eSt:                 b2estate,
-		cfg:                   cfg,
+		etherman:                 etherman,
+		lastFinalizedBlockNumber: stored,
+		e2bSt:                    e2bstate,
+		b2eSt:                    b2estate,
+		cfg:                      cfg,
 	}, nil
 }
 
@@ -75,8 +71,8 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 				return err
 			}
 
-			// newFinalized <= lastFinalized
-			if newFinalized.Cmp(s.lastProcessedBlockNum) != 1 {
+			// continue if new finalized block number is less than the last processed block number
+			if newFinalized.Cmp(s.lastFinalizedBlockNumber) != 1 {
 				continue
 			}
 
@@ -85,7 +81,7 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 			// For each block with height starting from lastFinalized + 1 to newFinalized,
 			// extract all the TWBTC minted, redeem request and redeem prepared events.
 			// Send all the events to the relevant states via channels.
-			num := new(big.Int).Add(s.lastProcessedBlockNum, big.NewInt(1))
+			num := new(big.Int).Add(s.lastFinalizedBlockNumber, big.NewInt(1))
 			for num.Cmp(newFinalized) != 1 {
 				minted, requested, prepared, err := s.etherman.GetEventLogs(num)
 				if err != nil {
@@ -126,7 +122,7 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 				num.Add(num, big.NewInt(1))
 			}
 
-			s.lastProcessedBlockNum = new(big.Int).Set(newFinalized)
+			s.lastFinalizedBlockNumber = new(big.Int).Set(newFinalized)
 		}
 	}
 }
