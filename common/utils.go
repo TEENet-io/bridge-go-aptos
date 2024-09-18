@@ -5,12 +5,12 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/common"
+	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 func HexStrToBytes32(hexStr string) [32]byte {
 	var bytes32 [32]byte
-	copy(bytes32[:], common.Hex2BytesFixed(trimHexPrefix(hexStr), 32))
+	copy(bytes32[:], ethcommon.Hex2BytesFixed(trimHexPrefix(hexStr), 32))
 	return bytes32
 }
 
@@ -35,7 +35,7 @@ func appendHexPrefix(str string) string {
 }
 
 func Bytes32ToHexStr(bytes32 [32]byte) string {
-	return appendHexPrefix(common.Bytes2Hex(bytes32[:]))
+	return appendHexPrefix(ethcommon.Bytes2Hex(bytes32[:]))
 }
 
 func BigIntToHexStr(bigInt *big.Int) string {

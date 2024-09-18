@@ -2,13 +2,14 @@ package eth2btcstate
 
 import (
 	"context"
-	"errors"
+	"database/sql"
 	"math/big"
 	"sync/atomic"
 
 	logger "github.com/0xPolygonHermez/zkevm-node/log"
 	"github.com/TEENet-io/bridge-go/common"
 	"github.com/TEENet-io/bridge-go/ethsync"
+	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/lru"
 	"github.com/ethereum/go-ethereum/crypto"
 )
@@ -22,28 +23,28 @@ var (
 	KeyLastFinalizedBlock = crypto.Keccak256Hash([]byte("lastFinalizedBlock")).Bytes()
 )
 
-const (
-	WarningRedeemAlreadyPrepared = "redeem already prepared"
-
-	ErrorRedeemNotFound              = "redeem not found"
-	ErrorRedeemInvalid               = "redeem invalid"
-	ErrorFinalizedBlockNumberInvalid = "finalized block number invalid"
-)
-
 type State struct {
-	db Database
+	db *StateDB
 
 	newFinalizedCh         chan *big.Int
 	newRedeemRequestedEvCh chan *ethsync.RedeemRequestedEvent
 	newRedeemPreparedEvCh  chan *ethsync.RedeemPreparedEvent
 
 	cache struct {
-		lastFinalized atomic.Value // uint64
-		redeems       *lru.Cache[[32]byte, *Redeem]
+		lastFinalized    atomic.Value // uint64
+		redeemsRequested *lru.Cache[[32]byte, *Redeem]
+		redeemsPrepared  *lru.Cache[[32]byte, *Redeem]
+		redeemsInvalid   *lru.Cache[[32]byte, *Redeem]
+		redeemsCompleted *lru.Cache[[32]byte, *Redeem]
 	}
 }
 
-func New(db Database) (*State, error) {
+var (
+	stateErrors   ModifiyStateError
+	stateWarnings ModifyStateWarning
+)
+
+func New(db *StateDB) (*State, error) {
 	st := &State{
 		db:                     db,
 		newFinalizedCh:         make(chan *big.Int, 1),
@@ -51,21 +52,24 @@ func New(db Database) (*State, error) {
 		newRedeemPreparedEvCh:  make(chan *ethsync.RedeemPreparedEvent, MaxPendingPreparedEv),
 	}
 
-	st.cache.redeems = lru.NewCache[[32]byte, *Redeem](CacheSize)
+	st.cache.redeemsRequested = lru.NewCache[[32]byte, *Redeem](CacheSize)
+	st.cache.redeemsPrepared = lru.NewCache[[32]byte, *Redeem](CacheSize)
+	st.cache.redeemsInvalid = lru.NewCache[[32]byte, *Redeem](CacheSize)
+	st.cache.redeemsCompleted = lru.NewCache[[32]byte, *Redeem](CacheSize)
 
-	ok, err := st.db.Has(KeyLastFinalizedBlock)
-	if err != nil {
+	_, err := st.db.KVGet(KeyLastFinalizedBlock)
+	if err != nil && err != sql.ErrNoRows {
 		return nil, err
 	}
 
-	if !ok {
+	if err == sql.ErrNoRows {
 		logger.Warnf("no stored last finalized block number found, using the default value %v", common.EthStartingBlock)
 		// save the default value
-		db.Put(KeyLastFinalizedBlock, common.EthStartingBlock.Bytes())
+		db.KVSet(KeyLastFinalizedBlock, common.EthStartingBlock.Bytes())
 		st.cache.lastFinalized.Store(common.EthStartingBlock.Bytes())
 	} else {
 		// read the stored value
-		lastFinalizedBytes, err := db.Get(KeyLastFinalizedBlock)
+		lastFinalizedBytes, err := db.KVGet(KeyLastFinalizedBlock)
 		if err != nil {
 			return nil, err
 		}
@@ -73,9 +77,7 @@ func New(db Database) (*State, error) {
 		// compare the stored value with the default value
 		lastFinalized := new(big.Int).SetBytes(lastFinalizedBytes)
 		if lastFinalized.Cmp(common.EthStartingBlock) == -1 {
-			logger.Errorf("stored value %s less than the starting block number %s",
-				lastFinalized.Text(10), common.EthStartingBlock.Text(10))
-			return nil, errors.New(ErrorFinalizedBlockNumberInvalid)
+			return nil, stateErrors.StoredFinalizedBlockNumberLessThanStartingBlockNumber(lastFinalized)
 		}
 		st.cache.lastFinalized.Store(lastFinalizedBytes)
 	}
@@ -104,8 +106,7 @@ func (st *State) Start(ctx context.Context) error {
 					return err
 				}
 			} else {
-				logger.Warnf("new finalized block number %s less than the stored one %s",
-					newFinalized.Text(10), lastFinalized.Text(10))
+				logger.Warnf(stateWarnings.NewFinalizedBlockNumberLessThanStored(newFinalized, lastFinalized))
 			}
 		// After receiving a redeem request event
 		// 1. 	Check the existence of the hash of the previous redeem requested tx.
@@ -113,22 +114,25 @@ func (st *State) Start(ctx context.Context) error {
 		// 2.	Save a new redeem record in state db
 		case ev := <-st.newRedeemRequestedEvCh:
 			// Check if the redeem already exists
-			ok, err := st.has(ev.RedeemRequestTxHash)
+			ok, err := st.db.Has(ev.RedeemRequestTxHash[:])
 			if err != nil {
+				logger.Errorf("failed to check if redeem exists: txHash=0x%x, err=%v", ev.RedeemRequestTxHash[:], err)
 				return err
 			}
 
 			if ok {
-				logger.Warnf("redeem %s already exists", common.Shorten(common.Bytes32ToHexStr(ev.RedeemRequestTxHash)))
+				logger.Warnf(stateWarnings.RedeemAlreadyExists(ev.RedeemRequestTxHash[:]))
 				continue
 			}
 
 			// Create a new redeem and save it to the database
-			redeem, err := (&Redeem{}).SetFromRequestedEvent(ev)
+			redeem, err := createFromRequestedEvent(ev)
 			if err != nil {
+				logger.Errorf("failed to create redeem from requested event: err=%v, ev=%v", err, ev)
 				return err
 			}
-			if err := st.put(redeem); err != nil {
+			if err := st.insert(redeem); err != nil {
+				logger.Errorf("failed to insert redeem to db: txHash=0x%x, err=%v", ev.RedeemRequestTxHash[:], err)
 				return err
 			}
 		// After receiving a redeem prepared event
@@ -138,28 +142,31 @@ func (st *State) Start(ctx context.Context) error {
 		// 4.   Skip if already prepared
 		// 4.   Update redeem accordingly and save it to db
 		case ev := <-st.newRedeemPreparedEvCh:
-			redeem, err := st.get(ev.RedeemRequestTxHash)
+			redeem, err := st.get(ev.RedeemRequestTxHash, RedeemStatusRequested)
 			if err != nil {
+				logger.Errorf("failed to get redeem from db: txHash=0x%x, err=%v", ev.RedeemRequestTxHash[:], err)
 				return err
 			}
 
 			if redeem == nil {
-				return errors.New(ErrorRedeemNotFound)
+				return stateErrors.CannotPrepareDueToRequestedRedeemNotFound(ev.RedeemRequestTxHash[:])
 			}
 
 			if redeem.Status == RedeemStatusInvalid {
-				return errors.New(ErrorRedeemInvalid)
+				return stateErrors.CannotPrepareDueToRequestedRedeemInvalid(ev.RedeemRequestTxHash[:])
 			}
 
 			if redeem.Status != RedeemStatusRequested {
+				logger.Warnf(stateWarnings.RedeemAlreadyPreparedOrCompleted(ev.RedeemRequestTxHash[:]))
 				continue
 			}
 
-			redeem, err = redeem.SetFromPreparedEvent(ev)
+			redeem, err = redeem.updateFromPreparedEvent(ev)
 			if err != nil {
+				logger.Errorf("failed to update redeem from prepared event: err=%v, ev=%v", err, ev)
 				return err
 			}
-			if err = st.put(redeem); err != nil {
+			if err = st.update(redeem); err != nil {
 				return err
 			}
 		}
@@ -171,11 +178,11 @@ func (st *State) GetFinalizedBlockNumber() (*big.Int, error) {
 		return new(big.Int).SetBytes(v.([]byte)), nil
 	}
 
-	b, err := st.db.Get(KeyLastFinalizedBlock)
+	b, err := st.db.KVGet(KeyLastFinalizedBlock)
 	if err != nil {
 		return nil, err
 	}
-	st.cache.lastFinalized.Store(b)
+	st.cache.lastFinalized.Store(ethcommon.TrimLeftZeroes(b))
 
 	return new(big.Int).SetBytes(b), nil
 }
@@ -192,70 +199,89 @@ func (st *State) GetNewRedeemPreparedEventChannel() chan *ethsync.RedeemPrepared
 	return st.newRedeemPreparedEvCh
 }
 
-func (st *State) setFinalizedBlockNumber(blk *big.Int) error {
-	if err := st.db.Put(KeyLastFinalizedBlock, blk.Bytes()); err != nil {
+func (st *State) setFinalizedBlockNumber(fbNum *big.Int) error {
+	if err := st.db.KVSet(KeyLastFinalizedBlock, fbNum.Bytes()); err != nil {
 		return err
 	}
-	st.cache.lastFinalized.Store(blk.Bytes())
+	st.cache.lastFinalized.Store(fbNum.Bytes())
 
 	return nil
 }
 
-func (st *State) put(r *Redeem) error {
-	b, err := r.MarshalJSON()
-	if err != nil {
+func (st *State) insert(r *Redeem) error {
+	if err := st.db.InsertAfterRequested(r); err != nil {
 		return err
 	}
 
-	if err := st.db.Put(r.RequestTxHash[:], b); err != nil {
-		return err
+	if r.Status == RedeemStatusRequested {
+		st.cache.redeemsRequested.Add(r.RequestTxHash, r.Clone())
+	} else if r.Status == RedeemStatusInvalid {
+		st.cache.redeemsInvalid.Add(r.RequestTxHash, r.Clone())
 	}
-
-	st.cache.redeems.Add(r.RequestTxHash, r.Clone())
 
 	return nil
 }
 
-func (st *State) get(ethTxHash [32]byte) (*Redeem, error) {
-	ok, err := st.has(ethTxHash)
+func (st *State) update(r *Redeem) error {
+	if err := st.db.UpdateAfterPrepared(r); err != nil {
+		return err
+	}
+
+	st.cache.redeemsPrepared.Add(r.RequestTxHash, r.Clone())
+	st.cache.redeemsRequested.Remove(r.RequestTxHash)
+
+	return nil
+}
+
+func (st *State) get(ethTxHash [32]byte, status RedeemStatus) (*Redeem, error) {
+	if status == RedeemStatusRequested {
+		if v, ok := st.cache.redeemsRequested.Get(ethTxHash); ok {
+			return v, nil
+		}
+	}
+
+	if status == RedeemStatusPrepared {
+		if v, ok := st.cache.redeemsPrepared.Get(ethTxHash); ok {
+			return v, nil
+		}
+	}
+
+	if status == RedeemStatusInvalid {
+		if v, ok := st.cache.redeemsInvalid.Get(ethTxHash); ok {
+			return v, nil
+		}
+	}
+
+	if status == RedeemStatusCompleted {
+		if v, ok := st.cache.redeemsCompleted.Get(ethTxHash); ok {
+			return v, nil
+		}
+	}
+
+	r, err := st.db.Get(ethTxHash[:], status)
 	if err != nil {
 		return nil, err
 	}
 
-	if ok {
-		if r, ok := st.cache.redeems.Get(ethTxHash); ok {
-			return r.Clone(), nil
-		}
+	if r == nil {
+		return nil, nil
 	}
 
-	return nil, nil
-}
-
-func (st *State) has(ethTxHash [32]byte) (bool, error) {
-	if st.cache.redeems.Contains(ethTxHash) {
-		return true, nil
+	if r.Status == RedeemStatusRequested {
+		st.cache.redeemsRequested.Add(r.RequestTxHash, r.Clone())
 	}
 
-	ok, err := st.db.Has(ethTxHash[:])
-	if err != nil {
-		return false, err
+	if r.Status == RedeemStatusPrepared {
+		st.cache.redeemsPrepared.Add(r.RequestTxHash, r.Clone())
 	}
 
-	if ok {
-		b, err := st.db.Get(ethTxHash[:])
-		if err != nil {
-			return false, err
-		}
-		redeem := &Redeem{}
-		err = redeem.UnmarshalJSON(b)
-		if err != nil {
-			return false, err
-		}
-
-		st.cache.redeems.Add(ethTxHash, redeem)
-
-		return true, nil
+	if r.Status == RedeemStatusInvalid {
+		st.cache.redeemsInvalid.Add(r.RequestTxHash, r.Clone())
 	}
 
-	return false, nil
+	if r.Status == RedeemStatusCompleted {
+		st.cache.redeemsCompleted.Add(r.RequestTxHash, r.Clone())
+	}
+
+	return r, nil
 }

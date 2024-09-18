@@ -22,7 +22,9 @@ const (
 	RedeemStatusPrepared  RedeemStatus = "prepared"
 	RedeemStatusCompleted RedeemStatus = "completed"
 	RedeemStatusInvalid   RedeemStatus = "invalid"
+)
 
+var (
 	ErrorAmountInvalid                = "amount invalid"
 	ErrorRequesterInvalid             = "requester address invalid"
 	ErrorRedeemRequestTxHashInvalid   = "redeem request tx hash invalid"
@@ -31,8 +33,9 @@ const (
 	ErrorRequesterUnmatched           = "requester unmatched"
 	ErrorAmountUnmatched              = "amount unmatched"
 	ErrorReceiverUnmatched            = "receiver unmatched"
-	ErrorOutpointsEmpty               = "outpoints empty"
+	ErrorOutpointsInvalid             = "outpoints invalid"
 	ErrorOutpointTxIdInvalid          = "outpoint tx id invalid"
+	ErrorRequireStatusRequested       = "require status == requested"
 )
 
 type Redeem struct {
@@ -40,13 +43,15 @@ type Redeem struct {
 	PrepareTxHash [32]byte
 	BtcTxId       [32]byte
 	Requester     ethcommon.Address
+	Receiver      string // receiver btc address
 	Amount        *big.Int
 	Outpoints     []Outpoint
-	Receiver      string // receiver btc address
 	Status        RedeemStatus
 }
 
-func (r *Redeem) SetFromRequestedEvent(ev *ethsync.RedeemRequestedEvent) (*Redeem, error) {
+func createFromRequestedEvent(ev *ethsync.RedeemRequestedEvent) (*Redeem, error) {
+	r := &Redeem{}
+
 	if ev.RedeemRequestTxHash == [32]byte{} {
 		return nil, errors.New(ErrorRedeemRequestTxHashInvalid)
 	}
@@ -72,7 +77,11 @@ func (r *Redeem) SetFromRequestedEvent(ev *ethsync.RedeemRequestedEvent) (*Redee
 	return r, nil
 }
 
-func (r *Redeem) SetFromPreparedEvent(ev *ethsync.RedeemPreparedEvent) (*Redeem, error) {
+func (r *Redeem) updateFromPreparedEvent(ev *ethsync.RedeemPreparedEvent) (*Redeem, error) {
+	if r.Status != RedeemStatusRequested {
+		return nil, errors.New(ErrorRequireStatusRequested)
+	}
+
 	if ev.RedeemPrepareTxHash == [32]byte{} {
 		return nil, errors.New(ErrorRedeemPrepareTxHashInvalid)
 	}
@@ -97,8 +106,8 @@ func (r *Redeem) SetFromPreparedEvent(ev *ethsync.RedeemPreparedEvent) (*Redeem,
 		return nil, errors.New(ErrorReceiverUnmatched)
 	}
 
-	if len(ev.OutpointTxIds) == 0 || len(ev.OutpointIdxs) == 0 {
-		return nil, errors.New(ErrorOutpointsEmpty)
+	if ev.OutpointTxIds == nil || ev.OutpointIdxs == nil || len(ev.OutpointTxIds) == 0 || len(ev.OutpointIdxs) == 0 {
+		return nil, errors.New(ErrorOutpointsInvalid)
 	}
 
 	r.PrepareTxHash = ev.RedeemPrepareTxHash
@@ -135,6 +144,7 @@ func (r *Redeem) MarshalJSON() ([]byte, error) {
 		Amount:        common.BigIntToHexStr(r.Amount),
 		Outpoints:     jOutpoint,
 		Receiver:      r.Receiver,
+		Status:        string(r.Status),
 	})
 }
 
@@ -150,6 +160,7 @@ func (r *Redeem) UnmarshalJSON(data []byte) error {
 	r.Requester = ethcommon.HexToAddress(jRedeem.Requester)
 	r.Amount = common.HexStrToBigInt(jRedeem.Amount)
 	r.Receiver = jRedeem.Receiver
+	r.Status = RedeemStatus(jRedeem.Status)
 
 	for _, jOutpoint := range jRedeem.Outpoints {
 		r.Outpoints = append(r.Outpoints, Outpoint{
@@ -178,4 +189,9 @@ func (r *Redeem) Clone() *Redeem {
 	clone.Amount = new(big.Int).Set(r.Amount)
 
 	return &clone
+}
+
+func (r *Redeem) String() string {
+	j, _ := r.MarshalJSON()
+	return string(j)
 }
