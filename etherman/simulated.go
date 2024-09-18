@@ -75,6 +75,34 @@ type TestEnv struct {
 	Etherman *Etherman
 }
 
+func NewSimEtherman() (*Etherman, *SimulatedChain, *btcec.PrivateKey, error) {
+	sim := NewSimulatedChain()
+	sk, err := btcec.NewPrivateKey()
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	pk := sk.PubKey().X()
+	address, _, contract, err := bridge.DeployTEENetBtcBridge(sim.Accounts[0], sim.Backend.Client(), pk)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	sim.Backend.Commit()
+
+	_pk, err := contract.Pk(nil)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if pk.Cmp(_pk) != 0 {
+		return nil, nil, nil, err
+	}
+
+	return &Etherman{
+		ethClient:     sim.Backend.Client(),
+		bridgeAddress: address,
+	}, sim, sk, nil
+}
+
 func NewTestEnv() *TestEnv {
 	sim := NewSimulatedChain()
 	sk, err := btcec.NewPrivateKey()
