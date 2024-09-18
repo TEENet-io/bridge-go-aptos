@@ -31,7 +31,7 @@ func New(etherman *etherman.Etherman, e2bstate Eth2BtcState, b2estate Btc2EthSta
 		return nil
 	}
 	if chainID.Cmp(cfg.EthChainID) != 0 {
-		logger.Error("chain ID mismatch")
+		logger.Errorf("chain ID mismatch: expected=%v, actual=%v", cfg.EthChainID, chainID)
 		return nil
 	}
 
