@@ -13,10 +13,17 @@ import (
 )
 
 func TestSync(t *testing.T) {
-	env := etherman.NewTestEnv()
-	if env == nil {
-		t.Fatal("failed to create test environment")
-	}
+	common.EthStartingBlock = big.NewInt(10)
+
+	common.Debug = true
+	logger.Debug("DEBUG MODE ON")
+	defer func() {
+		logger.Debug("DEBUG MODE OFF")
+		common.Debug = false
+	}()
+
+	env, err := etherman.NewSimEtherman()
+	assert.NoError(t, err)
 
 	chainID, err := env.Etherman.Client().ChainID(context.Background())
 	assert.NoError(t, err)
@@ -31,34 +38,48 @@ func TestSync(t *testing.T) {
 		EthChainID:                     chainID,
 	}
 
+	// test when stored finalized block number is less than the starting block number
+	mockE2BState.lastFinalized = new(big.Int).Sub(common.EthStartingBlock, big.NewInt(1))
+	_, err = New(env.Etherman, mockE2BState, mockB2EState, cfg)
+	assert.Equal(t, err, ErrStoredFinalizedBlockNumberInvalid(mockE2BState.lastFinalized, common.EthStartingBlock))
+
+	mockE2BState.lastFinalized = new(big.Int).Set(common.EthStartingBlock)
 	synchronizer, err := New(env.Etherman, mockE2BState, mockB2EState, cfg)
 	assert.NoError(t, err)
-	if synchronizer == nil {
-		t.Fatal("failed to create synchronizer")
+
+	// No event should be sent since the finalized block number is too small
+	ctx1, cancel1 := context.WithCancel(context.Background())
+	go mockB2EState.Start(ctx1)
+	go mockE2BState.Start(ctx1)
+	go synchronizer.Sync(ctx1)
+	sendTxs(t, env)
+	time.Sleep(500 * time.Millisecond)
+	cancel1()
+	assert.Empty(t, mockB2EState.mintedEv)
+	assert.Empty(t, mockE2BState.requestedEv)
+	assert.Empty(t, mockE2BState.preparedEv)
+
+	// test when the finalized block number is valid
+	ctx2, cancel2 := context.WithCancel(context.Background())
+	blk, _ := env.Sim.Backend.Client().BlockByNumber(context.Background(), nil)
+	start := blk.Number()
+	assert.NoError(t, err)
+	for start.Cmp(synchronizer.lastProcessedBlockNum) != 1 {
+		env.Sim.Backend.Commit()
+		start.Add(start, big.NewInt(1))
 	}
+	blk, _ = env.Sim.Backend.Client().BlockByNumber(context.Background(), nil)
+	assert.Equal(t, blk.Number(), synchronizer.lastProcessedBlockNum.Add(synchronizer.lastProcessedBlockNum, big.NewInt(1)))
 
-	common.Debug = true
-	logger.Debug("DEBUG ON")
-	defer func() {
-		logger.Debug("DEBUG OFF")
-		common.Debug = false
-	}()
-
-	ctx, cancel := context.WithCancel(context.Background())
-
-	go mockB2EState.Start(ctx)
-	go mockE2BState.Start(ctx)
-	go synchronizer.Sync(ctx)
+	go mockB2EState.Start(ctx2)
+	go mockE2BState.Start(ctx2)
+	go synchronizer.Sync(ctx2)
 
 	mintedEvs, reqeustedEvs, preparedEvs := sendTxs(t, env)
-
 	time.Sleep(200 * time.Millisecond)
+	cancel2()
 
-	cancel()
-
-	blk, err := env.Sim.Backend.Client().BlockByNumber(context.Background(), nil)
-	assert.NoError(t, err)
-
+	blk, _ = env.Sim.Backend.Client().BlockByNumber(context.Background(), nil)
 	assert.Equal(t, blk.Number(), mockE2BState.lastFinalized)
 	assert.Equal(t, 2, len(mockE2BState.requestedEv))
 	assert.Equal(t, 1, len(mockE2BState.preparedEv))
@@ -70,7 +91,7 @@ func TestSync(t *testing.T) {
 	assert.Equal(t, preparedEvs[0], mockE2BState.preparedEv[0])
 }
 
-func sendTxs(t *testing.T, env *etherman.TestEnv) (
+func sendTxs(t *testing.T, env *etherman.SimEtherman) (
 	mintedEvs []*MintedEvent,
 	requestedEvs []*RedeemRequestedEvent,
 	preparedEvs []*RedeemPreparedEvent,

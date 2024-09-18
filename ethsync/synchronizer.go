@@ -40,15 +40,19 @@ func New(
 		return nil, ErrChainIDUnmatched(cfg.EthChainID, chainID)
 	}
 
-	n, err := e2bstate.GetFinalizedBlockNumber()
+	stored, err := e2bstate.GetFinalizedBlockNumber()
 	if err != nil {
 		logger.Error("failed to get eth finalized block number from database when initializing eth synchronizer")
 		return nil, err
 	}
 
+	if stored.Cmp(common.EthStartingBlock) == -1 {
+		return nil, ErrStoredFinalizedBlockNumberInvalid(stored, common.EthStartingBlock)
+	}
+
 	return &Synchronizer{
 		etherman:              etherman,
-		lastProcessedBlockNum: n,
+		lastProcessedBlockNum: stored,
 		e2bSt:                 e2bstate,
 		b2eSt:                 b2estate,
 		cfg:                   cfg,
