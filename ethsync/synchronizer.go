@@ -24,21 +24,26 @@ type Synchronizer struct {
 	lastProcessedBlockNum *big.Int
 }
 
-func New(etherman *etherman.Etherman, e2bstate Eth2BtcState, b2estate Btc2EthState, cfg *Config) *Synchronizer {
+func New(
+	etherman *etherman.Etherman,
+	e2bstate Eth2BtcState,
+	b2estate Btc2EthState,
+	cfg *Config,
+) (*Synchronizer, error) {
 	chainID, err := etherman.Client().ChainID(context.Background())
 	if err != nil {
 		logger.Error("failed to get eth chain ID")
-		return nil
+		return nil, err
 	}
+
 	if chainID.Cmp(cfg.EthChainID) != 0 {
-		logger.Errorf("chain ID mismatch: expected=%v, actual=%v", cfg.EthChainID, chainID)
-		return nil
+		return nil, ErrChainIDUnmatched(cfg.EthChainID, chainID)
 	}
 
 	n, err := e2bstate.GetFinalizedBlockNumber()
 	if err != nil {
 		logger.Error("failed to get eth finalized block number from database when initializing eth synchronizer")
-		return nil
+		return nil, err
 	}
 
 	return &Synchronizer{
@@ -47,7 +52,7 @@ func New(etherman *etherman.Etherman, e2bstate Eth2BtcState, b2estate Btc2EthSta
 		e2bSt:                 e2bstate,
 		b2eSt:                 b2estate,
 		cfg:                   cfg,
-	}
+	}, nil
 }
 
 func (s *Synchronizer) Sync(ctx context.Context) error {
