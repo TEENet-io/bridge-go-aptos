@@ -8,10 +8,10 @@ var (
 
 	// table that stores the life cycle of a redeem request
 	redeemTable = `CREATE TABLE IF NOT EXISTS redeem (
-		requestTxHash CHAR(66) PRIMARY KEY NOT NULL,
-		prepareTxHash CHAR(66) UNIQUE,
-		btcTxId CHAR(66) UNIQUE,
-		requester VARCHAR(42) NOT NULL,
+		requestTxHash CHAR(64) PRIMARY KEY NOT NULL,
+		prepareTxHash CHAR(64) UNIQUE,
+		btcTxId CHAR(64) UNIQUE,
+		requester VARCHAR(40) NOT NULL,
 		receiver VARCHAR(62) NOT NULL,
 		amount BIGINT UNSIGNED NOT NULL,
 		outpoints BLOB,
