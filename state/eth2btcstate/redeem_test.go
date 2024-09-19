@@ -70,22 +70,22 @@ func TestHasCompleted(t *testing.T) {
 func TestSetFromRequestEvent(t *testing.T) {
 	ev := &ethsync.RedeemRequestedEvent{}
 
-	_, err := createFromRequestedEvent(ev)
+	_, err := createRedeemFromRequestedEvent(ev)
 	assert.Equal(t, ErrorRedeemRequestTxHashInvalid, err.Error())
 
 	// invalid requester
 	ev.RedeemRequestTxHash = common.RandBytes32()
-	_, err = createFromRequestedEvent(ev)
+	_, err = createRedeemFromRequestedEvent(ev)
 	assert.Equal(t, ErrorRequesterInvalid, err.Error())
 
 	// nil amount
 	ev.Requester = common.RandEthAddress()
-	_, err = createFromRequestedEvent(ev)
+	_, err = createRedeemFromRequestedEvent(ev)
 	assert.Equal(t, ErrorAmountInvalid, err.Error())
 
 	// zero amount
 	ev.Amount = big.NewInt(0)
-	_, err = createFromRequestedEvent(ev)
+	_, err = createRedeemFromRequestedEvent(ev)
 	assert.Equal(t, ErrorAmountInvalid, err.Error())
 
 	// success
@@ -93,7 +93,7 @@ func TestSetFromRequestEvent(t *testing.T) {
 	ev.Receiver = "valid_btc_address"
 	ev.IsValidReceiver = true
 
-	_, err = createFromRequestedEvent(ev)
+	_, err = createRedeemFromRequestedEvent(ev)
 	assert.NoError(t, err)
 }
 

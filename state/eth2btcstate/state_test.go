@@ -1,18 +1,21 @@
 package eth2btcstate
 
 import (
+	"context"
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/TEENet-io/bridge-go/common"
+	"github.com/TEENet-io/bridge-go/ethsync"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestNewState(t *testing.T) {
-	db, err := NewStateDB("sqlite3", ":memory:")
+	db, err := newStateDB("sqlite3", ":memory:")
 	assert.NoError(t, err)
-	defer db.Close()
-	st, err := New(db)
+	defer db.close()
+	st, err := New(db, &Config{ChannelSize: 1, CacheSize: 1})
 	assert.NoError(t, err)
 	finalized, err := st.GetFinalizedBlockNumber()
 	assert.NoError(t, err)
@@ -22,155 +25,131 @@ func TestNewState(t *testing.T) {
 	finalized = new(big.Int).Sub(common.EthStartingBlock, big.NewInt(1))
 	err = db.KVSet(KeyLastFinalizedBlock, finalized.Bytes())
 	assert.NoError(t, err)
-	_, err = New(db)
+	_, err = New(db, &Config{ChannelSize: 1, CacheSize: 1})
 	assert.Equal(t, err, stateErrors.StoredFinalizedBlockNumberLessThanStartingBlockNumber(finalized))
 }
 
-// func TestUpdateFinalizedBlockNumber(t *testing.T) {
-// 	db := rawdb.NewMemoryDatabase()
-// 	st, err := New(db)
-// 	assert.NoError(t, err)
+func TestNewFinalizedBlockNumber(t *testing.T) {
+	st, err := NewSimState(1, 1)
+	assert.NoError(t, err)
+	defer st.Close()
 
-// 	ctx, cancel := context.WithCancel(context.Background())
-// 	go st.Start(ctx)
-// 	defer cancel()
+	stored, err := st.GetFinalizedBlockNumber()
+	assert.NoError(t, err)
 
-// 	// test updating last finalized block number
-// 	ch := st.GetNewFinalizedBlockChannel()
-// 	ch <- new(big.Int).Sub(common.EthStartingBlock, big.NewInt(1))
-// 	time.Sleep(100 * time.Millisecond)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-// 	finalized, err := st.GetFinalizedBlockNumber()
-// 	assert.NoError(t, err)
-// 	assert.Equal(t, finalized, common.EthStartingBlock)
+	go st.Start(ctx)
 
-// 	ch <- new(big.Int).Add(common.EthStartingBlock, big.NewInt(1))
-// 	time.Sleep(100 * time.Millisecond)
+	// no change when the new finalized block number is equal or less than the stored one
+	minusOne := new(big.Int).Sub(stored, big.NewInt(1))
+	st.GetNewFinalizedBlockChannel() <- minusOne
+	time.Sleep(100 * time.Millisecond)
+	curr, err := st.GetFinalizedBlockNumber()
+	assert.NoError(t, err)
+	assert.Equal(t, curr, stored)
 
-// 	finalized, err = st.GetFinalizedBlockNumber()
-// 	assert.NoError(t, err)
-// 	assert.Equal(t, finalized, common.EthStartingBlock.Add(common.EthStartingBlock, big.NewInt(1)))
-// }
+	// update when the new finalized block number is larger than the current one
+	plusOne := new(big.Int).Add(stored, big.NewInt(1))
+	st.GetNewFinalizedBlockChannel() <- plusOne
+	time.Sleep(100 * time.Millisecond)
+	curr, err = st.GetFinalizedBlockNumber()
+	assert.NoError(t, err)
+	assert.Equal(t, curr, plusOne)
+}
 
-// func TestDBOps(t *testing.T) {
-// 	db := rawdb.NewMemoryDatabase()
-// 	st, err := New(db)
-// 	assert.NoError(t, err)
+func TestNewRedeemRequestedEvent(t *testing.T) {
+	st, err := NewSimState(1, 1)
+	assert.NoError(t, err)
+	defer st.Close()
 
-// 	redeem := randRedeem()
-// 	err = st.put(redeem)
-// 	assert.NoError(t, err)
+	ch := st.GetNewRedeemRequestedEventChannel()
 
-// 	ok, err := st.has(redeem.RequestTxHash)
-// 	assert.NoError(t, err)
-// 	assert.True(t, ok)
+	// generate a random event and generate a redeem from it,
+	// for comparison
+	simSync := &ethsync.SimSync{}
+	ev := simSync.RandRedeemRequestedEvent(100, true)
+	expected, err := createRedeemFromRequestedEvent(ev)
+	assert.NoError(t, err)
 
-// 	ok, err = st.has(common.RandBytes32())
-// 	assert.NoError(t, err)
-// 	assert.False(t, ok)
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() { err = st.Start(ctx) }()
+	defer cancel()
 
-// 	redeem2, err := st.get(redeem.RequestTxHash)
-// 	assert.NoError(t, err)
-// 	assert.Equal(t, redeem, redeem2)
+	ch <- ev
+	// wait for the state to process the event
+	time.Sleep(100 * time.Millisecond)
 
-// 	// make sure the returned is a copy, not a reference
-// 	redeem2.BtcTxId = common.RandBytes32()
-// 	redeem3, err := st.get(redeem.RequestTxHash)
-// 	assert.NoError(t, err)
-// 	assert.Equal(t, redeem, redeem3)
-// }
+	// change the amount and send the event again
+	ev.Amount = new(big.Int).Add(ev.Amount, big.NewInt(1))
+	ch <- ev
+	time.Sleep(100 * time.Millisecond)
 
-// func TestNewRedeemRequestedEvent(t *testing.T) {
-// 	db := rawdb.NewMemoryDatabase()
-// 	st, err := New(db)
-// 	assert.NoError(t, err)
+	actual, err := st.db.getByStatus(RedeemStatusRequested)
+	assert.NoError(t, err)
+	assert.Len(t, actual, 1) // only one redeem should be saved
+	assert.Equal(t, expected, actual[0])
+}
 
-// 	ch := st.GetNewRedeemRequestedEventChannel()
+func TestNewRedeemPreparedEvent(t *testing.T) {
+	st, err := NewSimState(1, 1)
+	assert.NoError(t, err)
+	defer st.Close()
 
-// 	ev := &ethsync.RedeemRequestedEvent{}
-// 	ev.RedeemRequestTxHash = common.RandBytes32()
-// 	ev.Requester = common.RandEthAddress()
-// 	ev.Amount = big.NewInt(100)
-// 	ev.Receiver = "valid_btc_address"
-// 	ev.IsValidReceiver = true
+	ch1 := st.GetNewRedeemRequestedEventChannel()
+	ch2 := st.GetNewRedeemPreparedEventChannel()
 
-// 	ctx, cancel := context.WithCancel(context.Background())
-// 	go func() { err = st.Start(ctx) }()
-// 	defer cancel()
+	simSync := &ethsync.SimSync{}
+	ev1 := simSync.RandRedeemPreparedEvent(100, 2)      //generate a random prepared event
+	expected, err := createRedeemFromPreparedEvent(ev1) // generate a redeem from the event for comparison
+	assert.NoError(t, err)
 
-// 	ch <- ev
+	ctx, cancel := context.WithCancel(context.Background())
+	var retErr error
+	go func() { retErr = st.Start(ctx) }()
+	defer cancel()
 
-// 	time.Sleep(100 * time.Millisecond)
-// 	assert.NoError(t, err)
-// 	redeem1, err := st.get(ev.RedeemRequestTxHash)
-// 	redeem2 := &Redeem{}
-// 	redeem2, err = redeem2.SetFromRequestedEvent(ev)
-// 	assert.Equal(t, redeem1, redeem2)
+	// Insert without a corresponding request redeem stored
+	ch2 <- ev1                         // send the prepared event
+	time.Sleep(100 * time.Millisecond) // wait for the state to process the event
+	actual, ok, err := st.Get(ev1.RedeemRequestTxHash, RedeemStatusPrepared)
+	assert.NoError(t, err)
+	assert.True(t, ok)
+	assert.Equal(t, expected, actual)
 
-// 	ev.Requester = common.RandEthAddress()
-// 	ev.Amount = big.NewInt(200)
-// 	ch <- ev // warning should be printed
-// 	time.Sleep(100 * time.Millisecond)
+	// Insert with a corresponding request redeem stored
+	ev2 := simSync.RandRedeemPreparedEvent(200, 1)
+	ev3 := &ethsync.RedeemRequestedEvent{
+		RedeemRequestTxHash: ev2.RedeemRequestTxHash,
+		Requester:           ev2.Requester,
+		Amount:              ev2.Amount,
+		Receiver:            ev2.Receiver,
+		IsValidReceiver:     true,
+	}
+	ch1 <- ev3                         // insert the requested event
+	time.Sleep(100 * time.Millisecond) // wait for the state to process the event
+	ch2 <- ev2                         // send the prepared event
+	time.Sleep(100 * time.Millisecond) // wait for the state to process the event
+	expected, err = createRedeemFromPreparedEvent(ev2)
+	assert.NoError(t, err)
+	actual, ok, err = st.Get(ev2.RedeemRequestTxHash, RedeemStatusPrepared)
+	assert.NoError(t, err)
+	assert.True(t, ok)
+	assert.Equal(t, expected, actual)
 
-// 	// redeem not changed
-// 	redeem3, err := st.get(ev.RedeemRequestTxHash)
-// 	assert.NoError(t, err)
-// 	assert.Equal(t, redeem1, redeem3)
-// }
-
-// func TestNewRedeemPreparedEvent(t *testing.T) {
-// 	db := rawdb.NewMemoryDatabase()
-// 	st, err := New(db)
-// 	assert.NoError(t, err)
-
-// 	redeem := randRedeem()
-// 	ch := st.GetNewRedeemPreparedEventChannel()
-
-// 	ev := &ethsync.RedeemPreparedEvent{}
-// 	ev.RedeemPrepareTxHash = common.RandBytes32()
-// 	ev.RedeemRequestTxHash = redeem.RequestTxHash
-// 	ev.Requester = redeem.Requester
-// 	ev.Receiver = redeem.Receiver
-// 	ev.Amount = new(big.Int).Set(redeem.Amount)
-// 	ev.OutpointTxIds = [][32]byte{common.RandBytes32(), common.RandBytes32()}
-// 	ev.OutpointIdxs = []uint16{1, 2}
-
-// 	run := func() {
-// 		ctx, cancel := context.WithCancel(context.Background())
-// 		go func() { err = st.Start(ctx) }()
-// 		defer cancel()
-// 		ch <- ev
-// 		time.Sleep(100 * time.Millisecond)
-// 	}
-
-// 	// redeem not found
-// 	run()
-// 	assert.Equal(t, ErrorRedeemNotFound, err.Error())
-
-// 	// redeem invalid
-// 	redeem.Status = RedeemStatusInvalid
-// 	err = st.put(redeem)
-// 	assert.NoError(t, err)
-// 	run()
-// 	assert.Equal(t, ErrorRedeemInvalid, err.Error())
-
-// 	// do nothing
-// 	redeem.Status = RedeemStatusCompleted
-// 	err = st.put(redeem)
-// 	assert.NoError(t, err)
-// 	run()
-// 	redeem2, err := st.get(redeem.RequestTxHash)
-// 	assert.Equal(t, redeem, redeem2)
-
-// 	// success
-// 	redeem.Status = RedeemStatusRequested
-// 	err = st.put(redeem)
-// 	assert.NoError(t, err)
-// 	run()
-// 	redeem3, err := st.get(redeem.RequestTxHash)
-// 	assert.NoError(t, err)
-// 	assert.Equal(t, RedeemStatusPrepared, redeem3.Status)
-// 	redeem4, err := redeem.SetFromPreparedEvent(ev)
-// 	assert.NoError(t, err)
-// 	assert.Equal(t, redeem3, redeem4)
-// }
+	// Error when updating a invalid redeem request
+	ev4 := simSync.RandRedeemPreparedEvent(300, 1)
+	ev5 := &ethsync.RedeemRequestedEvent{
+		RedeemRequestTxHash: ev4.RedeemRequestTxHash,
+		Requester:           ev4.Requester,
+		Amount:              ev4.Amount,
+		Receiver:            "invalid_btc_address",
+		IsValidReceiver:     false,
+	}
+	ch1 <- ev5                         // insert the requested event
+	time.Sleep(100 * time.Millisecond) // wait for the state to process the event
+	ch2 <- ev4                         // send the prepared event
+	time.Sleep(100 * time.Millisecond) // wait for the state to process the event
+	assert.Equal(t, retErr, stateErrors.CannotPrepareDueToRedeemRequestInvalid(ev4.RedeemRequestTxHash[:]))
+}

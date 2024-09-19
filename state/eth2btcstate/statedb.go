@@ -34,7 +34,7 @@ func newStateDB(driverName, dataSourceName string) (*StateDB, error) {
 	}, nil
 }
 
-func (st *StateDB) Close() error {
+func (st *StateDB) close() error {
 	st.stmtCache.Clear()
 
 	if err := st.db.Close(); err != nil {
@@ -50,13 +50,7 @@ func (st *StateDB) insertAfterRequested(redeem *Redeem) error {
 
 	// Insert after receiving a new redeem requested event. Only fields
 	// requestTxHash, requester, receiver, amount, and status are required.
-	query := `INSERT OR IGNORE INTO redeem (
-		requestTxHash,
-		requester,
-		receiver,
-		amount,
-		status
-	) VALUES (?, ?, ?, ?, ?)`
+	query := `INSERT OR IGNORE INTO redeem (` + statusRequestedParamList + `) VALUES (?, ?, ?, ?, ?)`
 
 	stmt := st.stmtCache.MustPrepare(query)
 
@@ -85,7 +79,16 @@ func (st *StateDB) updateAfterPrepared(redeem *Redeem) error {
 
 	// Update after receiving a new redeem prepared event. Only fields
 	// prepareTxHash, outpoints, and status are required.
-	query := `UPDATE redeem SET prepareTxHash = ?, outpoints = ?, status = ? WHERE requestTxHash = ?`
+	var query string
+	_, ok, err := st.get(redeem.RequestTxHash[:], RedeemStatusRequested)
+	if err != nil {
+		return err
+	}
+	if ok {
+		query = `UPDATE redeem SET prepareTxHash = ?, outpoints = ?, status = ? WHERE requestTxHash = ?`
+	} else {
+		query = `INSERT OR IGNORE INTO redeem (` + statusPreparedParamList + `) VALUES (?, ?, ?, ?, ?, ?, ?)`
+	}
 
 	stmt := st.stmtCache.MustPrepare(query)
 
@@ -94,8 +97,22 @@ func (st *StateDB) updateAfterPrepared(redeem *Redeem) error {
 		return err
 	}
 
-	if _, err := stmt.Exec(r.PrepareTxHash, r.Outpoints, r.Status, r.RequestTxHash); err != nil {
-		return err
+	if ok {
+		if _, err := stmt.Exec(r.PrepareTxHash, r.Outpoints, r.Status, r.RequestTxHash); err != nil {
+			return err
+		}
+	} else {
+		if _, err := stmt.Exec(
+			r.RequestTxHash,
+			r.PrepareTxHash,
+			r.Requester,
+			r.Receiver,
+			r.Amount,
+			r.Outpoints,
+			r.Status,
+		); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -104,11 +121,9 @@ func (st *StateDB) updateAfterPrepared(redeem *Redeem) error {
 func (st *StateDB) getByStatus(status RedeemStatus) ([]*Redeem, error) {
 	var query string
 	if status == RedeemStatusRequested || status == RedeemStatusInvalid {
-		query = `SELECT requestTxHash, requester, receiver, amount, status FROM redeem WHERE status = ?`
+		query = `SELECT` + statusRequestedParamList + `FROM redeem WHERE status = ?`
 	} else if status == RedeemStatusPrepared {
-		query = `SELECT 
-			requestTxHash, prepareTxHash, requester, receiver, amount, outpoints, status 
-		FROM redeem WHERE status = ?`
+		query = `SELECT` + statusPreparedParamList + `FROM redeem WHERE status = ?`
 	} else {
 		query = `SELECT * FROM redeem WHERE status = ?`
 	}
@@ -164,33 +179,18 @@ func (st *StateDB) getByStatus(status RedeemStatus) ([]*Redeem, error) {
 		if err != nil {
 			return nil, err
 		}
-
 		redeems = append(redeems, redeem)
 	}
 
 	return redeems, nil
 }
 
-func (st *StateDB) get(requestTxHash []byte, status RedeemStatus) (redeem *Redeem, err error) {
+func (st *StateDB) get(requestTxHash []byte, status RedeemStatus) (*Redeem, bool, error) {
 	var query string
 	if status == RedeemStatusRequested || status == RedeemStatusInvalid {
-		query = `SELECT 
-			requestTxHash, 
-			requester, 
-			receiver, 
-			amount, 
-			status 
-		FROM redeem WHERE requestTxHash = ? AND status = ?`
+		query = `SELECT` + statusRequestedParamList + `FROM redeem WHERE requestTxHash = ? AND status = ?`
 	} else if status == RedeemStatusPrepared {
-		query = `SELECT 
-			requestTxHash, 
-			prepareTxHash, 
-			requester, 
-			receiver, 
-			amount, 
-			outpoints, 
-			status 
-		FROM redeem WHERE requestTxHash = ? AND status = ?`
+		query = `SELECT` + statusPreparedParamList + `FROM redeem WHERE requestTxHash = ? AND status = ?`
 	} else {
 		query = `SELECT * FROM redeem WHERE requestTxHash = ? AND status = ?`
 	}
@@ -199,6 +199,7 @@ func (st *StateDB) get(requestTxHash []byte, status RedeemStatus) (redeem *Redee
 	hash := ethcommon.Bytes2Hex(requestTxHash)
 	row := stmt.QueryRow(hash, string(status))
 	var r sqlRedeem
+	var err error
 	if status == RedeemStatusRequested || status == RedeemStatusInvalid {
 		err = row.Scan(
 			&r.RequestTxHash,
@@ -232,17 +233,17 @@ func (st *StateDB) get(requestTxHash []byte, status RedeemStatus) (redeem *Redee
 
 	if err != nil {
 		if err == sql.ErrNoRows { // no redeem found
-			return nil, nil
+			return nil, false, nil
 		}
-		return nil, err
+		return nil, false, err
 	}
 
-	redeem, err = r.decode()
+	redeem, err := r.decode()
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
-	return
+	return redeem, true, nil
 }
 
 func (st *StateDB) has(requestTxHash []byte) (bool, RedeemStatus, error) {
