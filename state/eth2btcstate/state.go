@@ -27,7 +27,6 @@ type State struct {
 
 	cache struct {
 		lastFinalized atomic.Value // uint64
-		redeems       *redeemCache
 	}
 }
 
@@ -43,7 +42,6 @@ func New(db *StateDB, cfg *Config) (*State, error) {
 		newRedeemRequestedEvCh: make(chan *ethsync.RedeemRequestedEvent, cfg.ChannelSize),
 		newRedeemPreparedEvCh:  make(chan *ethsync.RedeemPreparedEvent, cfg.ChannelSize),
 	}
-	st.cache.redeems = newRedeemCache(cfg.CacheSize)
 
 	_, err := st.db.KVGet(KeyLastFinalizedBlock)
 	if err != nil && err != sql.ErrNoRows {
@@ -122,7 +120,7 @@ func (st *State) Start(ctx context.Context) error {
 				logger.Errorf("failed to create redeem from requested event: err=%v, ev=%v", err, ev)
 				return err
 			}
-			if err := st.insert(redeem); err != nil {
+			if err := st.db.insertAfterRequested(redeem); err != nil {
 				logger.Errorf("failed to insert redeem to db: tx=0x%x, err=%v", ev.RedeemRequestTxHash[:], err)
 				return err
 			}
@@ -171,7 +169,7 @@ func (st *State) Start(ctx context.Context) error {
 				}
 			}
 
-			if err = st.update(redeem); err != nil {
+			if err = st.db.updateAfterPrepared(redeem); err != nil {
 				return err
 			}
 		}
@@ -205,33 +203,11 @@ func (st *State) GetNewRedeemPreparedEventChannel() chan<- *ethsync.RedeemPrepar
 }
 
 func (st *State) Get(ethTxHash [32]byte, status RedeemStatus) (*Redeem, bool, error) {
-	if v, ok := st.cache.redeems.get(ethTxHash, status); ok {
-		return v, true, nil
-	}
-
-	r, ok, err := st.db.get(ethTxHash[:], status)
-	if err != nil {
-		return nil, false, err
-	}
-
-	if ok {
-		st.cache.redeems.add(r)
-	}
-
-	return r, true, nil
+	return st.db.get(ethTxHash[:], status)
 }
 
 func (st *State) GetByStatus(status RedeemStatus) ([]*Redeem, error) {
-	redeems, err := st.db.getByStatus(status)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, r := range redeems {
-		st.cache.redeems.add(r)
-	}
-
-	return redeems, nil
+	return st.db.getByStatus(status)
 }
 
 func (st *State) setFinalizedBlockNumber(fbNum *big.Int) error {
@@ -239,27 +215,6 @@ func (st *State) setFinalizedBlockNumber(fbNum *big.Int) error {
 		return err
 	}
 	st.cache.lastFinalized.Store(fbNum.Bytes())
-
-	return nil
-}
-
-func (st *State) insert(r *Redeem) error {
-	if err := st.db.insertAfterRequested(r); err != nil {
-		return err
-	}
-
-	st.cache.redeems.add(r)
-
-	return nil
-}
-
-func (st *State) update(r *Redeem) error {
-	if err := st.db.updateAfterPrepared(r); err != nil {
-		return err
-	}
-
-	st.cache.redeems.remove(r.RequestTxHash, RedeemStatusRequested)
-	st.cache.redeems.add(r)
 
 	return nil
 }
