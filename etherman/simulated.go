@@ -62,12 +62,13 @@ func newAuth() *bind.TransactOpts {
 }
 
 type ParamConfig struct {
-	Deployer  int
 	Receiver  int
 	Sender    int
 	Requester int
 
 	Amount *big.Int
+
+	OutpointNum int
 }
 type SimEtherman struct {
 	Sim      *SimulatedChain
@@ -83,11 +84,20 @@ func NewSimEtherman() (*SimEtherman, error) {
 	}
 
 	pk := sk.PubKey().X()
-	address, _, contract, err := bridge.DeployTEENetBtcBridge(sim.Accounts[0], sim.Backend.Client(), pk)
+	bridgeAddress, _, contract, err := bridge.DeployTEENetBtcBridge(sim.Accounts[0], sim.Backend.Client(), pk)
 	if err != nil {
 		return nil, err
 	}
 	sim.Backend.Commit()
+
+	bridgeContract, err := bridge.NewTEENetBtcBridge(bridgeAddress, sim.Backend.Client())
+	if err != nil {
+		return nil, err
+	}
+	twbtcAddress, err := bridgeContract.Twbtc(nil)
+	if err != nil {
+		return nil, err
+	}
 
 	_pk, err := contract.Pk(nil)
 	if err != nil {
@@ -97,9 +107,15 @@ func NewSimEtherman() (*SimEtherman, error) {
 		return nil, err
 	}
 
+	cfg := &Config{
+		BridgeContractAddress: bridgeAddress,
+		TWBTCContractAddress:  twbtcAddress,
+	}
+
 	etherman := &Etherman{
-		ethClient:     sim.Backend.Client(),
-		bridgeAddress: address,
+		ethClient: sim.Backend.Client(),
+		cfg:       cfg,
+		auth:      sim.Accounts[0],
 	}
 
 	return &SimEtherman{
@@ -126,7 +142,6 @@ func (env *SimEtherman) GenMintParams(cfg *ParamConfig) *MintParams {
 	}
 
 	return &MintParams{
-		Auth:     sim.Accounts[cfg.Deployer],
 		BtcTxId:  btcTxId,
 		Amount:   cfg.Amount,
 		Receiver: receiver,
@@ -145,20 +160,17 @@ func (env *SimEtherman) GenRequestParams(cfg *ParamConfig) *RequestParams {
 
 func (env *SimEtherman) GenPrepareParams(cfg *ParamConfig) *PrepareParams {
 	txHash := common.RandBytes32()
-	if len(txHash) == 0 {
-		return nil
-	}
 	requester := env.Sim.Accounts[cfg.Requester].From
 	receiver := btcAddrs[0]
 	outpointTxIds := [][32]byte{}
-	for i := 0; i < 2; i++ {
-		txId := common.RandBytes32()
-		if len(txId) == 0 {
-			return nil
-		}
-		outpointTxIds = append(outpointTxIds, txId)
+	outpointIdxs := []uint16{}
+	outpointTxIndices := []*big.Int{}
+
+	for i := 0; i < cfg.OutpointNum; i++ {
+		outpointTxIds = append(outpointTxIds, common.RandBytes32())
+		outpointIdxs = append(outpointIdxs, uint16(i))
+		outpointTxIndices = append(outpointTxIndices, big.NewInt(int64(i)))
 	}
-	outpointTxIndices := []*big.Int{big.NewInt(0), big.NewInt(1)}
 
 	msg := crypto.Keccak256Hash(common.EncodePacked(
 		txHash, requester.String(), string(receiver), cfg.Amount, outpointTxIds, outpointTxIndices)).Bytes()
@@ -168,13 +180,12 @@ func (env *SimEtherman) GenPrepareParams(cfg *ParamConfig) *PrepareParams {
 	}
 
 	return &PrepareParams{
-		Auth:                env.Sim.Accounts[cfg.Sender],
 		RedeemRequestTxHash: txHash,
 		Requester:           requester,
 		Receiver:            receiver,
 		Amount:              cfg.Amount,
 		OutpointTxIds:       outpointTxIds,
-		OutpointIdxs:        []uint16{0, 1},
+		OutpointIdxs:        outpointIdxs,
 		Rx:                  rx,
 		S:                   s,
 	}

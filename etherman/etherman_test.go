@@ -7,7 +7,7 @@ import (
 
 	logger "github.com/0xPolygonHermez/zkevm-node/log"
 	"github.com/TEENet-io/bridge-go/common"
-	ethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -17,7 +17,7 @@ func TestIsPrepared(t *testing.T) {
 	sim := env.Sim
 	etherman := env.Etherman
 
-	params := env.GenPrepareParams(&ParamConfig{Sender: 0, Requester: 1, Amount: big.NewInt(100)})
+	params := env.GenPrepareParams(&ParamConfig{Sender: 0, Requester: 1, Amount: big.NewInt(100), OutpointNum: 2})
 	assert.NotNil(t, params)
 
 	_, err = etherman.RedeemPrepare(params)
@@ -35,7 +35,7 @@ func TestIsMinted(t *testing.T) {
 	sim := env.Sim
 	etherman := env.Etherman
 
-	params := env.GenMintParams(&ParamConfig{Deployer: 0, Receiver: 1, Amount: big.NewInt(100)})
+	params := env.GenMintParams(&ParamConfig{Receiver: 1, Amount: big.NewInt(100)})
 	assert.NotNil(t, params)
 	_, err = etherman.Mint(params)
 	assert.NoError(t, err)
@@ -52,12 +52,12 @@ func TestGetEventLogs(t *testing.T) {
 	sim := env.Sim
 	etherman := env.Etherman
 
-	mintParams := env.GenMintParams(&ParamConfig{Deployer: 0, Receiver: 1, Amount: big.NewInt(100)})
+	mintParams := env.GenMintParams(&ParamConfig{Receiver: 1, Amount: big.NewInt(100)})
 	assert.NotNil(t, mintParams)
 	_, err = etherman.Mint(mintParams)
 	assert.NoError(t, err)
 
-	prepareParams := env.GenPrepareParams(&ParamConfig{Sender: 3, Requester: 4, Amount: big.NewInt(400)})
+	prepareParams := env.GenPrepareParams(&ParamConfig{Sender: 3, Requester: 4, Amount: big.NewInt(400), OutpointNum: 1})
 	assert.NotNil(t, prepareParams)
 	tx, err := etherman.RedeemPrepare(prepareParams)
 	assert.NoError(t, err)
@@ -102,7 +102,7 @@ func TestRedeemPrepare(t *testing.T) {
 	sim := env.Sim
 	etherman := env.Etherman
 
-	params := env.GenPrepareParams(&ParamConfig{Sender: 0, Requester: 1, Amount: big.NewInt(100)})
+	params := env.GenPrepareParams(&ParamConfig{Sender: 0, Requester: 1, Amount: big.NewInt(100), OutpointNum: 3})
 	assert.NotNil(t, params)
 	_, err = etherman.RedeemPrepare(params)
 	assert.NoError(t, err)
@@ -116,7 +116,7 @@ func TestRedeemRequest(t *testing.T) {
 	etherman := env.Etherman
 
 	// Mint tokens
-	mintParams := env.GenMintParams(&ParamConfig{Deployer: 0, Receiver: 1, Amount: big.NewInt(100)})
+	mintParams := env.GenMintParams(&ParamConfig{Receiver: 1, Amount: big.NewInt(100)})
 	assert.NotNil(t, mintParams)
 	_, err = etherman.Mint(mintParams)
 	assert.NoError(t, err)
@@ -151,7 +151,7 @@ func TestMint(t *testing.T) {
 	sim := env.Sim
 	etherman := env.Etherman
 
-	params := env.GenMintParams(&ParamConfig{Deployer: 0, Receiver: 1, Amount: big.NewInt(100)})
+	params := env.GenMintParams(&ParamConfig{Receiver: 1, Amount: big.NewInt(100)})
 	assert.NotNil(t, params)
 	_, err = etherman.Mint(params)
 	assert.NoError(t, err)
@@ -163,11 +163,10 @@ func TestMint(t *testing.T) {
 }
 
 func TestGetLatestFinalizedBlockNumber(t *testing.T) {
-	etherman, err := NewEtherman(&Config{
-		URL:                   "https://mainnet.infura.io/v3/f37af697a9dd4cbfa7e22aaacce33e50",
-		BridgeContractAddress: ethcommon.Address([20]byte{}),
-	})
+	URL := "https://mainnet.infura.io/v3/f37af697a9dd4cbfa7e22aaacce33e50"
+	client, err := ethclient.Dial(URL)
 	assert.NoError(t, err)
+	etherman := &Etherman{ethClient: client}
 
 	b, err := etherman.GetLatestFinalizedBlockNumber()
 	assert.NoError(t, err)

@@ -63,7 +63,8 @@ func TestSync(t *testing.T) {
 		start.Add(start, big.NewInt(1))
 	}
 	blk, _ = env.Sim.Backend.Client().BlockByNumber(context.Background(), nil)
-	assert.Equal(t, blk.Number(), synchronizer.lastFinalizedBlockNumber.Add(synchronizer.lastFinalizedBlockNumber, big.NewInt(1)))
+	assert.Equal(t, blk.Number(),
+		synchronizer.lastFinalizedBlockNumber.Add(synchronizer.lastFinalizedBlockNumber, big.NewInt(1)))
 
 	go mockB2EState.Start(ctx2)
 	go mockE2BState.Start(ctx2)
@@ -90,7 +91,7 @@ func sendTxs(t *testing.T, env *etherman.SimEtherman) (
 	requestedEvs []*RedeemRequestedEvent,
 	preparedEvs []*RedeemPreparedEvent,
 ) {
-	mintParams := env.GenMintParams(&etherman.ParamConfig{Deployer: 0, Receiver: 1, Amount: big.NewInt(100)})
+	mintParams := env.GenMintParams(&etherman.ParamConfig{Receiver: 1, Amount: big.NewInt(100)})
 	tx, err := env.Etherman.Mint(mintParams)
 	if err != nil {
 		t.Fatal(err)
@@ -103,11 +104,10 @@ func sendTxs(t *testing.T, env *etherman.SimEtherman) (
 		Receiver:     mintParams.Receiver,
 	})
 
-	prepareParams := env.GenPrepareParams(&etherman.ParamConfig{Sender: 3, Requester: 4, Amount: big.NewInt(400)})
+	prepareParams := env.GenPrepareParams(
+		&etherman.ParamConfig{Sender: 3, Requester: 4, Amount: big.NewInt(400), OutpointNum: 1})
 	tx, err = env.Etherman.RedeemPrepare(prepareParams)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	time.Sleep(200 * time.Millisecond)
 	env.Sim.Backend.Commit()
 

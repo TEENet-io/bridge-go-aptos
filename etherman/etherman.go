@@ -2,10 +2,12 @@ package etherman
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/big"
 	"strings"
 
+	logger "github.com/0xPolygonHermez/zkevm-node/log"
 	"github.com/TEENet-io/bridge-go/common"
 	bridge "github.com/TEENet-io/bridge-go/contracts/TEENetBtcBridge"
 	"github.com/TEENet-io/bridge-go/contracts/TWBTC"
@@ -42,23 +44,42 @@ type ethereumClient interface {
 }
 
 type Etherman struct {
-	ethClient      ethereumClient
-	bridgeAddress  ethcommon.Address
-	bridgeContract *bridge.TEENetBtcBridge
-	twbtcContract  *TWBTC.TWBTC
+	ethClient ethereumClient
+
+	cfg *Config
+
+	auth *bind.TransactOpts
 }
 
-func NewEtherman(cfg *Config) (*Etherman, error) {
+func NewEtherman(cfg *Config, auth *bind.TransactOpts) (*Etherman, error) {
 	ethClient, err := ethclient.Dial(cfg.URL)
 	if err != nil {
+		logger.Errorf("failed to dial Ethereum node: url=%s, err=%v", cfg.URL, err)
 		return nil, err
 	}
 
+	contract, err := bridge.NewTEENetBtcBridge(cfg.BridgeContractAddress, ethClient)
+	if err != nil {
+		logger.Errorf("failed to create bridge contract instance: address=0x%x, err=%v", cfg.BridgeContractAddress, err)
+		return nil, err
+	}
+
+	twbtcAddr, err := contract.Twbtc(nil)
+	if err != nil {
+		logger.Errorf("failed to get TWBTC address from bridge contract: err=%v", err)
+		return nil, err
+	}
+
+	if twbtcAddr != cfg.TWBTCContractAddress {
+		errMsg := fmt.Sprintf("TWBTC address mismatch: expected=0x%x, got=0x%x", cfg.TWBTCContractAddress, twbtcAddr)
+		logger.Errorf(errMsg)
+		return nil, errors.New(errMsg)
+	}
+
 	return &Etherman{
-		ethClient:      ethClient,
-		bridgeAddress:  cfg.BridgeContractAddress,
-		bridgeContract: nil,
-		twbtcContract:  nil,
+		ethClient: ethClient,
+		cfg:       cfg,
+		auth:      auth,
 	}, nil
 }
 
@@ -91,7 +112,7 @@ func (etherman *Etherman) GetEventLogs(blockNum *big.Int) (
 	logs, err := etherman.ethClient.FilterLogs(context.Background(), ethereum.FilterQuery{
 		FromBlock: blockNum,
 		ToBlock:   blockNum,
-		Addresses: []ethcommon.Address{etherman.bridgeAddress},
+		Addresses: []ethcommon.Address{etherman.cfg.BridgeContractAddress},
 	})
 	if err != nil {
 		return nil, nil, nil, err
@@ -152,7 +173,14 @@ func (etherman *Etherman) Mint(params *MintParams) (*types.Transaction, error) {
 		return nil, err
 	}
 
-	tx, err := contract.Mint(params.Auth, params.BtcTxId, params.Receiver, params.Amount, params.Rx, params.S)
+	tx, err := contract.Mint(
+		etherman.auth,
+		params.BtcTxId,
+		params.Receiver,
+		params.Amount,
+		params.Rx,
+		params.S,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +209,7 @@ func (etherman *Etherman) RedeemPrepare(params *PrepareParams) (*types.Transacti
 	}
 
 	tx, err := contract.RedeemPrepare(
-		params.Auth,
+		etherman.auth,
 		params.RedeemRequestTxHash,
 		params.Requester,
 		string(params.Receiver),
@@ -232,7 +260,7 @@ func (etherman *Etherman) TWBTCApprove(auth *bind.TransactOpts, amount *big.Int)
 		return err
 	}
 
-	_, err = contract.Approve(auth, etherman.bridgeAddress, amount)
+	_, err = contract.Approve(auth, etherman.cfg.BridgeContractAddress, amount)
 	if err != nil {
 		return err
 	}
@@ -246,7 +274,7 @@ func (etherman *Etherman) TWBTCAllowance(owner ethcommon.Address) (*big.Int, err
 		return nil, err
 	}
 
-	allowance, err := contract.Allowance(nil, owner, etherman.bridgeAddress)
+	allowance, err := contract.Allowance(nil, owner, etherman.cfg.BridgeContractAddress)
 	if err != nil {
 		return nil, err
 	}
@@ -255,36 +283,21 @@ func (etherman *Etherman) TWBTCAllowance(owner ethcommon.Address) (*big.Int, err
 }
 
 func (etherman *Etherman) getBridgeContract() (*bridge.TEENetBtcBridge, error) {
-	if etherman.bridgeContract != nil {
-		return etherman.bridgeContract, nil
-	}
-
-	contract, err := bridge.NewTEENetBtcBridge(etherman.bridgeAddress, etherman.ethClient)
+	contract, err := bridge.NewTEENetBtcBridge(etherman.cfg.BridgeContractAddress, etherman.ethClient)
 	if err != nil {
 		return nil, err
 	}
-
-	etherman.bridgeContract = contract
 
 	return contract, nil
 }
 
 func (etherman *Etherman) getTWBTCContract() (*TWBTC.TWBTC, error) {
-	if etherman.twbtcContract != nil {
-		return etherman.twbtcContract, nil
-	}
-
-	twbtcAddr, err := etherman.TWBTCAddress()
+	contract, err := TWBTC.NewTWBTC(etherman.cfg.TWBTCContractAddress, etherman.ethClient)
 	if err != nil {
 		return nil, err
 	}
 
-	etherman.twbtcContract, err = TWBTC.NewTWBTC(twbtcAddr, etherman.ethClient)
-	if err != nil {
-		return nil, err
-	}
-
-	return etherman.twbtcContract, nil
+	return contract, nil
 }
 
 func (etherman *Etherman) IsPrepared(ethTxHash [32]byte) (bool, error) {
