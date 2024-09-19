@@ -3,12 +3,13 @@ package eth2btcstate
 import (
 	"database/sql"
 
+	"github.com/TEENet-io/bridge-go/database"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 type StateDB struct {
 	db        *sql.DB
-	stmtCache *StmtCache
+	stmtCache *database.StmtCache
 }
 
 var stateDBErrors StateDBError
@@ -30,7 +31,7 @@ func newStateDB(driverName, dataSourceName string) (*StateDB, error) {
 
 	return &StateDB{
 		db:        db,
-		stmtCache: NewStmtCache(db),
+		stmtCache: database.NewStmtCache(db),
 	}, nil
 }
 
