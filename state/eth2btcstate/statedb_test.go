@@ -10,7 +10,7 @@ import (
 )
 
 func TestInsertAfterRequested(t *testing.T) {
-	db, err := newStateDB("sqlite3", ":memory:")
+	db, err := NewStateDB("sqlite3", ":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -20,7 +20,7 @@ func TestInsertAfterRequested(t *testing.T) {
 	r0 := randRedeem(RedeemStatusRequested)
 	err = db.insertAfterRequested(r0)
 	assert.NoError(t, err)
-	rs, err := db.getByStatus(RedeemStatusRequested)
+	rs, err := db.GetByStatus(RedeemStatusRequested)
 	assert.Equal(t, 1, len(rs))
 	r1 := rs[0]
 	assert.NoError(t, err)
@@ -44,7 +44,7 @@ func TestInsertAfterRequested(t *testing.T) {
 	r2.RequestTxHash = r0.RequestTxHash
 	err = db.insertAfterRequested(r2)
 	assert.NoError(t, err)
-	rs, err = db.getByStatus(RedeemStatusRequested)
+	rs, err = db.GetByStatus(RedeemStatusRequested)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(rs))
 	assert.Equal(t, rs[0], r1)
@@ -53,7 +53,7 @@ func TestInsertAfterRequested(t *testing.T) {
 	r2.RequestTxHash = common.RandBytes32()
 	err = db.insertAfterRequested(r2)
 	assert.NoError(t, err)
-	rs, err = db.getByStatus(RedeemStatusRequested)
+	rs, err = db.GetByStatus(RedeemStatusRequested)
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(rs))
 	assert.Equal(t, rs[0].RequestTxHash, r0.RequestTxHash)
@@ -61,7 +61,7 @@ func TestInsertAfterRequested(t *testing.T) {
 }
 
 func TestUpdateAfterPrepared(t *testing.T) {
-	db, err := newStateDB("sqlite3", ":memory:")
+	db, err := NewStateDB("sqlite3", ":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +77,7 @@ func TestUpdateAfterPrepared(t *testing.T) {
 	r0.BtcTxId = [32]byte{}
 	err = db.updateAfterPrepared(r0)
 	assert.NoError(t, err)
-	actual, ok, err := db.get(r0.RequestTxHash[:], RedeemStatusPrepared)
+	actual, ok, err := db.Get(r0.RequestTxHash[:], RedeemStatusPrepared)
 	assert.NoError(t, err)
 	assert.True(t, ok)
 	assert.Equal(t, r0, actual)
@@ -92,14 +92,14 @@ func TestUpdateAfterPrepared(t *testing.T) {
 	r1.Outpoints = []Outpoint{{TxId: common.RandBytes32(), Idx: 0}}
 	err = db.updateAfterPrepared(r1)
 	assert.NoError(t, err)
-	actual, ok, err = db.get(r1.RequestTxHash[:], RedeemStatusPrepared)
+	actual, ok, err = db.Get(r1.RequestTxHash[:], RedeemStatusPrepared)
 	assert.NoError(t, err)
 	assert.True(t, ok)
 	assert.Equal(t, r1, actual)
 }
 
 func TestHas(t *testing.T) {
-	db, err := newStateDB("sqlite3", ":memory:")
+	db, err := NewStateDB("sqlite3", ":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,37 +107,37 @@ func TestHas(t *testing.T) {
 
 	r := randRedeem(RedeemStatusRequested)
 
-	ok, _, err := db.has(r.RequestTxHash[:])
+	ok, _, err := db.Has(r.RequestTxHash[:])
 	assert.NoError(t, err)
 	assert.False(t, ok)
 
 	err = db.insertAfterRequested(r)
 	assert.NoError(t, err)
-	ok, status, err := db.has(r.RequestTxHash[:])
+	ok, status, err := db.Has(r.RequestTxHash[:])
 	assert.NoError(t, err)
 	assert.True(t, ok)
 	assert.Equal(t, RedeemStatusRequested, status)
 }
 
 func TestKV(t *testing.T) {
-	db, err := newStateDB("sqlite3", ":memory:")
+	db, err := NewStateDB("sqlite3", ":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer db.close()
 
 	// insert
-	err = db.KVSet([]byte("key"), []byte("value1"))
+	err = db.setKeyedValue([]byte("key"), []byte("value1"))
 	assert.NoError(t, err)
 
 	// get
-	v, err := db.KVGet([]byte("key"))
+	v, err := db.GetKeyedValue([]byte("key"))
 	assert.NoError(t, err)
 	assert.Equal(t, []byte("value1"), ethcommon.TrimLeftZeroes(v))
 
-	err = db.KVSet([]byte("key"), []byte("value2"))
+	err = db.setKeyedValue([]byte("key"), []byte("value2"))
 	assert.NoError(t, err)
-	v, err = db.KVGet([]byte("key"))
+	v, err = db.GetKeyedValue([]byte("key"))
 	assert.NoError(t, err)
 	assert.Equal(t, []byte("value2"), ethcommon.TrimLeftZeroes(v))
 }

@@ -14,7 +14,7 @@ type StateDB struct {
 
 var stateDBErrors StateDBError
 
-func newStateDB(driverName, dataSourceName string) (*StateDB, error) {
+func NewStateDB(driverName, dataSourceName string) (*StateDB, error) {
 	db, err := sql.Open(driverName, dataSourceName)
 	if err != nil {
 		return nil, err
@@ -81,7 +81,7 @@ func (st *StateDB) updateAfterPrepared(redeem *Redeem) error {
 	// Update after receiving a new redeem prepared event. Only fields
 	// prepareTxHash, outpoints, and status are required.
 	var query string
-	_, ok, err := st.get(redeem.RequestTxHash[:], RedeemStatusRequested)
+	_, ok, err := st.Get(redeem.RequestTxHash[:], RedeemStatusRequested)
 	if err != nil {
 		return err
 	}
@@ -119,7 +119,7 @@ func (st *StateDB) updateAfterPrepared(redeem *Redeem) error {
 	return nil
 }
 
-func (st *StateDB) getByStatus(status RedeemStatus) ([]*Redeem, error) {
+func (st *StateDB) GetByStatus(status RedeemStatus) ([]*Redeem, error) {
 	var query string
 	if status == RedeemStatusRequested || status == RedeemStatusInvalid {
 		query = `SELECT` + statusRequestedParamList + `FROM redeem WHERE status = ?`
@@ -186,7 +186,7 @@ func (st *StateDB) getByStatus(status RedeemStatus) ([]*Redeem, error) {
 	return redeems, nil
 }
 
-func (st *StateDB) get(requestTxHash []byte, status RedeemStatus) (*Redeem, bool, error) {
+func (st *StateDB) Get(requestTxHash []byte, status RedeemStatus) (*Redeem, bool, error) {
 	var query string
 	if status == RedeemStatusRequested || status == RedeemStatusInvalid {
 		query = `SELECT` + statusRequestedParamList + `FROM redeem WHERE requestTxHash = ? AND status = ?`
@@ -247,7 +247,7 @@ func (st *StateDB) get(requestTxHash []byte, status RedeemStatus) (*Redeem, bool
 	return redeem, true, nil
 }
 
-func (st *StateDB) has(requestTxHash []byte) (bool, RedeemStatus, error) {
+func (st *StateDB) Has(requestTxHash []byte) (bool, RedeemStatus, error) {
 	query := `SELECT status FROM redeem WHERE requestTxHash = ?`
 	stmt := st.stmtCache.MustPrepare(query)
 
@@ -263,7 +263,7 @@ func (st *StateDB) has(requestTxHash []byte) (bool, RedeemStatus, error) {
 	return true, RedeemStatus(status), nil
 }
 
-func (st *StateDB) KVGet(key []byte) ([]byte, error) {
+func (st *StateDB) GetKeyedValue(key []byte) ([]byte, error) {
 	query := `SELECT value FROM kv WHERE key = ?`
 	stmt := st.stmtCache.MustPrepare(query)
 
@@ -276,7 +276,7 @@ func (st *StateDB) KVGet(key []byte) ([]byte, error) {
 	return ethcommon.Hex2BytesFixed(value, 32), nil
 }
 
-func (st *StateDB) KVSet(key, value []byte) error {
+func (st *StateDB) setKeyedValue(key, value []byte) error {
 	query := `INSERT OR REPLACE INTO kv (key, value) VALUES (?, ?)`
 	stmt := st.stmtCache.MustPrepare(query)
 
