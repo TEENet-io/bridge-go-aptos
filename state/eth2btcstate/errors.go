@@ -9,12 +9,12 @@ import (
 type StateError struct{}
 
 func (e *StateError) CannotPrepareDueToRedeemRequestInvalid(txHash []byte) error {
-	msg := fmt.Sprintf("cannot be prepared since the requested redeem is invalid: txHash=0x%x", txHash)
+	msg := fmt.Sprintf("cannot be prepared since the requested redeem is invalid: tx=0x%x", txHash)
 	return errors.New(msg)
 }
 
 func (e *StateError) StoredFinalizedBlockNumberLessThanStartingBlockNumber(num *big.Int) error {
-	msg := fmt.Sprintf("stored finalized block number less than the starting block number: fbNum=%v", num)
+	msg := fmt.Sprintf("stored finalized block number less than the starting block number: fb=%v", num)
 	return errors.New(msg)
 }
 
