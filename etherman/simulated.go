@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	simulatedChainID = big.NewInt(1337)
+	SimulatedChainID = big.NewInt(1337)
 	blockGasLimit    = uint64(999999999999999999)
 
 	btcAddrs = []string{
@@ -57,7 +57,7 @@ func NewSimulatedChain() *SimulatedChain {
 
 func newAuth() *bind.TransactOpts {
 	sk, _ := crypto.GenerateKey()
-	auth, _ := bind.NewKeyedTransactorWithChainID(sk, simulatedChainID)
+	auth, _ := bind.NewKeyedTransactorWithChainID(sk, SimulatedChainID)
 	return auth
 }
 

@@ -3,6 +3,7 @@ package eth2btcstate
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math/big"
 
 	"github.com/TEENet-io/bridge-go/common"
@@ -49,7 +50,7 @@ type Redeem struct {
 	Status        RedeemStatus
 }
 
-func createFromRequestedEvent(ev *ethsync.RedeemRequestedEvent) (*Redeem, error) {
+func createRedeemFromRequestedEvent(ev *ethsync.RedeemRequestedEvent) (*Redeem, error) {
 	r := &Redeem{}
 
 	if ev.RedeemRequestTxHash == [32]byte{} {
@@ -127,6 +128,22 @@ func (r *Redeem) updateFromPreparedEvent(ev *ethsync.RedeemPreparedEvent) (*Rede
 	return r, nil
 }
 
+func createRedeemFromPreparedEvent(ev *ethsync.RedeemPreparedEvent) (*Redeem, error) {
+	r, err := createRedeemFromRequestedEvent(&ethsync.RedeemRequestedEvent{
+		RedeemRequestTxHash: ev.RedeemRequestTxHash,
+		Requester:           ev.Requester,
+		Receiver:            ev.Receiver,
+		Amount:              new(big.Int).Set(ev.Amount),
+		IsValidReceiver:     true,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return r.updateFromPreparedEvent(ev)
+}
+
 func (r *Redeem) MarshalJSON() ([]byte, error) {
 	jOutpoint := []JSONOutpoint{}
 	for _, outpoint := range r.Outpoints {
@@ -192,6 +209,12 @@ func (r *Redeem) Clone() *Redeem {
 }
 
 func (r *Redeem) String() string {
-	j, _ := r.MarshalJSON()
-	return string(j)
+	str := fmt.Sprintf("Redeem { RequestTxHash: 0x%x, PrepareTxHash: 0x%x BtcTxId: 0x%x Requester: 0x%x, Receiver: 0x%x, Amount: %v, Status: %s, ",
+		r.RequestTxHash, r.PrepareTxHash, r.BtcTxId, r.Requester.Hex(), r.Receiver, r.Amount, r.Status)
+	str += "Outpoints: [ "
+	for i, outpoint := range r.Outpoints {
+		str += fmt.Sprintf("[%d]: { TxId: 0x%x, Idx: %d }, ", i, outpoint.TxId, outpoint.Idx)
+	}
+	str += " ] }"
+	return str
 }

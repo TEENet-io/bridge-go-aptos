@@ -14,7 +14,7 @@ func TestInsertAfterRequested(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	defer db.close()
 
 	// Insert a redeem with status == requested
 	r0 := randRedeem(RedeemStatusRequested)
@@ -65,31 +65,37 @@ func TestUpdateAfterPrepared(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	defer db.close()
 
 	// Check errors
 	r0 := randRedeem(RedeemStatusRequested)
 	err = db.updateAfterPrepared(r0)
 	assert.Equal(t, err, stateDBErrors.CannotUpdateDueToInvalidStatus(r0))
 
-	// Insert a redeem with status == requested
+	// Insert without previous redeem request stored
+	r0.Status = RedeemStatusPrepared
+	r0.BtcTxId = [32]byte{}
+	err = db.updateAfterPrepared(r0)
+	assert.NoError(t, err)
+	actual, ok, err := db.get(r0.RequestTxHash[:], RedeemStatusPrepared)
+	assert.NoError(t, err)
+	assert.True(t, ok)
+	assert.Equal(t, r0, actual)
+
+	// Update with previous redeem request stored
 	r1 := randRedeem(RedeemStatusRequested)
 	r1.Outpoints = nil
+	r1.BtcTxId = [32]byte{}
 	err = db.insertAfterRequested(r1)
 	assert.NoError(t, err)
-
-	// update
 	r1.Status = RedeemStatusPrepared
 	r1.Outpoints = []Outpoint{{TxId: common.RandBytes32(), Idx: 0}}
 	err = db.updateAfterPrepared(r1)
 	assert.NoError(t, err)
-
-	// check
-	rs, err := db.getByStatus(RedeemStatusPrepared)
+	actual, ok, err = db.get(r1.RequestTxHash[:], RedeemStatusPrepared)
 	assert.NoError(t, err)
-	assert.Equal(t, 1, len(rs))
-	r2 := rs[0]
-	assert.Equal(t, r2.BtcTxId, [32]byte{})
+	assert.True(t, ok)
+	assert.Equal(t, r1, actual)
 }
 
 func TestHas(t *testing.T) {
@@ -97,7 +103,7 @@ func TestHas(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	defer db.close()
 
 	r := randRedeem(RedeemStatusRequested)
 
@@ -118,7 +124,7 @@ func TestKV(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	defer db.close()
 
 	// insert
 	err = db.KVSet([]byte("key"), []byte("value1"))

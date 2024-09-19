@@ -1,17 +1,23 @@
 package btc2ethstate
 
-import bridge "github.com/TEENet-io/bridge-go/contracts/TEENetBtcBridge"
+import (
+	"github.com/TEENet-io/bridge-go/ethsync"
+)
 
 type State struct {
-	mintedEvCh chan *bridge.TEENetBtcBridgeMinted
+	mintedEvCh chan *ethsync.MintedEvent
 }
 
 func New() *State {
 	return &State{
-		mintedEvCh: make(chan *bridge.TEENetBtcBridgeMinted),
+		mintedEvCh: make(chan *ethsync.MintedEvent),
 	}
 }
 
-func (st *State) GetMintedEventChannel() chan *bridge.TEENetBtcBridgeMinted {
+func (st *State) Close() {
+	// to be implemented
+}
+
+func (st *State) GetNewMintedEventChannel() chan<- *ethsync.MintedEvent {
 	return st.mintedEvCh
 }

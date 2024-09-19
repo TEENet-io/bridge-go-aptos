@@ -29,4 +29,7 @@ var (
 		key CHAR(64) PRIMARY KEY NOT NULL,
 		value CHAR(64) NOT NULL
 	);`
+
+	statusRequestedParamList = " requestTxHash, requester, receiver, amount, status "
+	statusPreparedParamList  = " requestTxHash, prepareTxHash, requester, receiver, amount, outpoints, status "
 )
