@@ -1,11 +1,17 @@
 package eth2btcstate
 
+import "database/sql"
+
 type SimState struct {
 	*State
 }
 
 func NewSimState(channelSize, cacheSize int) (*SimState, error) {
-	db, err := NewStateDB("sqlite3", ":memory:")
+	sqlDB, err := sql.Open("sqlite3", ":memory:")
+	if err != nil {
+		return nil, err
+	}
+	db, err := NewStateDB(sqlDB)
 	if err != nil {
 		return nil, err
 	}
@@ -20,4 +26,9 @@ func NewSimState(channelSize, cacheSize int) (*SimState, error) {
 	} else {
 		return &SimState{st}, nil
 	}
+}
+
+func (st *SimState) Close() {
+	st.State.Close()
+	st.db.Close()
 }

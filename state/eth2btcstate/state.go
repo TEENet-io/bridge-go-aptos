@@ -73,7 +73,7 @@ func New(db *StateDB, cfg *Config) (*State, error) {
 
 func (st *State) Close() {
 	if st.db != nil {
-		st.db.close()
+		st.db.Close()
 	}
 }
 
