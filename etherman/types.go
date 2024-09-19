@@ -9,7 +9,6 @@ import (
 )
 
 type MintParams struct {
-	Auth     *bind.TransactOpts
 	BtcTxId  [32]byte
 	Amount   *big.Int
 	Receiver common.Address
@@ -24,7 +23,6 @@ type RequestParams struct {
 }
 
 type PrepareParams struct {
-	Auth                *bind.TransactOpts
 	RedeemRequestTxHash [32]byte
 	Requester           common.Address
 	Receiver            string
