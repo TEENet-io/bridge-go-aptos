@@ -12,9 +12,16 @@ import (
 )
 
 func TestNewState(t *testing.T) {
-	db, err := NewStateDB("sqlite3", ":memory:")
-	assert.NoError(t, err)
-	defer db.close()
+	sqlDB := getMemoryDB()
+	db, err := NewStateDB(sqlDB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		sqlDB.Close()
+		db.Close()
+	}()
+
 	st, err := New(db, &Config{ChannelSize: 1, CacheSize: 1})
 	assert.NoError(t, err)
 	finalized, err := st.GetFinalizedBlockNumber()

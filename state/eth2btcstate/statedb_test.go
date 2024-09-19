@@ -1,6 +1,7 @@
 package eth2btcstate
 
 import (
+	"database/sql"
 	"testing"
 
 	"github.com/TEENet-io/bridge-go/common"
@@ -9,12 +10,23 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func getMemoryDB() *sql.DB {
+	db, err := sql.Open("sqlite3", ":memory:")
+	if err != nil {
+		panic(err)
+	}
+	return db
+}
 func TestInsertAfterRequested(t *testing.T) {
-	db, err := NewStateDB("sqlite3", ":memory:")
+	sqlDB := getMemoryDB()
+	db, err := NewStateDB(sqlDB)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.close()
+	defer func() {
+		sqlDB.Close()
+		db.Close()
+	}()
 
 	// Insert a redeem with status == requested
 	r0 := randRedeem(RedeemStatusRequested)
@@ -61,11 +73,15 @@ func TestInsertAfterRequested(t *testing.T) {
 }
 
 func TestUpdateAfterPrepared(t *testing.T) {
-	db, err := NewStateDB("sqlite3", ":memory:")
+	sqlDB := getMemoryDB()
+	db, err := NewStateDB(sqlDB)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.close()
+	defer func() {
+		sqlDB.Close()
+		db.Close()
+	}()
 
 	// Check errors
 	r0 := randRedeem(RedeemStatusRequested)
@@ -99,11 +115,15 @@ func TestUpdateAfterPrepared(t *testing.T) {
 }
 
 func TestHas(t *testing.T) {
-	db, err := NewStateDB("sqlite3", ":memory:")
+	sqlDB := getMemoryDB()
+	db, err := NewStateDB(sqlDB)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.close()
+	defer func() {
+		sqlDB.Close()
+		db.Close()
+	}()
 
 	r := randRedeem(RedeemStatusRequested)
 
@@ -120,11 +140,15 @@ func TestHas(t *testing.T) {
 }
 
 func TestKV(t *testing.T) {
-	db, err := NewStateDB("sqlite3", ":memory:")
+	sqlDB := getMemoryDB()
+	db, err := NewStateDB(sqlDB)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.close()
+	defer func() {
+		sqlDB.Close()
+		db.Close()
+	}()
 
 	// insert
 	err = db.setKeyedValue([]byte("key"), []byte("value1"))

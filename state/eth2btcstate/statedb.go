@@ -14,17 +14,7 @@ type StateDB struct {
 
 var stateDBErrors StateDBError
 
-func NewStateDB(driverName, dataSourceName string) (*StateDB, error) {
-	db, err := sql.Open(driverName, dataSourceName)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		if err != nil {
-			_ = db.Close()
-		}
-	}()
-
+func NewStateDB(db *sql.DB) (*StateDB, error) {
 	if _, err := db.Exec(redeemTable + kvTable); err != nil {
 		return nil, err
 	}
@@ -35,13 +25,8 @@ func NewStateDB(driverName, dataSourceName string) (*StateDB, error) {
 	}, nil
 }
 
-func (st *StateDB) close() error {
+func (st *StateDB) Close() {
 	st.stmtCache.Clear()
-
-	if err := st.db.Close(); err != nil {
-		return err
-	}
-	return nil
 }
 
 func (st *StateDB) insertAfterRequested(redeem *Redeem) error {
