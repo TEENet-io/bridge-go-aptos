@@ -101,7 +101,7 @@ func (st *State) Start(ctx context.Context) error {
 				}
 			}
 		// After receiving a redeem request event
-		// 1. 	Check the existence of the tx hash
+		// 1. 	Check the existence of the redeem request tx hash
 		// 2.	Skip if found
 		// 3.	Insert a new redeem record in state db
 		case ev := <-st.newRedeemRequestedEvCh:
