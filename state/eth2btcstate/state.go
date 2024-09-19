@@ -108,7 +108,7 @@ func (st *State) Start(ctx context.Context) error {
 			// Check if the redeem already exists
 			ok, _, err := st.db.has(ev.RedeemRequestTxHash[:])
 			if err != nil {
-				logger.Errorf("failed to check if redeem exists: txHash=0x%x, err=%v", ev.RedeemRequestTxHash[:], err)
+				logger.Errorf("failed to check if redeem exists: tx=0x%x, err=%v", ev.RedeemRequestTxHash[:], err)
 				return err
 			}
 
@@ -123,7 +123,7 @@ func (st *State) Start(ctx context.Context) error {
 				return err
 			}
 			if err := st.insert(redeem); err != nil {
-				logger.Errorf("failed to insert redeem to db: txHash=0x%x, err=%v", ev.RedeemRequestTxHash[:], err)
+				logger.Errorf("failed to insert redeem to db: tx=0x%x, err=%v", ev.RedeemRequestTxHash[:], err)
 				return err
 			}
 		// After receiving a redeem prepared event
@@ -137,7 +137,7 @@ func (st *State) Start(ctx context.Context) error {
 		case ev := <-st.newRedeemPreparedEvCh:
 			ok, status, err := st.db.has(ev.RedeemRequestTxHash[:])
 			if err != nil {
-				logger.Errorf("failed to check if redeem exists: txHash=0x%x, err=%v", ev.RedeemRequestTxHash[:], err)
+				logger.Errorf("failed to check if redeem exists: tx=0x%x, err=%v", ev.RedeemRequestTxHash[:], err)
 				return err
 			}
 
@@ -149,13 +149,13 @@ func (st *State) Start(ctx context.Context) error {
 				}
 
 				if status == RedeemStatusInvalid {
-					logger.Errorf("cannot prepare since redeem request is invalid: txHash=0x%x, status=%s", ev.RedeemRequestTxHash[:], status)
+					logger.Errorf("cannot prepare since redeem request is invalid: tx=0x%x, status=%s", ev.RedeemRequestTxHash[:], status)
 					return stateErrors.CannotPrepareDueToRedeemRequestInvalid(ev.RedeemRequestTxHash[:])
 				}
 
 				redeem, _, err = st.Get(ev.RedeemRequestTxHash, RedeemStatusRequested)
 				if err != nil {
-					logger.Errorf("failed to get stored redeem: txHash=0x%x, err=%v", ev.RedeemRequestTxHash[:], err)
+					logger.Errorf("failed to get stored redeem: tx=0x%x, err=%v", ev.RedeemRequestTxHash[:], err)
 				}
 
 				redeem, err = redeem.updateFromPreparedEvent(ev)
@@ -219,6 +219,19 @@ func (st *State) Get(ethTxHash [32]byte, status RedeemStatus) (*Redeem, bool, er
 	}
 
 	return r, true, nil
+}
+
+func (st *State) GetByStatus(status RedeemStatus) ([]*Redeem, error) {
+	redeems, err := st.db.getByStatus(status)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, r := range redeems {
+		st.cache.redeems.add(r)
+	}
+
+	return redeems, nil
 }
 
 func (st *State) setFinalizedBlockNumber(fbNum *big.Int) error {
