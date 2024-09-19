@@ -12,7 +12,7 @@ import (
 )
 
 func TestNewState(t *testing.T) {
-	db, err := newStateDB("sqlite3", ":memory:")
+	db, err := NewStateDB("sqlite3", ":memory:")
 	assert.NoError(t, err)
 	defer db.close()
 	st, err := New(db, &Config{ChannelSize: 1, CacheSize: 1})
@@ -23,7 +23,7 @@ func TestNewState(t *testing.T) {
 
 	// return error when stored finalized block number less than the default starting block number
 	finalized = new(big.Int).Sub(common.EthStartingBlock, big.NewInt(1))
-	err = db.KVSet(KeyLastFinalizedBlock, finalized.Bytes())
+	err = db.setKeyedValue(KeyLastFinalizedBlock, finalized.Bytes())
 	assert.NoError(t, err)
 	_, err = New(db, &Config{ChannelSize: 1, CacheSize: 1})
 	assert.Equal(t, err, stateErrors.StoredFinalizedBlockNumberLessThanStartingBlockNumber(finalized))
@@ -86,7 +86,7 @@ func TestNewRedeemRequestedEvent(t *testing.T) {
 	ch <- ev
 	time.Sleep(100 * time.Millisecond)
 
-	actual, err := st.db.getByStatus(RedeemStatusRequested)
+	actual, err := st.db.GetByStatus(RedeemStatusRequested)
 	assert.NoError(t, err)
 	assert.Len(t, actual, 1) // only one redeem should be saved
 	assert.Equal(t, expected, actual[0])
@@ -113,7 +113,7 @@ func TestNewRedeemPreparedEvent(t *testing.T) {
 	// Insert without a corresponding request redeem stored
 	ch2 <- ev1                         // send the prepared event
 	time.Sleep(100 * time.Millisecond) // wait for the state to process the event
-	actual, ok, err := st.Get(ev1.RedeemRequestTxHash, RedeemStatusPrepared)
+	actual, ok, err := st.db.Get(ev1.RedeemRequestTxHash[:], RedeemStatusPrepared)
 	assert.NoError(t, err)
 	assert.True(t, ok)
 	assert.Equal(t, expected, actual)
@@ -133,7 +133,7 @@ func TestNewRedeemPreparedEvent(t *testing.T) {
 	time.Sleep(100 * time.Millisecond) // wait for the state to process the event
 	expected, err = createRedeemFromPreparedEvent(ev2)
 	assert.NoError(t, err)
-	actual, ok, err = st.Get(ev2.RedeemRequestTxHash, RedeemStatusPrepared)
+	actual, ok, err = st.db.Get(ev2.RedeemRequestTxHash[:], RedeemStatusPrepared)
 	assert.NoError(t, err)
 	assert.True(t, ok)
 	assert.Equal(t, expected, actual)

@@ -43,7 +43,7 @@ func New(db *StateDB, cfg *Config) (*State, error) {
 		newRedeemPreparedEvCh:  make(chan *ethsync.RedeemPreparedEvent, cfg.ChannelSize),
 	}
 
-	_, err := st.db.KVGet(KeyLastFinalizedBlock)
+	_, err := st.db.GetKeyedValue(KeyLastFinalizedBlock)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
 	}
@@ -51,11 +51,11 @@ func New(db *StateDB, cfg *Config) (*State, error) {
 	if err == sql.ErrNoRows {
 		logger.Warnf("no stored last finalized block number found, using the default value %v", common.EthStartingBlock)
 		// save the default value
-		db.KVSet(KeyLastFinalizedBlock, common.EthStartingBlock.Bytes())
+		db.setKeyedValue(KeyLastFinalizedBlock, common.EthStartingBlock.Bytes())
 		st.cache.lastFinalized.Store(common.EthStartingBlock.Bytes())
 	} else {
 		// read the stored value
-		lastFinalizedBytes, err := db.KVGet(KeyLastFinalizedBlock)
+		lastFinalizedBytes, err := db.GetKeyedValue(KeyLastFinalizedBlock)
 		if err != nil {
 			return nil, err
 		}
@@ -104,7 +104,7 @@ func (st *State) Start(ctx context.Context) error {
 		// 3.	Insert a new redeem record in state db
 		case ev := <-st.newRedeemRequestedEvCh:
 			// Check if the redeem already exists
-			ok, _, err := st.db.has(ev.RedeemRequestTxHash[:])
+			ok, _, err := st.db.Has(ev.RedeemRequestTxHash[:])
 			if err != nil {
 				logger.Errorf("failed to check if redeem exists: tx=0x%x, err=%v", ev.RedeemRequestTxHash[:], err)
 				return err
@@ -133,7 +133,7 @@ func (st *State) Start(ctx context.Context) error {
 		// NOTE that it is possible that a prepared event arrives earlier than
 		// its corresponding requested event
 		case ev := <-st.newRedeemPreparedEvCh:
-			ok, status, err := st.db.has(ev.RedeemRequestTxHash[:])
+			ok, status, err := st.db.Has(ev.RedeemRequestTxHash[:])
 			if err != nil {
 				logger.Errorf("failed to check if redeem exists: tx=0x%x, err=%v", ev.RedeemRequestTxHash[:], err)
 				return err
@@ -151,7 +151,7 @@ func (st *State) Start(ctx context.Context) error {
 					return stateErrors.CannotPrepareDueToRedeemRequestInvalid(ev.RedeemRequestTxHash[:])
 				}
 
-				redeem, _, err = st.Get(ev.RedeemRequestTxHash, RedeemStatusRequested)
+				redeem, _, err = st.db.Get(ev.RedeemRequestTxHash[:], RedeemStatusRequested)
 				if err != nil {
 					logger.Errorf("failed to get stored redeem: tx=0x%x, err=%v", ev.RedeemRequestTxHash[:], err)
 				}
@@ -181,7 +181,7 @@ func (st *State) GetFinalizedBlockNumber() (*big.Int, error) {
 		return new(big.Int).SetBytes(v.([]byte)), nil
 	}
 
-	b, err := st.db.KVGet(KeyLastFinalizedBlock)
+	b, err := st.db.GetKeyedValue(KeyLastFinalizedBlock)
 	if err != nil {
 		return nil, err
 	}
@@ -202,16 +202,8 @@ func (st *State) GetNewRedeemPreparedEventChannel() chan<- *ethsync.RedeemPrepar
 	return st.newRedeemPreparedEvCh
 }
 
-func (st *State) Get(ethTxHash [32]byte, status RedeemStatus) (*Redeem, bool, error) {
-	return st.db.get(ethTxHash[:], status)
-}
-
-func (st *State) GetByStatus(status RedeemStatus) ([]*Redeem, error) {
-	return st.db.getByStatus(status)
-}
-
 func (st *State) setFinalizedBlockNumber(fbNum *big.Int) error {
-	if err := st.db.KVSet(KeyLastFinalizedBlock, fbNum.Bytes()); err != nil {
+	if err := st.db.setKeyedValue(KeyLastFinalizedBlock, fbNum.Bytes()); err != nil {
 		return err
 	}
 	st.cache.lastFinalized.Store(fbNum.Bytes())

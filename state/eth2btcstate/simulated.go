@@ -5,7 +5,7 @@ type SimState struct {
 }
 
 func NewSimState(channelSize, cacheSize int) (*SimState, error) {
-	db, err := newStateDB("sqlite3", ":memory:")
+	db, err := NewStateDB("sqlite3", ":memory:")
 	if err != nil {
 		return nil, err
 	}
