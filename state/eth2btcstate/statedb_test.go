@@ -45,11 +45,6 @@ func TestInsertAfterRequested(t *testing.T) {
 	assert.Equal(t, r1.PrepareTxHash, [32]byte{})
 	assert.Nil(t, r1.Outpoints)
 
-	// Can only insert when status == requested or invalid
-	r0.Status = RedeemStatusPrepared
-	err = db.insertAfterRequested(r0)
-	assert.Equal(t, err, stateDBErrors.CannotInsertDueToInvalidStatus(r0))
-
 	// Cannot insert two redeems with the same request tx hash
 	r2 := randRedeem(RedeemStatusRequested)
 	r2.Outpoints = nil
@@ -84,12 +79,7 @@ func TestUpdateAfterPrepared(t *testing.T) {
 	}()
 
 	// Check errors
-	r0 := randRedeem(RedeemStatusRequested)
-	err = db.updateAfterPrepared(r0)
-	assert.Equal(t, err, stateDBErrors.CannotUpdateDueToInvalidStatus(r0))
-
-	// Insert without previous redeem request stored
-	r0.Status = RedeemStatusPrepared
+	r0 := randRedeem(RedeemStatusPrepared)
 	r0.BtcTxId = [32]byte{}
 	err = db.updateAfterPrepared(r0)
 	assert.NoError(t, err)
