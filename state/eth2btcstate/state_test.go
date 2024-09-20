@@ -22,7 +22,7 @@ func TestNewState(t *testing.T) {
 		db.Close()
 	}()
 
-	st, err := New(db, &Config{ChannelSize: 1, CacheSize: 1})
+	st, err := New(db, &Config{ChannelSize: 1})
 	assert.NoError(t, err)
 	finalized, err := st.GetFinalizedBlockNumber()
 	assert.NoError(t, err)
@@ -32,12 +32,15 @@ func TestNewState(t *testing.T) {
 	finalized = new(big.Int).Sub(common.EthStartingBlock, big.NewInt(1))
 	err = db.setKeyedValue(KeyLastFinalizedBlock, finalized.Bytes())
 	assert.NoError(t, err)
-	_, err = New(db, &Config{ChannelSize: 1, CacheSize: 1})
+	_, err = New(db, &Config{ChannelSize: 1})
 	assert.Equal(t, err, ErrStoredFinalizedBlockNumberInvalid)
 }
 
 func TestNewFinalizedBlockNumber(t *testing.T) {
-	st, err := NewSimState(1, 1)
+	sqlDB := getMemoryDB()
+	defer sqlDB.Close()
+
+	st, err := NewSimState(sqlDB, 1)
 	assert.NoError(t, err)
 	defer st.Close()
 
@@ -67,7 +70,10 @@ func TestNewFinalizedBlockNumber(t *testing.T) {
 }
 
 func TestNewRedeemRequestedEvent(t *testing.T) {
-	st, err := NewSimState(1, 1)
+	sqlDB := getMemoryDB()
+	defer sqlDB.Close()
+
+	st, err := NewSimState(sqlDB, 1)
 	assert.NoError(t, err)
 	defer st.Close()
 
@@ -100,7 +106,10 @@ func TestNewRedeemRequestedEvent(t *testing.T) {
 }
 
 func TestNewRedeemPreparedEvent(t *testing.T) {
-	st, err := NewSimState(1, 1)
+	sqlDB := getMemoryDB()
+	defer sqlDB.Close()
+
+	st, err := NewSimState(sqlDB, 1)
 	assert.NoError(t, err)
 	defer st.Close()
 
