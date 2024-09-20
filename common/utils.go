@@ -76,3 +76,7 @@ func Shorten(hexStr string, n int) string {
 	}
 	return appendHexPrefix(str[:n] + "..." + hexStr[len(str)-n:])
 }
+
+func BigIntClone(bigInt *big.Int) *big.Int {
+	return new(big.Int).Set(bigInt)
+}
