@@ -22,8 +22,3 @@ func NewSimState(sqldb *sql.DB, channelSize int) (*SimState, error) {
 		return &SimState{st}, nil
 	}
 }
-
-func (st *SimState) Close() {
-	st.State.Close()
-	st.db.Close()
-}
