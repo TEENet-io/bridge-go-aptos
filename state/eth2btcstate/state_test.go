@@ -40,7 +40,11 @@ func TestNewFinalizedBlockNumber(t *testing.T) {
 	sqlDB := getMemoryDB()
 	defer sqlDB.Close()
 
-	st, err := NewSimState(sqlDB, 1)
+	statedb, err := NewStateDB(sqlDB)
+	assert.NoError(t, err)
+	defer statedb.Close()
+
+	st, err := New(statedb, &Config{ChannelSize: 1})
 	assert.NoError(t, err)
 
 	stored, err := st.GetFinalizedBlockNumber()
@@ -72,7 +76,11 @@ func TestNewRedeemRequestedEvent(t *testing.T) {
 	sqlDB := getMemoryDB()
 	defer sqlDB.Close()
 
-	st, err := NewSimState(sqlDB, 1)
+	statedb, err := NewStateDB(sqlDB)
+	assert.NoError(t, err)
+	defer statedb.Close()
+
+	st, err := New(statedb, &Config{ChannelSize: 1})
 	assert.NoError(t, err)
 
 	ch := st.GetNewRedeemRequestedEventChannel()
@@ -107,7 +115,11 @@ func TestNewRedeemPreparedEvent(t *testing.T) {
 	sqlDB := getMemoryDB()
 	defer sqlDB.Close()
 
-	st, err := NewSimState(sqlDB, 1)
+	statedb, err := NewStateDB(sqlDB)
+	assert.NoError(t, err)
+	defer statedb.Close()
+
+	st, err := New(statedb, &Config{ChannelSize: 1})
 	assert.NoError(t, err)
 
 	ch1 := st.GetNewRedeemRequestedEventChannel()
