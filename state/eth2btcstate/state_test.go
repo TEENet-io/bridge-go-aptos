@@ -33,7 +33,7 @@ func TestNewState(t *testing.T) {
 	err = db.setKeyedValue(KeyLastFinalizedBlock, finalized.Bytes())
 	assert.NoError(t, err)
 	_, err = New(db, &Config{ChannelSize: 1, CacheSize: 1})
-	assert.Equal(t, err, stateErrors.StoredFinalizedBlockNumberLessThanStartingBlockNumber(finalized))
+	assert.Equal(t, err, ErrStoredFinalizedBlockNumberInvalid)
 }
 
 func TestNewFinalizedBlockNumber(t *testing.T) {
@@ -158,5 +158,5 @@ func TestNewRedeemPreparedEvent(t *testing.T) {
 	time.Sleep(100 * time.Millisecond) // wait for the state to process the event
 	ch2 <- ev4                         // send the prepared event
 	time.Sleep(100 * time.Millisecond) // wait for the state to process the event
-	assert.Equal(t, retErr, stateErrors.CannotPrepareDueToRedeemRequestInvalid(ev4.RequestTxHash[:]))
+	assert.Equal(t, retErr, ErrRedeemInvalid)
 }

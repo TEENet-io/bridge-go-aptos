@@ -12,8 +12,6 @@ type StateDB struct {
 	stmtCache *database.StmtCache
 }
 
-var stateDBErrors StateDBError
-
 func NewStateDB(db *sql.DB) (*StateDB, error) {
 	if _, err := db.Exec(redeemTable + kvTable); err != nil {
 		return nil, err
@@ -30,10 +28,6 @@ func (st *StateDB) Close() {
 }
 
 func (st *StateDB) insertAfterRequested(redeem *Redeem) error {
-	if redeem.Status != RedeemStatusRequested && redeem.Status != RedeemStatusInvalid {
-		return stateDBErrors.CannotInsertDueToInvalidStatus(redeem)
-	}
-
 	// Insert after receiving a new redeem requested event. Only fields
 	// requestTxHash, requester, receiver, amount, and status are required.
 	query := `INSERT OR IGNORE INTO redeem (` + statusRequestedParamList + `) VALUES (?, ?, ?, ?, ?)`
@@ -59,10 +53,6 @@ func (st *StateDB) insertAfterRequested(redeem *Redeem) error {
 }
 
 func (st *StateDB) updateAfterPrepared(redeem *Redeem) error {
-	if redeem.Status != RedeemStatusPrepared {
-		return stateDBErrors.CannotUpdateDueToInvalidStatus(redeem)
-	}
-
 	// Update after receiving a new redeem prepared event. Only fields
 	// prepareTxHash, outpoints, and status are required.
 	var query string
