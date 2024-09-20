@@ -1,6 +1,7 @@
 package etherman
 
 import (
+	"fmt"
 	"math/big"
 
 	"github.com/TEENet-io/bridge-go/common"
@@ -158,35 +159,37 @@ func (env *SimEtherman) GenRequestParams(cfg *ParamConfig) *RequestParams {
 	}
 }
 
-func (env *SimEtherman) GenPrepareParams(cfg *ParamConfig) *PrepareParams {
+func (env *SimEtherman) GenPrepareParams(cfg *ParamConfig) (p *PrepareParams) {
 	txHash := common.RandBytes32()
 	requester := env.Sim.Accounts[cfg.Requester].From
 	receiver := btcAddrs[0]
 	outpointTxIds := [][32]byte{}
 	outpointIdxs := []uint16{}
-	outpointTxIndices := []*big.Int{}
 
 	for i := 0; i < cfg.OutpointNum; i++ {
 		outpointTxIds = append(outpointTxIds, common.RandBytes32())
 		outpointIdxs = append(outpointIdxs, uint16(i))
-		outpointTxIndices = append(outpointTxIndices, big.NewInt(int64(i)))
 	}
 
-	msg := crypto.Keccak256Hash(common.EncodePacked(
-		txHash, requester.String(), string(receiver), cfg.Amount, outpointTxIds, outpointTxIndices)).Bytes()
-	rx, s, err := Sign(env.Sk, msg[:])
-	if err != nil {
-		return nil
-	}
-
-	return &PrepareParams{
+	p = &PrepareParams{
 		RedeemRequestTxHash: txHash,
 		Requester:           requester,
 		Receiver:            receiver,
 		Amount:              cfg.Amount,
 		OutpointTxIds:       outpointTxIds,
 		OutpointIdxs:        outpointIdxs,
-		Rx:                  rx,
-		S:                   s,
 	}
+
+	msg := p.SigningHash()
+	fmt.Printf("msg: %x\n", msg)
+
+	rx, s, err := Sign(env.Sk, msg[:])
+	if err != nil {
+		return nil
+	}
+
+	p.Rx = rx
+	p.S = s
+
+	return
 }
