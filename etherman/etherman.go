@@ -210,7 +210,7 @@ func (etherman *Etherman) RedeemPrepare(params *PrepareParams) (*types.Transacti
 
 	tx, err := contract.RedeemPrepare(
 		etherman.auth,
-		params.RedeemRequestTxHash,
+		params.RequestTxHash,
 		params.Requester,
 		string(params.Receiver),
 		params.Amount,

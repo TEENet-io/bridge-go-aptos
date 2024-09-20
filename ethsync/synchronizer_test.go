@@ -112,13 +112,13 @@ func sendTxs(t *testing.T, env *etherman.SimEtherman) (
 	env.Sim.Backend.Commit()
 
 	preparedEvs = append(preparedEvs, &RedeemPreparedEvent{
-		RedeemPrepareTxHash: [32]byte(tx.Hash().Bytes()),
-		RedeemRequestTxHash: prepareParams.RedeemRequestTxHash,
-		Amount:              new(big.Int).Set(prepareParams.Amount),
-		Requester:           prepareParams.Requester,
-		Receiver:            string(prepareParams.Receiver),
-		OutpointTxIds:       prepareParams.OutpointTxIds,
-		OutpointIdxs:        prepareParams.OutpointIdxs,
+		PrepareTxHash: [32]byte(tx.Hash().Bytes()),
+		RequestTxHash: prepareParams.RequestTxHash,
+		Amount:        new(big.Int).Set(prepareParams.Amount),
+		Requester:     prepareParams.Requester,
+		Receiver:      string(prepareParams.Receiver),
+		OutpointTxIds: prepareParams.OutpointTxIds,
+		OutpointIdxs:  prepareParams.OutpointIdxs,
 	})
 
 	err = env.Etherman.TWBTCApprove(env.Sim.Accounts[1], big.NewInt(100))
@@ -138,11 +138,11 @@ func sendTxs(t *testing.T, env *etherman.SimEtherman) (
 	env.Sim.Backend.Commit()
 
 	requestedEvs = append(requestedEvs, &RedeemRequestedEvent{
-		RedeemRequestTxHash: [32]byte(tx.Hash().Bytes()),
-		Requester:           requestParams.Auth.From,
-		Amount:              new(big.Int).Set(requestParams.Amount),
-		Receiver:            string(requestParams.Receiver),
-		IsValidReceiver:     true,
+		RequestTxHash:   [32]byte(tx.Hash().Bytes()),
+		Requester:       requestParams.Auth.From,
+		Amount:          new(big.Int).Set(requestParams.Amount),
+		Receiver:        string(requestParams.Receiver),
+		IsValidReceiver: true,
 	})
 
 	requestParams = env.GenRequestParams(&etherman.ParamConfig{Sender: 1, Amount: big.NewInt(20)})
@@ -157,11 +157,11 @@ func sendTxs(t *testing.T, env *etherman.SimEtherman) (
 	env.Sim.Backend.Commit()
 
 	requestedEvs = append(requestedEvs, &RedeemRequestedEvent{
-		RedeemRequestTxHash: [32]byte(tx.Hash().Bytes()),
-		Requester:           requestParams.Auth.From,
-		Amount:              new(big.Int).Set(requestParams.Amount),
-		Receiver:            requestParams.Receiver,
-		IsValidReceiver:     false,
+		RequestTxHash:   [32]byte(tx.Hash().Bytes()),
+		Requester:       requestParams.Auth.From,
+		Amount:          new(big.Int).Set(requestParams.Amount),
+		Receiver:        requestParams.Receiver,
+		IsValidReceiver: false,
 	})
 
 	return

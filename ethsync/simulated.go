@@ -13,30 +13,30 @@ type SimSync struct {
 func (s *SimSync) RandRedeemRequestedEvent(amount int, valid bool) *RedeemRequestedEvent {
 	if valid {
 		return &RedeemRequestedEvent{
-			RedeemRequestTxHash: common.RandBytes32(),
-			Requester:           common.RandEthAddress(),
-			Amount:              big.NewInt(int64(amount)),
-			Receiver:            "valid_btc_address",
-			IsValidReceiver:     true,
+			RequestTxHash:   common.RandBytes32(),
+			Requester:       common.RandEthAddress(),
+			Amount:          big.NewInt(int64(amount)),
+			Receiver:        "valid_btc_address",
+			IsValidReceiver: true,
 		}
 	}
 
 	return &RedeemRequestedEvent{
-		RedeemRequestTxHash: common.RandBytes32(),
-		Requester:           common.RandEthAddress(),
-		Amount:              big.NewInt(int64(amount)),
-		Receiver:            "Invalid_btc_address",
-		IsValidReceiver:     false,
+		RequestTxHash:   common.RandBytes32(),
+		Requester:       common.RandEthAddress(),
+		Amount:          big.NewInt(int64(amount)),
+		Receiver:        "Invalid_btc_address",
+		IsValidReceiver: false,
 	}
 }
 
 func (s *SimSync) RandRedeemPreparedEvent(amount int, outpointNum int) *RedeemPreparedEvent {
 	ev := &RedeemPreparedEvent{
-		RedeemRequestTxHash: common.RandBytes32(),
-		RedeemPrepareTxHash: common.RandBytes32(),
-		Requester:           common.RandEthAddress(),
-		Receiver:            "valid_btc_address",
-		Amount:              big.NewInt(int64(amount)),
+		RequestTxHash: common.RandBytes32(),
+		PrepareTxHash: common.RandBytes32(),
+		Requester:     common.RandEthAddress(),
+		Receiver:      "valid_btc_address",
+		Amount:        big.NewInt(int64(amount)),
 	}
 
 	for i := 0; i < outpointNum; i++ {
