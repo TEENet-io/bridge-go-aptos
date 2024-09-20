@@ -120,7 +120,7 @@ func TestNewRedeemPreparedEvent(t *testing.T) {
 	// Insert without a corresponding request redeem stored
 	ch2 <- ev1                         // send the prepared event
 	time.Sleep(100 * time.Millisecond) // wait for the state to process the event
-	actual, ok, err := st.db.Get(ev1.RedeemRequestTxHash[:], RedeemStatusPrepared)
+	actual, ok, err := st.db.Get(ev1.RequestTxHash[:], RedeemStatusPrepared)
 	assert.NoError(t, err)
 	assert.True(t, ok)
 	assert.Equal(t, expected, actual)
@@ -128,11 +128,11 @@ func TestNewRedeemPreparedEvent(t *testing.T) {
 	// Insert with a corresponding request redeem stored
 	ev2 := simSync.RandRedeemPreparedEvent(200, 1)
 	ev3 := &ethsync.RedeemRequestedEvent{
-		RedeemRequestTxHash: ev2.RedeemRequestTxHash,
-		Requester:           ev2.Requester,
-		Amount:              ev2.Amount,
-		Receiver:            ev2.Receiver,
-		IsValidReceiver:     true,
+		RequestTxHash:   ev2.RequestTxHash,
+		Requester:       ev2.Requester,
+		Amount:          ev2.Amount,
+		Receiver:        ev2.Receiver,
+		IsValidReceiver: true,
 	}
 	ch1 <- ev3                         // insert the requested event
 	time.Sleep(100 * time.Millisecond) // wait for the state to process the event
@@ -140,7 +140,7 @@ func TestNewRedeemPreparedEvent(t *testing.T) {
 	time.Sleep(100 * time.Millisecond) // wait for the state to process the event
 	expected, err = createRedeemFromPreparedEvent(ev2)
 	assert.NoError(t, err)
-	actual, ok, err = st.db.Get(ev2.RedeemRequestTxHash[:], RedeemStatusPrepared)
+	actual, ok, err = st.db.Get(ev2.RequestTxHash[:], RedeemStatusPrepared)
 	assert.NoError(t, err)
 	assert.True(t, ok)
 	assert.Equal(t, expected, actual)
@@ -148,15 +148,15 @@ func TestNewRedeemPreparedEvent(t *testing.T) {
 	// Error when updating a invalid redeem request
 	ev4 := simSync.RandRedeemPreparedEvent(300, 1)
 	ev5 := &ethsync.RedeemRequestedEvent{
-		RedeemRequestTxHash: ev4.RedeemRequestTxHash,
-		Requester:           ev4.Requester,
-		Amount:              ev4.Amount,
-		Receiver:            "invalid_btc_address",
-		IsValidReceiver:     false,
+		RequestTxHash:   ev4.RequestTxHash,
+		Requester:       ev4.Requester,
+		Amount:          ev4.Amount,
+		Receiver:        "invalid_btc_address",
+		IsValidReceiver: false,
 	}
 	ch1 <- ev5                         // insert the requested event
 	time.Sleep(100 * time.Millisecond) // wait for the state to process the event
 	ch2 <- ev4                         // send the prepared event
 	time.Sleep(100 * time.Millisecond) // wait for the state to process the event
-	assert.Equal(t, retErr, stateErrors.CannotPrepareDueToRedeemRequestInvalid(ev4.RedeemRequestTxHash[:]))
+	assert.Equal(t, retErr, stateErrors.CannotPrepareDueToRedeemRequestInvalid(ev4.RequestTxHash[:]))
 }
