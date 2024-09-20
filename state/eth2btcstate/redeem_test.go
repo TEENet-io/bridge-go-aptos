@@ -71,10 +71,10 @@ func TestSetFromRequestEvent(t *testing.T) {
 	ev := &ethsync.RedeemRequestedEvent{}
 
 	_, err := createRedeemFromRequestedEvent(ev)
-	assert.Equal(t, ErrorRedeemRequestTxHashInvalid, err.Error())
+	assert.Equal(t, ErrorRequestTxHashInvalid, err.Error())
 
 	// invalid requester
-	ev.RedeemRequestTxHash = common.RandBytes32()
+	ev.RequestTxHash = common.RandBytes32()
 	_, err = createRedeemFromRequestedEvent(ev)
 	assert.Equal(t, ErrorRequesterInvalid, err.Error())
 
@@ -106,13 +106,13 @@ func TestUpdateFromPrepareEvent(t *testing.T) {
 	assert.Equal(t, ErrorRedeemPrepareTxHashInvalid, err.Error())
 
 	// unmatch request tx hash
-	ev.RedeemPrepareTxHash = common.RandBytes32()
-	ev.RedeemRequestTxHash = common.RandBytes32()
+	ev.PrepareTxHash = common.RandBytes32()
+	ev.RequestTxHash = common.RandBytes32()
 	_, err = redeem.updateFromPreparedEvent(ev)
-	assert.Equal(t, ErrorRedeemRequestTxHashUnmatched, err.Error())
+	assert.Equal(t, ErrorRequestTxHashUnmatched, err.Error())
 
 	// unmatched requester
-	ev.RedeemRequestTxHash = redeem.RequestTxHash
+	ev.RequestTxHash = redeem.RequestTxHash
 	ev.Requester = common.RandEthAddress()
 	_, err = redeem.updateFromPreparedEvent(ev)
 	assert.Equal(t, ErrorRequesterUnmatched, err.Error())
