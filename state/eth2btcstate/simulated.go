@@ -6,22 +6,17 @@ type SimState struct {
 	*State
 }
 
-func NewSimState(channelSize, cacheSize int) (*SimState, error) {
-	sqlDB, err := sql.Open("sqlite3", ":memory:")
-	if err != nil {
-		return nil, err
-	}
-	db, err := NewStateDB(sqlDB)
+func NewSimState(sqldb *sql.DB, channelSize int) (*SimState, error) {
+	statedb, err := NewStateDB(sqldb)
 	if err != nil {
 		return nil, err
 	}
 
 	cfg := &Config{
 		ChannelSize: channelSize,
-		CacheSize:   cacheSize,
 	}
 
-	if st, err := New(db, cfg); err != nil {
+	if st, err := New(statedb, cfg); err != nil {
 		return nil, err
 	} else {
 		return &SimState{st}, nil
