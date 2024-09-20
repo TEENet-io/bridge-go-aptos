@@ -3,15 +3,17 @@ package etherman
 import (
 	"math/big"
 
+	"github.com/TEENet-io/bridge-go/common"
 	bridge "github.com/TEENet-io/bridge-go/contracts/TEENetBtcBridge"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/common"
+	ethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 type MintParams struct {
 	BtcTxId  [32]byte
 	Amount   *big.Int
-	Receiver common.Address
+	Receiver ethcommon.Address
 	Rx       *big.Int
 	S        *big.Int
 }
@@ -24,13 +26,29 @@ type RequestParams struct {
 
 type PrepareParams struct {
 	RedeemRequestTxHash [32]byte
-	Requester           common.Address
+	Requester           ethcommon.Address
 	Receiver            string
 	Amount              *big.Int
 	OutpointTxIds       [][32]byte
 	OutpointIdxs        []uint16
 	Rx                  *big.Int
 	S                   *big.Int
+}
+
+func (p *PrepareParams) SigningHash() [32]byte {
+	outpointIdxs := []*big.Int{}
+	for _, idx := range p.OutpointIdxs {
+		outpointIdxs = append(outpointIdxs, big.NewInt(int64(idx)))
+	}
+
+	return crypto.Keccak256Hash(common.EncodePacked(
+		p.RedeemRequestTxHash,
+		p.Requester.String(),
+		string(p.Receiver),
+		p.Amount,
+		p.OutpointTxIds,
+		outpointIdxs,
+	))
 }
 
 type RedeemRequestedEvent struct {
