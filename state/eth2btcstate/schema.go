@@ -3,8 +3,8 @@ package eth2btcstate
 import "strings"
 
 var (
-	zeroBytes32 = "0x" + strings.Repeat("0", 64)
-	zeroBytes20 = strings.Repeat("0", 40)
+	strZeroBytes32 = strings.Repeat("0", 64)
+	strZeroBytes20 = strings.Repeat("0", 40)
 
 	// table that stores the life cycle of a redeem request
 	redeemTable = `CREATE TABLE IF NOT EXISTS redeem (
@@ -18,10 +18,10 @@ var (
 		status VARCHAR(10) NOT NULL,
 		CONSTRAINT chk_status CHECK (status IN ('requested', 'prepared', 'redeemed', 'invalid')),
 		CONSTRAINT chk_amount CHECK (amount > 0)
-		CONSTRAINT chk_requestTxHash CHECK (requestTxHash != '` + zeroBytes32 + `'),
-		CONSTRAINT chk_prepareTxHash CHECK (prepareTxHash IS NULL OR prepareTxHash != '` + zeroBytes32 + `'),
-		CONSTRAINT chk_btcTxId CHECK (btcTxId IS NULL OR btcTxId != '` + zeroBytes32 + `'),
-		CONSTRAINT chk_requester CHECK (requester != '` + zeroBytes20 + `')
+		CONSTRAINT chk_requestTxHash CHECK (requestTxHash != '` + strZeroBytes32 + `'),
+		CONSTRAINT chk_prepareTxHash CHECK (prepareTxHash IS NULL OR prepareTxHash != '` + strZeroBytes32 + `'),
+		CONSTRAINT chk_btcTxId CHECK (btcTxId IS NULL OR btcTxId != '` + strZeroBytes32 + `'),
+		CONSTRAINT chk_requester CHECK (requester != '` + strZeroBytes20 + `')
 	);`
 
 	// table stores key-value pairs. Both key and value are a 32-byte hex string without prefix '0x'
