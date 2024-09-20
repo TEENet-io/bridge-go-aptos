@@ -42,7 +42,6 @@ func TestNewFinalizedBlockNumber(t *testing.T) {
 
 	st, err := NewSimState(sqlDB, 1)
 	assert.NoError(t, err)
-	defer st.Close()
 
 	stored, err := st.GetFinalizedBlockNumber()
 	assert.NoError(t, err)
@@ -75,7 +74,6 @@ func TestNewRedeemRequestedEvent(t *testing.T) {
 
 	st, err := NewSimState(sqlDB, 1)
 	assert.NoError(t, err)
-	defer st.Close()
 
 	ch := st.GetNewRedeemRequestedEventChannel()
 
@@ -111,7 +109,6 @@ func TestNewRedeemPreparedEvent(t *testing.T) {
 
 	st, err := NewSimState(sqlDB, 1)
 	assert.NoError(t, err)
-	defer st.Close()
 
 	ch1 := st.GetNewRedeemRequestedEventChannel()
 	ch2 := st.GetNewRedeemPreparedEventChannel()

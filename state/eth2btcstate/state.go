@@ -79,12 +79,6 @@ func New(db *StateDB, cfg *Config) (*State, error) {
 	return st, nil
 }
 
-func (st *State) Close() {
-	if st.db != nil {
-		st.db.Close()
-	}
-}
-
 func (st *State) Start(ctx context.Context) error {
 	logger.Info("starting eth2btc state")
 	defer logger.Info("stopping eth2btc state")
