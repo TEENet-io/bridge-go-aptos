@@ -282,6 +282,20 @@ func (etherman *Etherman) TWBTCAllowance(owner ethcommon.Address) (*big.Int, err
 	return allowance, nil
 }
 
+func (etherman *Etherman) GetPublicKey() (*big.Int, error) {
+	contract, err := etherman.getBridgeContract()
+	if err != nil {
+		return nil, err
+	}
+
+	pk, err := contract.Pk(nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return pk, nil
+}
+
 func (etherman *Etherman) getBridgeContract() (*bridge.TEENetBtcBridge, error) {
 	contract, err := bridge.NewTEENetBtcBridge(etherman.cfg.BridgeContractAddress, etherman.ethClient)
 	if err != nil {
