@@ -25,14 +25,14 @@ type RequestParams struct {
 }
 
 type PrepareParams struct {
-	RedeemRequestTxHash [32]byte
-	Requester           ethcommon.Address
-	Receiver            string
-	Amount              *big.Int
-	OutpointTxIds       [][32]byte
-	OutpointIdxs        []uint16
-	Rx                  *big.Int
-	S                   *big.Int
+	RequestTxHash [32]byte
+	Requester     ethcommon.Address
+	Receiver      string
+	Amount        *big.Int
+	OutpointTxIds [][32]byte
+	OutpointIdxs  []uint16
+	Rx            *big.Int
+	S             *big.Int
 }
 
 func (p *PrepareParams) SigningHash() [32]byte {
@@ -42,7 +42,7 @@ func (p *PrepareParams) SigningHash() [32]byte {
 	}
 
 	return crypto.Keccak256Hash(common.EncodePacked(
-		p.RedeemRequestTxHash,
+		p.RequestTxHash,
 		p.Requester.String(),
 		string(p.Receiver),
 		p.Amount,

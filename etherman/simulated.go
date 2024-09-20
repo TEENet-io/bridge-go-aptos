@@ -172,12 +172,12 @@ func (env *SimEtherman) GenPrepareParams(cfg *ParamConfig) (p *PrepareParams) {
 	}
 
 	p = &PrepareParams{
-		RedeemRequestTxHash: txHash,
-		Requester:           requester,
-		Receiver:            receiver,
-		Amount:              cfg.Amount,
-		OutpointTxIds:       outpointTxIds,
-		OutpointIdxs:        outpointIdxs,
+		RequestTxHash: txHash,
+		Requester:     requester,
+		Receiver:      receiver,
+		Amount:        cfg.Amount,
+		OutpointTxIds: outpointTxIds,
+		OutpointIdxs:  outpointIdxs,
 	}
 
 	msg := p.SigningHash()

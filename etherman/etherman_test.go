@@ -24,7 +24,7 @@ func TestIsPrepared(t *testing.T) {
 	assert.NoError(t, err)
 	sim.Backend.Commit()
 
-	prepared, err := etherman.IsPrepared(params.RedeemRequestTxHash)
+	prepared, err := etherman.IsPrepared(params.RequestTxHash)
 	assert.NoError(t, err)
 	assert.True(t, prepared)
 }
@@ -210,7 +210,7 @@ func checkMintedEvent(t *testing.T, ev *MintedEvent, params *MintParams) {
 }
 
 func checkPreparedEvent(t *testing.T, ev *RedeemPreparedEvent, params *PrepareParams) {
-	assert.Equal(t, ev.EthTxHash, params.RedeemRequestTxHash)
+	assert.Equal(t, ev.EthTxHash, params.RequestTxHash)
 	assert.Equal(t, ev.Requester.String(), params.Requester.String())
 	assert.Equal(t, ev.Amount, params.Amount)
 	for i, txId := range ev.OutpointTxIds {

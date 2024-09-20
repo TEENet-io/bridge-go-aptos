@@ -99,23 +99,23 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 
 				for _, ev := range requested {
 					s.e2bSt.GetNewRedeemRequestedEventChannel() <- &RedeemRequestedEvent{
-						RedeemRequestTxHash: ev.TxHash,
-						Requester:           ev.Sender,
-						Amount:              new(big.Int).Set(ev.Amount),
-						Receiver:            ev.Receiver,
-						IsValidReceiver:     common.IsValidBtcAddress(ev.Receiver, s.cfg.BtcChainConfig),
+						RequestTxHash:   ev.TxHash,
+						Requester:       ev.Sender,
+						Amount:          new(big.Int).Set(ev.Amount),
+						Receiver:        ev.Receiver,
+						IsValidReceiver: common.IsValidBtcAddress(ev.Receiver, s.cfg.BtcChainConfig),
 					}
 				}
 
 				for _, ev := range prepared {
 					s.e2bSt.GetNewRedeemPreparedEventChannel() <- &RedeemPreparedEvent{
-						RedeemPrepareTxHash: ev.TxHash,
-						RedeemRequestTxHash: ev.EthTxHash,
-						Requester:           ev.Requester,
-						Receiver:            ev.Receiver,
-						Amount:              new(big.Int).Set(ev.Amount),
-						OutpointTxIds:       ev.OutpointTxIds,
-						OutpointIdxs:        ev.OutpointIdxs,
+						PrepareTxHash: ev.TxHash,
+						RequestTxHash: ev.EthTxHash,
+						Requester:     ev.Requester,
+						Receiver:      ev.Receiver,
+						Amount:        new(big.Int).Set(ev.Amount),
+						OutpointTxIds: ev.OutpointTxIds,
+						OutpointIdxs:  ev.OutpointIdxs,
 					}
 				}
 
