@@ -1,12 +1,12 @@
 package etherman
 
 import (
-	"fmt"
 	"math/big"
 
 	"github.com/TEENet-io/bridge-go/common"
 	bridge "github.com/TEENet-io/bridge-go/contracts/TEENetBtcBridge"
 	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -72,26 +72,26 @@ type ParamConfig struct {
 	OutpointNum int
 }
 type SimEtherman struct {
-	Sim      *SimulatedChain
+	Chain    *SimulatedChain
 	Sk       *btcec.PrivateKey
 	Etherman *Etherman
 }
 
 func NewSimEtherman() (*SimEtherman, error) {
-	sim := NewSimulatedChain()
+	chain := NewSimulatedChain()
 	sk, err := btcec.NewPrivateKey()
 	if err != nil {
 		return nil, err
 	}
 
 	pk := sk.PubKey().X()
-	bridgeAddress, _, contract, err := bridge.DeployTEENetBtcBridge(sim.Accounts[0], sim.Backend.Client(), pk)
+	bridgeAddress, _, contract, err := bridge.DeployTEENetBtcBridge(chain.Accounts[0], chain.Backend.Client(), pk)
 	if err != nil {
 		return nil, err
 	}
-	sim.Backend.Commit()
+	chain.Backend.Commit()
 
-	bridgeContract, err := bridge.NewTEENetBtcBridge(bridgeAddress, sim.Backend.Client())
+	bridgeContract, err := bridge.NewTEENetBtcBridge(bridgeAddress, chain.Backend.Client())
 	if err != nil {
 		return nil, err
 	}
@@ -114,27 +114,27 @@ func NewSimEtherman() (*SimEtherman, error) {
 	}
 
 	etherman := &Etherman{
-		ethClient: sim.Backend.Client(),
+		ethClient: chain.Backend.Client(),
 		cfg:       cfg,
-		auth:      sim.Accounts[0],
+		auth:      chain.Accounts[0],
 	}
 
 	return &SimEtherman{
 		Etherman: etherman,
 		Sk:       sk,
-		Sim:      sim,
+		Chain:    chain,
 	}, nil
 }
 
 func (env *SimEtherman) GenMintParams(cfg *ParamConfig) *MintParams {
-	sim := env.Sim
+	chain := env.Chain
 	sk := env.Sk
 
 	btcTxId := common.RandBytes32()
 	if len(btcTxId) == 0 {
 		return nil
 	}
-	receiver := sim.Accounts[cfg.Receiver].From
+	receiver := chain.Accounts[cfg.Receiver].From
 
 	msg := crypto.Keccak256Hash(common.EncodePacked(btcTxId, receiver.String(), cfg.Amount)).Bytes()
 	rx, s, err := Sign(sk, msg[:])
@@ -153,7 +153,7 @@ func (env *SimEtherman) GenMintParams(cfg *ParamConfig) *MintParams {
 
 func (env *SimEtherman) GenRequestParams(cfg *ParamConfig) *RequestParams {
 	return &RequestParams{
-		Auth:     env.Sim.Accounts[cfg.Sender],
+		Auth:     env.Chain.Accounts[cfg.Sender],
 		Amount:   cfg.Amount,
 		Receiver: btcAddrs[0],
 	}
@@ -161,7 +161,7 @@ func (env *SimEtherman) GenRequestParams(cfg *ParamConfig) *RequestParams {
 
 func (env *SimEtherman) GenPrepareParams(cfg *ParamConfig) (p *PrepareParams) {
 	txHash := common.RandBytes32()
-	requester := env.Sim.Accounts[cfg.Requester].From
+	requester := env.Chain.Accounts[cfg.Requester].From
 	receiver := btcAddrs[0]
 	outpointTxIds := [][32]byte{}
 	outpointIdxs := []uint16{}
@@ -181,8 +181,6 @@ func (env *SimEtherman) GenPrepareParams(cfg *ParamConfig) (p *PrepareParams) {
 	}
 
 	msg := p.SigningHash()
-	fmt.Printf("msg: %x\n", msg)
-
 	rx, s, err := Sign(env.Sk, msg[:])
 	if err != nil {
 		return nil
@@ -192,4 +190,14 @@ func (env *SimEtherman) GenPrepareParams(cfg *ParamConfig) (p *PrepareParams) {
 	p.S = s
 
 	return
+}
+
+func (env *SimEtherman) Sign(msg []byte) (*big.Int, *big.Int, error) {
+	sig, err := schnorr.Sign(env.Sk, msg)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	bytes := sig.Serialize()
+	return new(big.Int).SetBytes(bytes[:32]), new(big.Int).SetBytes(bytes[32:]), nil
 }

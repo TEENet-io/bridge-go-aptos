@@ -55,14 +55,14 @@ func TestSync(t *testing.T) {
 
 	// test when the finalized block number is valid
 	ctx2, cancel2 := context.WithCancel(context.Background())
-	blk, _ := env.Sim.Backend.Client().BlockByNumber(context.Background(), nil)
+	blk, _ := env.Chain.Backend.Client().BlockByNumber(context.Background(), nil)
 	start := blk.Number()
 	assert.NoError(t, err)
 	for start.Cmp(synchronizer.lastFinalizedBlockNumber) != 1 {
-		env.Sim.Backend.Commit()
+		env.Chain.Backend.Commit()
 		start.Add(start, big.NewInt(1))
 	}
-	blk, _ = env.Sim.Backend.Client().BlockByNumber(context.Background(), nil)
+	blk, _ = env.Chain.Backend.Client().BlockByNumber(context.Background(), nil)
 	assert.Equal(t, blk.Number(),
 		synchronizer.lastFinalizedBlockNumber.Add(synchronizer.lastFinalizedBlockNumber, big.NewInt(1)))
 
@@ -74,7 +74,7 @@ func TestSync(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 	cancel2()
 
-	blk, _ = env.Sim.Backend.Client().BlockByNumber(context.Background(), nil)
+	blk, _ = env.Chain.Backend.Client().BlockByNumber(context.Background(), nil)
 	assert.Equal(t, blk.Number(), mockE2BState.lastFinalized)
 	assert.Equal(t, 2, len(mockE2BState.requestedEv))
 	assert.Equal(t, 1, len(mockE2BState.preparedEv))
@@ -109,7 +109,7 @@ func sendTxs(t *testing.T, env *etherman.SimEtherman) (
 	tx, err = env.Etherman.RedeemPrepare(prepareParams)
 	assert.NoError(t, err)
 	time.Sleep(200 * time.Millisecond)
-	env.Sim.Backend.Commit()
+	env.Chain.Backend.Commit()
 
 	preparedEvs = append(preparedEvs, &RedeemPreparedEvent{
 		PrepareTxHash: [32]byte(tx.Hash().Bytes()),
@@ -121,12 +121,12 @@ func sendTxs(t *testing.T, env *etherman.SimEtherman) (
 		OutpointIdxs:  prepareParams.OutpointIdxs,
 	})
 
-	err = env.Etherman.TWBTCApprove(env.Sim.Accounts[1], big.NewInt(100))
+	err = env.Etherman.TWBTCApprove(env.Chain.Accounts[1], big.NewInt(100))
 	if err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(200 * time.Millisecond)
-	env.Sim.Backend.Commit()
+	env.Chain.Backend.Commit()
 
 	requestParams := env.GenRequestParams(&etherman.ParamConfig{Sender: 1, Amount: big.NewInt(80)})
 	if requestParams == nil {
@@ -135,7 +135,7 @@ func sendTxs(t *testing.T, env *etherman.SimEtherman) (
 	tx, err = env.Etherman.RedeemRequest(requestParams)
 	assert.NoError(t, err)
 	time.Sleep(200 * time.Millisecond)
-	env.Sim.Backend.Commit()
+	env.Chain.Backend.Commit()
 
 	requestedEvs = append(requestedEvs, &RedeemRequestedEvent{
 		RequestTxHash:   [32]byte(tx.Hash().Bytes()),
@@ -154,7 +154,7 @@ func sendTxs(t *testing.T, env *etherman.SimEtherman) (
 	tx, err = env.Etherman.RedeemRequest(requestParams)
 	assert.NoError(t, err)
 	time.Sleep(200 * time.Millisecond)
-	env.Sim.Backend.Commit()
+	env.Chain.Backend.Commit()
 
 	requestedEvs = append(requestedEvs, &RedeemRequestedEvent{
 		RequestTxHash:   [32]byte(tx.Hash().Bytes()),

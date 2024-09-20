@@ -14,7 +14,7 @@ import (
 func TestIsPrepared(t *testing.T) {
 	env, err := NewSimEtherman()
 	assert.NoError(t, err)
-	sim := env.Sim
+	sim := env.Chain
 	etherman := env.Etherman
 
 	params := env.GenPrepareParams(&ParamConfig{Sender: 0, Requester: 1, Amount: big.NewInt(100), OutpointNum: 2})
@@ -32,7 +32,7 @@ func TestIsPrepared(t *testing.T) {
 func TestIsMinted(t *testing.T) {
 	env, err := NewSimEtherman()
 	assert.NoError(t, err)
-	sim := env.Sim
+	sim := env.Chain
 	etherman := env.Etherman
 
 	params := env.GenMintParams(&ParamConfig{Receiver: 1, Amount: big.NewInt(100)})
@@ -49,7 +49,7 @@ func TestIsMinted(t *testing.T) {
 func TestGetEventLogs(t *testing.T) {
 	env, err := NewSimEtherman()
 	assert.NoError(t, err)
-	sim := env.Sim
+	sim := env.Chain
 	etherman := env.Etherman
 
 	mintParams := env.GenMintParams(&ParamConfig{Receiver: 1, Amount: big.NewInt(100)})
@@ -99,7 +99,7 @@ func TestGetEventLogs(t *testing.T) {
 func TestRedeemPrepare(t *testing.T) {
 	env, err := NewSimEtherman()
 	assert.NoError(t, err)
-	sim := env.Sim
+	sim := env.Chain
 	etherman := env.Etherman
 
 	params := env.GenPrepareParams(&ParamConfig{Sender: 0, Requester: 1, Amount: big.NewInt(100), OutpointNum: 3})
@@ -112,7 +112,7 @@ func TestRedeemPrepare(t *testing.T) {
 func TestRedeemRequest(t *testing.T) {
 	env, err := NewSimEtherman()
 	assert.NoError(t, err)
-	sim := env.Sim
+	sim := env.Chain
 	etherman := env.Etherman
 
 	// Mint tokens
@@ -148,7 +148,7 @@ func TestRedeemRequest(t *testing.T) {
 func TestMint(t *testing.T) {
 	env, err := NewSimEtherman()
 	assert.NoError(t, err)
-	sim := env.Sim
+	sim := env.Chain
 	etherman := env.Etherman
 
 	params := env.GenMintParams(&ParamConfig{Receiver: 1, Amount: big.NewInt(100)})
@@ -190,7 +190,7 @@ func TestDebugGetLatestFinalizedBlockNumber(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, b, big.NewInt(1))
 
-	env.Sim.Backend.Commit()
+	env.Chain.Backend.Commit()
 
 	b, err = etherman.GetLatestFinalizedBlockNumber()
 	assert.NoError(t, err)
@@ -198,7 +198,7 @@ func TestDebugGetLatestFinalizedBlockNumber(t *testing.T) {
 }
 
 func curentBlockNum(t *testing.T, env *SimEtherman) *big.Int {
-	block, err := env.Sim.Backend.Client().BlockNumber(context.Background())
+	block, err := env.Chain.Backend.Client().BlockNumber(context.Background())
 	assert.NoError(t, err)
 	return big.NewInt(int64(block))
 }
