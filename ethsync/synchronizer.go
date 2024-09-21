@@ -89,6 +89,7 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 				}
 
 				for _, ev := range minted {
+					logger.Debugf("found event Minted: mintTx=0x%x, amount=%v, receiver=%s", ev.TxHash, ev.Amount, ev.Receiver)
 					s.b2eSt.GetNewMintedEventChannel() <- &MintedEvent{
 						MintedTxHash: ev.TxHash,
 						BtcTxId:      ev.BtcTxId,
@@ -98,6 +99,7 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 				}
 
 				for _, ev := range requested {
+					logger.Debugf("found event RedeemRequested: reqTx=0x%x, amount=%v", ev.TxHash, ev.Amount)
 					s.e2bSt.GetNewRedeemRequestedEventChannel() <- &RedeemRequestedEvent{
 						RequestTxHash:   ev.TxHash,
 						Requester:       ev.Sender,
@@ -108,6 +110,8 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 				}
 
 				for _, ev := range prepared {
+					logger.Debugf("found event RedeemPrepared: prepTx=0x%x, reqTx=0x%x, requester=%s",
+						ev.TxHash, ev.EthTxHash, ev.Requester)
 					s.e2bSt.GetNewRedeemPreparedEventChannel() <- &RedeemPreparedEvent{
 						PrepareTxHash: ev.TxHash,
 						RequestTxHash: ev.EthTxHash,
