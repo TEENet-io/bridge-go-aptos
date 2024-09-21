@@ -3,11 +3,26 @@ package ethtxmanager
 import "strings"
 
 var (
-	zeroBytes32 = "0x" + strings.Repeat("0", 64)
+	strZeroBytes32 = strings.Repeat("0", 64)
 
-	toPrepareTable = `CREATE TABLE IF NOT EXISTS toPrepare (
+	signatureRequestTable = `CREATE TABLE IF NOT EXISTS signatureRequest (
 		requestTxHash CHAR(64) PRIMARY KEY NOT NULL,
-		createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-		CONSTRAINT chk_requestTxHash CHECK (requestTxHash != '` + zeroBytes32 + `')
+		signingHash CHAR(64) UNIQUE NOT NULL,
+		rx CHAR(64),
+		s CHAR(64),
+		CONSTRAINT chk_requestTxHash CHECK (requestTxHash != '` + strZeroBytes32 + `')
+		CONSTRAINT chk_signingHash CHECK (signingHash != '` + strZeroBytes32 + `')
+	);`
+
+	// sentAt == hash of the latest block before sending the tx
+	// minedAt == hash of the block where the tx is mined
+	monitoredTxTable = `CREATE TABLE IF NOT EXISTS monitoredTx (
+		txHash CHAR(64) PRIMARY KEY NOT NULL,
+		requestTxHash CHAR(64) UNIQUE NOT NULL,
+		sentAt CHAR(64) NOT NULL,
+		minedAt CHAR(64) NOT NULL,
+		CONSTRAINT chk_txHash CHECK (txHash != '` + strZeroBytes32 + `'),
+		CONSTRAINT chk_requestTxHash CHECK (requestTxHash != '` + strZeroBytes32 + `'),
+		CONSTRAINT chk_sentAt CHECK (sentAt != '` + strZeroBytes32 + `')
 	);`
 )
