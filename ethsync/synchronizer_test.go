@@ -105,7 +105,7 @@ func sendTxs(t *testing.T, env *etherman.SimEtherman) (
 	})
 
 	prepareParams := env.GenPrepareParams(
-		&etherman.ParamConfig{Sender: 3, Requester: 4, Amount: big.NewInt(400), OutpointNum: 1})
+		&etherman.ParamConfig{Requester: 4, Amount: big.NewInt(400), OutpointNum: 1})
 	tx, err = env.Etherman.RedeemPrepare(prepareParams)
 	assert.NoError(t, err)
 	time.Sleep(200 * time.Millisecond)
@@ -128,7 +128,7 @@ func sendTxs(t *testing.T, env *etherman.SimEtherman) (
 	time.Sleep(200 * time.Millisecond)
 	env.Chain.Backend.Commit()
 
-	requestParams := env.GenRequestParams(&etherman.ParamConfig{Sender: 1, Amount: big.NewInt(80)})
+	requestParams := env.GenRequestParams(&etherman.ParamConfig{Requester: 1, Amount: big.NewInt(80)})
 	if requestParams == nil {
 		t.Fatal("failed to generate request params")
 	}
@@ -145,7 +145,7 @@ func sendTxs(t *testing.T, env *etherman.SimEtherman) (
 		IsValidReceiver: true,
 	})
 
-	requestParams = env.GenRequestParams(&etherman.ParamConfig{Sender: 1, Amount: big.NewInt(20)})
+	requestParams = env.GenRequestParams(&etherman.ParamConfig{Requester: 1, Amount: big.NewInt(20)})
 	if requestParams == nil {
 		t.Fatal("failed to generate request params")
 	}

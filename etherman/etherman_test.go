@@ -17,7 +17,7 @@ func TestIsPrepared(t *testing.T) {
 	sim := env.Chain
 	etherman := env.Etherman
 
-	params := env.GenPrepareParams(&ParamConfig{Sender: 0, Requester: 1, Amount: big.NewInt(100), OutpointNum: 2})
+	params := env.GenPrepareParams(&ParamConfig{Requester: 1, Amount: big.NewInt(100), OutpointNum: 2})
 	assert.NotNil(t, params)
 
 	_, err = etherman.RedeemPrepare(params)
@@ -57,7 +57,7 @@ func TestGetEventLogs(t *testing.T) {
 	_, err = etherman.Mint(mintParams)
 	assert.NoError(t, err)
 
-	prepareParams := env.GenPrepareParams(&ParamConfig{Sender: 3, Requester: 4, Amount: big.NewInt(400), OutpointNum: 1})
+	prepareParams := env.GenPrepareParams(&ParamConfig{Requester: 4, Amount: big.NewInt(400), OutpointNum: 1})
 	assert.NotNil(t, prepareParams)
 	tx, err := etherman.RedeemPrepare(prepareParams)
 	assert.NoError(t, err)
@@ -79,7 +79,7 @@ func TestGetEventLogs(t *testing.T) {
 	assert.NoError(t, err)
 	sim.Backend.Commit()
 
-	requestParams := env.GenRequestParams(&ParamConfig{Sender: 1, Amount: big.NewInt(80)})
+	requestParams := env.GenRequestParams(&ParamConfig{Requester: 1, Amount: big.NewInt(80)})
 	assert.NotNil(t, requestParams)
 	tx, err = etherman.RedeemRequest(requestParams)
 	assert.NoError(t, err)
@@ -102,7 +102,7 @@ func TestRedeemPrepare(t *testing.T) {
 	sim := env.Chain
 	etherman := env.Etherman
 
-	params := env.GenPrepareParams(&ParamConfig{Sender: 0, Requester: 1, Amount: big.NewInt(100), OutpointNum: 3})
+	params := env.GenPrepareParams(&ParamConfig{Requester: 1, Amount: big.NewInt(100), OutpointNum: 3})
 	assert.NotNil(t, params)
 	_, err = etherman.RedeemPrepare(params)
 	assert.NoError(t, err)
@@ -132,7 +132,7 @@ func TestRedeemRequest(t *testing.T) {
 	assert.Equal(t, big.NewInt(80), allowance)
 
 	// Request redeem
-	requestParams := env.GenRequestParams(&ParamConfig{Sender: 1, Amount: big.NewInt(80)})
+	requestParams := env.GenRequestParams(&ParamConfig{Requester: 1, Amount: big.NewInt(80)})
 	if requestParams == nil {
 		t.Fatal("failed to generate request params")
 	}
