@@ -20,17 +20,11 @@ type MockEth2BtcState struct {
 	preparedEv    []*RedeemPreparedEvent
 }
 
-type MockBtc2EthState struct {
-	mintedEvCh chan *MintedEvent
-
-	mintedEv []*MintedEvent
-}
-
 func NewMockEth2BtcState() *MockEth2BtcState {
 	return &MockEth2BtcState{
 		newFinalizedCh: make(chan *big.Int, 1),
-		requestedEvCh:  make(chan *RedeemRequestedEvent),
-		preparedEvCh:   make(chan *RedeemPreparedEvent),
+		requestedEvCh:  make(chan *RedeemRequestedEvent, 1),
+		preparedEvCh:   make(chan *RedeemPreparedEvent, 1),
 
 		lastFinalized: new(big.Int).Set(common.EthStartingBlock),
 		requestedEv:   make([]*RedeemRequestedEvent, 0, MaxEvNum),
@@ -72,11 +66,15 @@ func (st *MockEth2BtcState) GetNewFinalizedBlockChannel() chan<- *big.Int {
 	return st.newFinalizedCh
 }
 
+type MockBtc2EthState struct {
+	mintedEvCh chan *MintedEvent
+	mintedEv   []*MintedEvent
+}
+
 func NewMockBtc2EthState() *MockBtc2EthState {
 	return &MockBtc2EthState{
-		mintedEvCh: make(chan *MintedEvent),
-
-		mintedEv: make([]*MintedEvent, 0, MaxEvNum),
+		mintedEvCh: make(chan *MintedEvent, 1),
+		mintedEv:   []*MintedEvent{},
 	}
 }
 
@@ -87,7 +85,7 @@ func (st *MockBtc2EthState) Start(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			return (ctx).Err()
+			return ctx.Err()
 		case ev := <-st.mintedEvCh:
 			st.mintedEv = append(st.mintedEv, ev)
 		}
