@@ -22,6 +22,13 @@ var (
 		"1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
 		"1HLoD9E4SDFFPDiYfNYnkBLQ85Y51J3Zb1",
 		"1FvzCLoTPGANNjLgEB5D7e4JZCZ3fK5cP1",
+		"bc1qngcgpqcxfc0pq0dhkq3qknwqjte0yrawharxjm",
+		"14uFymMQ43y9TvCY5ZJC2dAB9n16cErfUz",
+		"bc1q7fpy8z8cpmx7qzvwac7lrp0vacqflnh4xpa9nx",
+		"bc1qee3s2t2kt5qmgddlt6wdh2dmlh9el9feazrzda",
+		"bc1q28pgr603dspc3ap88gdkzx25dl64ygz8p4y40p",
+		"31wn4XQAJLxyRCKs21hVqsio2iAJNLELQc",
+		"1NDxDDSHVHvSv48vd27NNHkXHYZjDdVLss",
 	}
 )
 
@@ -63,13 +70,23 @@ func newAuth() *bind.TransactOpts {
 }
 
 type ParamConfig struct {
+	// index of the accounts in the simulated chain
+	// 		< 0 	== accounts[0]
+	// 		[0, 9] 	== accounts[i]
+	// 		> 9		== accounts[9]
 	Receiver  int
-	Sender    int
 	Requester int
 
 	Amount *big.Int
 
+	// Number of randomly generated outpoints
 	OutpointNum int
+
+	// Index of the 10 BTC addresses stored for testing
+	// 		< 0 	== random and invalid
+	// 		[0, 9] 	== btcAddrs[i]
+	// 		> 0		== btcAddrs[9]
+	BtcAddrIdx int
 }
 type SimEtherman struct {
 	Chain    *SimulatedChain
@@ -131,10 +148,14 @@ func (env *SimEtherman) GenMintParams(cfg *ParamConfig) *MintParams {
 	sk := env.Sk
 
 	btcTxId := common.RandBytes32()
-	if len(btcTxId) == 0 {
-		return nil
+	idx := cfg.Receiver
+	if idx < 0 {
+		idx = 0
 	}
-	receiver := chain.Accounts[cfg.Receiver].From
+	if idx > 9 {
+		idx = 9
+	}
+	receiver := chain.Accounts[idx].From
 
 	msg := crypto.Keccak256Hash(common.EncodePacked(btcTxId, receiver.String(), cfg.Amount)).Bytes()
 	rx, s, err := Sign(sk, msg[:])
@@ -152,17 +173,54 @@ func (env *SimEtherman) GenMintParams(cfg *ParamConfig) *MintParams {
 }
 
 func (env *SimEtherman) GenRequestParams(cfg *ParamConfig) *RequestParams {
-	return &RequestParams{
-		Auth:     env.Chain.Accounts[cfg.Sender],
-		Amount:   cfg.Amount,
-		Receiver: btcAddrs[0],
+	idx1 := cfg.Requester
+	if idx1 < 0 {
+		idx1 = 0
+	}
+	if idx1 > 9 {
+		idx1 = 9
+	}
+
+	idx2 := cfg.BtcAddrIdx
+	if idx2 > 9 {
+		idx2 = 9
+	}
+
+	if cfg.BtcAddrIdx < 0 {
+		return &RequestParams{
+			Auth:     env.Chain.Accounts[idx1],
+			Amount:   cfg.Amount,
+			Receiver: "invalid_btc_address",
+		}
+	} else {
+		return &RequestParams{
+			Auth:     env.Chain.Accounts[idx1],
+			Amount:   cfg.Amount,
+			Receiver: btcAddrs[idx2],
+		}
 	}
 }
 
 func (env *SimEtherman) GenPrepareParams(cfg *ParamConfig) (p *PrepareParams) {
+	idx := cfg.BtcAddrIdx
+	if idx < 0 {
+		idx = 0
+	}
+	if idx > 9 {
+		idx = 9
+	}
+	receiver := btcAddrs[idx]
+
+	idx = cfg.Requester
+	if idx < 0 {
+		idx = 0
+	}
+	if idx > 9 {
+		idx = 9
+	}
+	requester := env.Chain.Accounts[idx].From
+
 	txHash := common.RandBytes32()
-	requester := env.Chain.Accounts[cfg.Requester].From
-	receiver := btcAddrs[0]
 	outpointTxIds := [][32]byte{}
 	outpointIdxs := []uint16{}
 
