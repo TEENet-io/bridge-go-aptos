@@ -259,3 +259,74 @@ func (env *SimEtherman) Sign(msg []byte) (*big.Int, *big.Int, error) {
 	bytes := sig.Serialize()
 	return new(big.Int).SetBytes(bytes[:32]), new(big.Int).SetBytes(bytes[32:]), nil
 }
+
+func (env *SimEtherman) Mint(receiver int, amount int) {
+	params := env.GenMintParams(&ParamConfig{
+		Receiver: receiver,
+		Amount:   big.NewInt(int64(amount)),
+	})
+	_, err := env.Etherman.Mint(params)
+	if err != nil {
+		panic(err)
+	}
+
+	env.Chain.Backend.Commit()
+
+	balance, err := env.Etherman.TWBTCBalanceOf(env.Chain.Accounts[receiver].From)
+	if err != nil {
+		panic(err)
+	}
+	if balance.Uint64() != uint64(amount) {
+		panic("balance incorrect")
+	}
+}
+
+func (env *SimEtherman) Request(requester int, amount int, btcAddrIdx int) {
+	balBefore, err := env.Etherman.TWBTCBalanceOf(env.Chain.Accounts[requester].From)
+	if err != nil {
+		panic(err)
+	}
+	if balBefore.Uint64() < uint64(amount) {
+		panic("insufficient balance")
+	}
+
+	err = env.Etherman.TWBTCApprove(env.Chain.Accounts[requester], big.NewInt(int64(amount)))
+	if err != nil {
+		panic(err)
+	}
+	env.Chain.Backend.Commit()
+
+	params := env.GenRequestParams(&ParamConfig{
+		Requester:  requester,
+		Amount:     big.NewInt(int64(amount)),
+		BtcAddrIdx: btcAddrIdx,
+	})
+	_, err = env.Etherman.RedeemRequest(params)
+	if err != nil {
+		panic(err)
+	}
+
+	env.Chain.Backend.Commit()
+
+	balAfter, err := env.Etherman.TWBTCBalanceOf(env.Chain.Accounts[requester].From)
+	if err != nil {
+		panic(err)
+	}
+	if balAfter.Uint64() != balBefore.Uint64()-uint64(amount) {
+		panic("balance incorrect")
+	}
+}
+
+func (env *SimEtherman) Prepare(requester int, amount int, btcAddrIdx int, outpointNum int) {
+	params := env.GenPrepareParams(&ParamConfig{
+		Requester:   requester,
+		Amount:      big.NewInt(int64(amount)),
+		BtcAddrIdx:  btcAddrIdx,
+		OutpointNum: outpointNum,
+	})
+	_, err := env.Etherman.RedeemPrepare(params)
+	if err != nil {
+		panic(err)
+	}
+	env.Chain.Backend.Commit()
+}
