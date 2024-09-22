@@ -91,12 +91,22 @@ func (txmgr *EthTxManager) Start(ctx context.Context) error {
 					continue
 				}
 
+				// Check the redeem status on bridge contract
 				ok, err := txmgr.etherman.IsPrepared(redeem.RequestTxHash)
 				if err != nil {
 					logger1.Error("Etherman: failed to check if prepared")
 					return err
 				}
+				if ok {
+					continue
+				}
 
+				// Check whether there has been a redeem prepare tx sent for the redeem
+				_, ok, err = txmgr.mgrdb.GetMonitoredTxByRequestTxHash(redeem.RequestTxHash)
+				if err != nil {
+					logger1.Error("failed to get monitored tx by request tx hash")
+					return err
+				}
 				if ok {
 					continue
 				}
@@ -268,15 +278,14 @@ func (txmgr *EthTxManager) handleRequestedSignature(
 	mt := &monitoredTx{
 		TxHash:        tx.Hash(),
 		RequestTxHash: params.RequestTxHash,
-		SentAt:        latestBlock.Hash(),
-		MinedAt:       [32]byte{},
+		SentAfter:     latestBlock.Hash(),
 	}
 	err = txmgr.mgrdb.insertMonitoredTx(mt)
 	if err != nil {
 		logger1.Error("failed to insert monitored tx in db")
 		return err
 	}
-	logger1.Debugf("inserted tx for monitoring after blk=0x%x", mt.SentAt)
+	logger1.Debugf("inserted tx for monitoring after blk=0x%x", mt.SentAfter)
 
 	return nil
 }

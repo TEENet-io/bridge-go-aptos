@@ -18,6 +18,7 @@ import (
 const (
 	frequencyToGetUnpreparedRedeem = 500 * time.Millisecond
 	timeoutOnWaitingForSignature   = 1 * time.Second
+	timtoutOnWaitingForOutpoints   = 1 * time.Second
 	frequencyToCheckFinalizedBlock = 100 * time.Millisecond
 	blockInterval                  = 100 * time.Millisecond
 )
@@ -73,6 +74,7 @@ func newTestEnv(t *testing.T) *testEnv {
 	cfg := &Config{
 		FrequencyToGetUnpreparedRedeem: frequencyToGetUnpreparedRedeem,
 		TimeoutOnWaitingForSignature:   timeoutOnWaitingForSignature,
+		TimeoutOnWaitingForOutpoints:   timtoutOnWaitingForOutpoints,
 	}
 
 	ch := make(chan *SignatureRequest, 1)
@@ -147,12 +149,15 @@ func TestPrepareRedeem(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	// Check for signature request
-	_, ok, err := env.mgrdb.GetSignatureRequestByRequestTxHash(tx1)
+	sr1, ok, err := env.mgrdb.GetSignatureRequestByRequestTxHash(tx1)
 	assert.NoError(t, err)
 	assert.True(t, ok)
+	assert.True(t, common.Verify(env.sim.Sk.PubKey().X().Bytes(), sr1.SigningHash[:], sr1.Rx, sr1.S))
+
 	_, ok, err = env.mgrdb.GetSignatureRequestByRequestTxHash(tx2)
 	assert.NoError(t, err)
 	assert.False(t, ok)
+
 	_, ok, err = env.mgrdb.GetSignatureRequestByRequestTxHash(tx3)
 	assert.NoError(t, err)
 	assert.True(t, ok)
@@ -160,9 +165,12 @@ func TestPrepareRedeem(t *testing.T) {
 	_, ok, err = env.mgrdb.GetMonitoredTxByRequestTxHash(tx1)
 	assert.NoError(t, err)
 	assert.True(t, ok)
+
 	_, ok, err = env.mgrdb.GetMonitoredTxByRequestTxHash(tx3)
 	assert.NoError(t, err)
 	assert.True(t, ok)
+
+	time.Sleep(2 * time.Second)
 
 	env.cancel()
 	wg.Wait()
