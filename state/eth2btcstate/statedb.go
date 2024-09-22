@@ -108,6 +108,9 @@ func (st *StateDB) GetByStatus(status RedeemStatus) ([]*Redeem, error) {
 
 	rows, err := stmt.Query(status)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil // No rows found, return nil slice
+		}
 		return nil, err
 	}
 	defer rows.Close()
