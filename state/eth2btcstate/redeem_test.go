@@ -7,6 +7,7 @@ import (
 
 	"github.com/TEENet-io/bridge-go/common"
 	"github.com/TEENet-io/bridge-go/ethsync"
+	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -15,15 +16,15 @@ func TestJSON(t *testing.T) {
 	jOutpoints := []JSONOutpoint{}
 	for _, outpoint := range redeem.Outpoints {
 		jOutpoints = append(jOutpoints, JSONOutpoint{
-			TxId: common.Bytes32ToHexStr(outpoint.TxId),
+			TxId: outpoint.TxId.String(),
 			Idx:  outpoint.Idx,
 		})
 	}
 	jRedeem := &JSONRedeem{
-		RequestTxHash: common.Bytes32ToHexStr(redeem.RequestTxHash),
-		PrepareTxHash: common.Bytes32ToHexStr(redeem.PrepareTxHash),
-		BtcTxId:       common.Bytes32ToHexStr(redeem.BtcTxId),
-		Requester:     redeem.Requester.Hex(),
+		RequestTxHash: redeem.RequestTxHash.String(),
+		PrepareTxHash: redeem.PrepareTxHash.String(),
+		BtcTxId:       redeem.BtcTxId.String(),
+		Requester:     redeem.Requester.String(),
 		Amount:        common.BigIntToHexStr(redeem.Amount),
 		Outpoints:     jOutpoints,
 		Receiver:      redeem.Receiver,
@@ -136,7 +137,7 @@ func TestUpdateFromPrepareEvent(t *testing.T) {
 	ev.Receiver = redeem.Receiver
 	_, err = redeem.updateFromPreparedEvent(ev)
 	assert.Equal(t, ErrorOutpointsInvalid, err.Error())
-	ev.OutpointTxIds = [][32]byte{common.RandBytes32()}
+	ev.OutpointTxIds = append([]ethcommon.Hash{}, common.RandBytes32())
 	_, err = redeem.updateFromPreparedEvent(ev)
 	assert.Equal(t, ErrorOutpointsInvalid, err.Error())
 

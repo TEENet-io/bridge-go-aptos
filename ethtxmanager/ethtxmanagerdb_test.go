@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/TEENet-io/bridge-go/common"
+	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -40,8 +41,9 @@ func TestSigReqOps(t *testing.T) {
 	err = etm.insertSignatureRequest(sr)
 	assert.NoError(t, err)
 
-	sr2, err := etm.GetSignatureRequestByRequestTxHash(sr.RequestTxHash)
+	sr2, ok, err := etm.GetSignatureRequestByRequestTxHash(sr.RequestTxHash)
 	assert.NoError(t, err)
+	assert.True(t, ok)
 	assert.Equal(t, sr, sr2)
 }
 
@@ -63,16 +65,18 @@ func TestMonitoredTxOps(t *testing.T) {
 
 	err = etm.insertMonitoredTx(mt)
 	assert.NoError(t, err)
-	mt1, err := etm.GetMonitoredTxByRequestTxHash(mt.RequestTxHash)
+	mt1, ok, err := etm.GetMonitoredTxByRequestTxHash(mt.RequestTxHash)
 	assert.NoError(t, err)
-	assert.Equal(t, mt1.MinedAt, [32]byte{})
+	assert.True(t, ok)
+	assert.Equal(t, mt1.MinedAt, ethcommon.BytesToHash([]byte{}))
 	mt1.MinedAt = mt.MinedAt
 	assert.Equal(t, mt, mt1)
 
 	err = etm.updateMonitoredTxAfterMined(mt)
 	assert.NoError(t, err)
-	mt2, err := etm.GetMonitoredTxByRequestTxHash(mt.RequestTxHash)
+	mt2, ok, err := etm.GetMonitoredTxByRequestTxHash(mt.RequestTxHash)
 	assert.NoError(t, err)
+	assert.True(t, ok)
 	assert.Equal(t, mt, mt2)
 
 	mt.MinedAt = [32]byte{}

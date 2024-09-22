@@ -8,6 +8,7 @@ import (
 	logger "github.com/0xPolygonHermez/zkevm-node/log"
 	"github.com/TEENet-io/bridge-go/common"
 	"github.com/TEENet-io/bridge-go/etherman"
+	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 const MinTickerDuration = 100 * time.Millisecond
@@ -112,13 +113,18 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 				for _, ev := range prepared {
 					logger.Debugf("found event RedeemPrepared: prepTx=0x%x, reqTx=0x%x, requester=%s",
 						ev.TxHash, ev.EthTxHash, ev.Requester)
+
+					outpointTxIds := []ethcommon.Hash{}
+					for _, txid := range ev.OutpointTxIds {
+						outpointTxIds = append(outpointTxIds, txid)
+					}
 					s.e2bSt.GetNewRedeemPreparedEventChannel() <- &RedeemPreparedEvent{
 						PrepareTxHash: ev.TxHash,
 						RequestTxHash: ev.EthTxHash,
 						Requester:     ev.Requester,
 						Receiver:      ev.Receiver,
 						Amount:        new(big.Int).Set(ev.Amount),
-						OutpointTxIds: ev.OutpointTxIds,
+						OutpointTxIds: outpointTxIds,
 						OutpointIdxs:  ev.OutpointIdxs,
 					}
 				}

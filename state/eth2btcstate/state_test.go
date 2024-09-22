@@ -30,7 +30,7 @@ func TestNewState(t *testing.T) {
 
 	// return error when stored finalized block number less than the default starting block number
 	finalized = new(big.Int).Sub(common.EthStartingBlock, big.NewInt(1))
-	err = db.setKeyedValue(KeyLastFinalizedBlock, finalized.Bytes())
+	err = db.setKeyedValue(KeyLastFinalizedBlock, common.BigInt2Bytes32(finalized))
 	assert.NoError(t, err)
 	_, err = New(db, &Config{ChannelSize: 1})
 	assert.Equal(t, err, ErrStoredFinalizedBlockNumberInvalid)

@@ -4,11 +4,12 @@ import (
 	"math/big"
 
 	"github.com/TEENet-io/bridge-go/common"
+	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 type SignatureRequest struct {
-	RequestTxHash [32]byte
-	SigningHash   [32]byte
+	RequestTxHash ethcommon.Hash
+	SigningHash   ethcommon.Hash
 	Rx            *big.Int
 	S             *big.Int
 }
@@ -22,8 +23,8 @@ type sqlSignatureRequest struct {
 
 func (s *SignatureRequest) convert() *sqlSignatureRequest {
 	return &sqlSignatureRequest{
-		RequestTxHash: common.Bytes32ToHexStr(s.RequestTxHash)[2:],
-		SigningHash:   common.Bytes32ToHexStr(s.SigningHash)[2:],
+		RequestTxHash: s.RequestTxHash.String()[2:],
+		SigningHash:   s.SigningHash.String()[2:],
 		Rx:            common.BigIntToHexStr(s.Rx)[2:],
 		S:             common.BigIntToHexStr(s.S)[2:],
 	}
@@ -40,10 +41,10 @@ func (s *SignatureRequest) restore(sqlSr *sqlSignatureRequest) *SignatureRequest
 }
 
 type monitoredTx struct {
-	TxHash        [32]byte
-	RequestTxHash [32]byte
-	SentAt        [32]byte // hash of the latest block before sending the tx
-	MinedAt       [32]byte // hash of the block where the tx is mined
+	TxHash        ethcommon.Hash
+	RequestTxHash ethcommon.Hash
+	SentAt        ethcommon.Hash // hash of the latest block before sending the tx
+	MinedAt       ethcommon.Hash // hash of the block where the tx is mined
 }
 
 type sqlmonitoredTx struct {
@@ -55,10 +56,10 @@ type sqlmonitoredTx struct {
 
 func (mt *monitoredTx) covert() *sqlmonitoredTx {
 	return &sqlmonitoredTx{
-		TxHash:        common.Bytes32ToHexStr(mt.TxHash)[2:],
-		RequestTxHash: common.Bytes32ToHexStr(mt.RequestTxHash)[2:],
-		SentAt:        common.Bytes32ToHexStr(mt.SentAt)[2:],
-		MinedAt:       common.Bytes32ToHexStr(mt.MinedAt)[2:],
+		TxHash:        mt.TxHash.String()[2:],
+		RequestTxHash: mt.RequestTxHash.String()[2:],
+		SentAt:        mt.SentAt.String()[2:],
+		MinedAt:       mt.MinedAt.String()[2:],
 	}
 }
 

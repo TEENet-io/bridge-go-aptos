@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 )
 
@@ -21,14 +22,40 @@ func EncodePacked(values ...interface{}) []byte {
 			res = append(res, v[:])
 		case [][32]byte:
 			res = append(res, encodeBytes32Array(v))
-		case *big.Int:
-			res = append(res, math.U256Bytes(v))
 		case []string:
 			res = append(res, encodeStringArray(v))
+		case *big.Int:
+			res = append(res, math.U256Bytes(v))
 		case []*big.Int:
 			res = append(res, encodeBigIntArray(v))
+		case common.Hash:
+			res = append(res, v[:])
+		case []common.Hash:
+			res = append(res, encodeHashArray(v))
+		case common.Address:
+			res = append(res, encodeString(v.String()))
+		case []common.Address:
+			res = append(res, encodeAddressArray(v))
 		}
 	}
+	return bytes.Join(res, nil)
+}
+
+func encodeAddressArray(arr []common.Address) []byte {
+	var res [][]byte
+	for _, v := range arr {
+		res = append(res, encodeString(v.String()))
+	}
+
+	return bytes.Join(res, nil)
+}
+
+func encodeHashArray(arr []common.Hash) []byte {
+	var res [][]byte
+	for _, v := range arr {
+		res = append(res, v[:])
+	}
+
 	return bytes.Join(res, nil)
 }
 

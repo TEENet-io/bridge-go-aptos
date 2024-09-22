@@ -11,7 +11,7 @@ import (
 )
 
 type MintParams struct {
-	BtcTxId  [32]byte
+	BtcTxId  ethcommon.Hash
 	Amount   *big.Int
 	Receiver ethcommon.Address
 	Rx       *big.Int
@@ -25,17 +25,17 @@ type RequestParams struct {
 }
 
 type PrepareParams struct {
-	RequestTxHash [32]byte
+	RequestTxHash ethcommon.Hash
 	Requester     ethcommon.Address
 	Receiver      string
 	Amount        *big.Int
-	OutpointTxIds [][32]byte
+	OutpointTxIds []ethcommon.Hash
 	OutpointIdxs  []uint16
 	Rx            *big.Int
 	S             *big.Int
 }
 
-func (p *PrepareParams) SigningHash() [32]byte {
+func (p *PrepareParams) SigningHash() ethcommon.Hash {
 	outpointIdxs := []*big.Int{}
 	for _, idx := range p.OutpointIdxs {
 		outpointIdxs = append(outpointIdxs, big.NewInt(int64(idx)))

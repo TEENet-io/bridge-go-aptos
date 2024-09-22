@@ -208,13 +208,18 @@ func (etherman *Etherman) RedeemPrepare(params *PrepareParams) (*types.Transacti
 		return nil, err
 	}
 
+	outpointTxIds := [][32]byte{}
+	for _, txid := range params.OutpointTxIds {
+		outpointTxIds = append(outpointTxIds, txid)
+	}
+
 	tx, err := contract.RedeemPrepare(
 		etherman.auth,
 		params.RequestTxHash,
 		params.Requester,
 		string(params.Receiver),
 		params.Amount,
-		params.OutpointTxIds,
+		outpointTxIds,
 		params.OutpointIdxs,
 		params.Rx,
 		params.S,
