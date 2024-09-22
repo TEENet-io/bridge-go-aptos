@@ -131,7 +131,7 @@ func (st *State) Start(ctx context.Context) error {
 				newLogger.Errorf("failed to insert redeem to db: err=%v", err)
 				return ErrInsertRedeem
 			}
-			newLogger.Debug("DB: insert redeem after requested")
+			newLogger.Debug("insert redeem after requested")
 		// After receiving a redeem prepared event
 		// 1. 	Check the existence of the tx hash
 		// 2. 	If found, check its status
@@ -186,7 +186,7 @@ func (st *State) Start(ctx context.Context) error {
 			if err = st.db.updateAfterPrepared(redeem); err != nil {
 				return ErrUpdateRedeem
 			}
-			newLogger.Debug("DB: update redeem after prepared")
+			newLogger.Debug("update redeem after prepared")
 		}
 	}
 }
