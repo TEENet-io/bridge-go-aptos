@@ -112,8 +112,7 @@ func TestPrepareRedeem(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		err := env.e2bst.Start(env.ctx)
-		panic(err)
+		env.e2bst.Start(env.ctx)
 	}()
 	wg.Add(1)
 	go func() {
@@ -141,22 +140,30 @@ func TestPrepareRedeem(t *testing.T) {
 	env.sim.Mint(2, 200)
 
 	// request redeem
-	tx1, _ := env.sim.Request(1, 50, 0)  // valid btc address
-	tx2, _ := env.sim.Request(1, 50, -1) // invalid btc address
+	tx1, _ := env.sim.Request(1, 60, 0)  // valid btc address
+	tx2, _ := env.sim.Request(1, 30, -1) // invalid btc address
 	tx3, _ := env.sim.Request(2, 100, 1) // valid btc address
 
-	// Check for signature request
-	sr1, err := env.mgrdb.GetSignatureRequestByRequestTxHash(tx1)
-	assert.NoError(t, err)
-	assert.NotNil(t, sr1)
-	sr2, err := env.mgrdb.GetSignatureRequestByRequestTxHash(tx2)
-	assert.NoError(t, err)
-	assert.Nil(t, sr2)
-	sr3, err := env.mgrdb.GetSignatureRequestByRequestTxHash(tx3)
-	assert.NoError(t, err)
-	assert.NotNil(t, sr3)
+	time.Sleep(2 * time.Second)
 
-	time.Sleep(5 * time.Second)
+	// Check for signature request
+	_, ok, err := env.mgrdb.GetSignatureRequestByRequestTxHash(tx1)
+	assert.NoError(t, err)
+	assert.True(t, ok)
+	_, ok, err = env.mgrdb.GetSignatureRequestByRequestTxHash(tx2)
+	assert.NoError(t, err)
+	assert.False(t, ok)
+	_, ok, err = env.mgrdb.GetSignatureRequestByRequestTxHash(tx3)
+	assert.NoError(t, err)
+	assert.True(t, ok)
+
+	_, ok, err = env.mgrdb.GetMonitoredTxByRequestTxHash(tx1)
+	assert.NoError(t, err)
+	assert.True(t, ok)
+	_, ok, err = env.mgrdb.GetMonitoredTxByRequestTxHash(tx3)
+	assert.NoError(t, err)
+	assert.True(t, ok)
+
 	env.cancel()
 	wg.Wait()
 }
