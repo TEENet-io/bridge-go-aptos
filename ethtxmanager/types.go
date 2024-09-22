@@ -11,7 +11,6 @@ type SignatureRequest struct {
 	SigningHash   [32]byte
 	Rx            *big.Int
 	S             *big.Int
-	SignatureCh   chan<- *SignatureRequest
 }
 
 type sqlSignatureRequest struct {

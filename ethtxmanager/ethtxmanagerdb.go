@@ -63,6 +63,9 @@ func (db *EthTxManagerDB) GetSignatureRequestByRequestTxHash(requestTxHash [32]b
 		&sqlSr.Rx,
 		&sqlSr.S,
 	); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
 		return nil, err
 	}
 
@@ -121,6 +124,9 @@ func (db *EthTxManagerDB) GetMonitoredTxByRequestTxHash(RequestTxHash [32]byte) 
 		&sqlMt.SentAt,
 		&sqlMt.MinedAt,
 	); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
 		return nil, err
 	}
 
