@@ -40,26 +40,37 @@ func (s *SignatureRequest) restore(sqlSr *sqlSignatureRequest) *SignatureRequest
 	return s
 }
 
+type MonitoredTxStatus string
+
+const (
+	MonitoredTxStatusPending  MonitoredTxStatus = "pending"
+	MonitoredTxStatusSuccess  MonitoredTxStatus = "success"
+	MonitoredTxStatusReverted MonitoredTxStatus = "reverted"
+)
+
 type monitoredTx struct {
 	TxHash        ethcommon.Hash
 	RequestTxHash ethcommon.Hash
-	SentAt        ethcommon.Hash // hash of the latest block before sending the tx
+	SentAfter     ethcommon.Hash // hash of the latest block before sending the tx
 	MinedAt       ethcommon.Hash // hash of the block where the tx is mined
+	Status        MonitoredTxStatus
 }
 
 type sqlmonitoredTx struct {
 	TxHash        string
 	RequestTxHash string
-	SentAt        string
+	SentAfter     string
 	MinedAt       string
+	Status        string
 }
 
 func (mt *monitoredTx) covert() *sqlmonitoredTx {
 	return &sqlmonitoredTx{
 		TxHash:        mt.TxHash.String()[2:],
 		RequestTxHash: mt.RequestTxHash.String()[2:],
-		SentAt:        mt.SentAt.String()[2:],
+		SentAfter:     mt.SentAfter.String()[2:],
 		MinedAt:       mt.MinedAt.String()[2:],
+		Status:        string(mt.Status),
 	}
 }
 
@@ -67,8 +78,9 @@ func (mt *monitoredTx) restore(sqlMt *sqlmonitoredTx) *monitoredTx {
 	mt = &monitoredTx{
 		TxHash:        common.HexStrToBytes32(sqlMt.TxHash),
 		RequestTxHash: common.HexStrToBytes32(sqlMt.RequestTxHash),
-		SentAt:        common.HexStrToBytes32(sqlMt.SentAt),
+		SentAfter:     common.HexStrToBytes32(sqlMt.SentAfter),
 		MinedAt:       common.HexStrToBytes32(sqlMt.MinedAt),
+		Status:        MonitoredTxStatus(sqlMt.Status),
 	}
 	return mt
 }

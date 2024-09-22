@@ -10,6 +10,7 @@ import (
 
 var (
 	ErrMintedAtNotSet = errors.New("mintedAt not set")
+	ErrInvalidStatus  = errors.New("invalid status")
 )
 
 type EthTxManagerDB struct {
@@ -76,7 +77,7 @@ func (db *EthTxManagerDB) GetSignatureRequestByRequestTxHash(
 }
 
 func (db *EthTxManagerDB) insertMonitoredTx(mt *monitoredTx) error {
-	query := `INSERT OR IGNORE INTO monitoredTx (txHash, requestTxHash, sentAt, minedAt) VALUES (?, ?, ?, ?)`
+	query := `INSERT OR IGNORE INTO monitoredTx (txHash, requestTxHash, sentAfter, minedAt, status) VALUES (?, ?, ?, ?, ?)`
 	stmt := db.stmtCache.MustPrepare(query)
 
 	sqlMt := mt.covert()
@@ -84,8 +85,9 @@ func (db *EthTxManagerDB) insertMonitoredTx(mt *monitoredTx) error {
 	if _, err := stmt.Exec(
 		sqlMt.TxHash,
 		sqlMt.RequestTxHash,
-		sqlMt.SentAt,
+		sqlMt.SentAfter,
 		strZeroBytes32,
+		MonitoredTxStatusPending,
 	); err != nil {
 		return err
 	}
@@ -98,13 +100,18 @@ func (db *EthTxManagerDB) updateMonitoredTxAfterMined(mt *monitoredTx) error {
 		return ErrMintedAtNotSet
 	}
 
-	query := `UPDATE monitoredTx SET minedAt = ? WHERE txHash = ?`
+	if mt.Status != MonitoredTxStatusSuccess && mt.Status != MonitoredTxStatusReverted {
+		return ErrInvalidStatus
+	}
+
+	query := `UPDATE monitoredTx SET minedAt = ?, status = ? WHERE txHash = ?`
 	stmt := db.stmtCache.MustPrepare(query)
 
 	sqlMt := mt.covert()
 
 	if _, err := stmt.Exec(
 		sqlMt.MinedAt,
+		sqlMt.Status,
 		sqlMt.TxHash,
 	); err != nil {
 		return err
@@ -125,8 +132,9 @@ func (db *EthTxManagerDB) GetMonitoredTxByRequestTxHash(
 	if err := stmt.QueryRow(hashStr).Scan(
 		&sqlMt.TxHash,
 		&sqlMt.RequestTxHash,
-		&sqlMt.SentAt,
+		&sqlMt.SentAfter,
 		&sqlMt.MinedAt,
+		&sqlMt.Status,
 	); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, false, nil
@@ -136,4 +144,37 @@ func (db *EthTxManagerDB) GetMonitoredTxByRequestTxHash(
 
 	mt := &monitoredTx{}
 	return mt.restore(&sqlMt), true, nil
+}
+
+func (db *EthTxManagerDB) GetMonitoredTxByStatus(status MonitoredTxStatus) ([]*monitoredTx, error) {
+	query := `SELECT * FROM monitoredTx WHERE status = ?`
+	stmt := db.stmtCache.MustPrepare(query)
+
+	rows, err := stmt.Query(string(status))
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil // No rows found, return nil slice
+		}
+		return nil, err
+	}
+	defer rows.Close()
+
+	var mts []*monitoredTx
+	for rows.Next() {
+		var sqlMt sqlmonitoredTx
+		if err := rows.Scan(
+			&sqlMt.TxHash,
+			&sqlMt.RequestTxHash,
+			&sqlMt.SentAfter,
+			&sqlMt.MinedAt,
+			&sqlMt.Status,
+		); err != nil {
+			return nil, err
+		}
+
+		mt := &monitoredTx{}
+		mts = append(mts, mt.restore(&sqlMt))
+	}
+
+	return mts, nil
 }
