@@ -32,9 +32,9 @@ func encode(r *Redeem) (*sqlRedeem, error) {
 	}
 
 	return &sqlRedeem{
-		RequestTxHash: common.Bytes32ToHexStr(r.RequestTxHash)[2:],
-		PrepareTxHash: common.Bytes32ToHexStr(r.PrepareTxHash)[2:],
-		BtcTxId:       common.Bytes32ToHexStr(r.BtcTxId)[2:],
+		RequestTxHash: r.RequestTxHash.String()[2:],
+		PrepareTxHash: r.PrepareTxHash.String()[2:],
+		BtcTxId:       r.BtcTxId.String()[2:],
 		Requester:     r.Requester.String()[2:],
 		Receiver:      r.Receiver,
 		Amount:        r.Amount.Uint64(),

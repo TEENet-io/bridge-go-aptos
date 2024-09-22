@@ -7,7 +7,7 @@ import (
 )
 
 type RedeemRequestedEvent struct {
-	RequestTxHash   [32]byte
+	RequestTxHash   common.Hash
 	Requester       common.Address
 	Receiver        string
 	Amount          *big.Int
@@ -15,18 +15,18 @@ type RedeemRequestedEvent struct {
 }
 
 type RedeemPreparedEvent struct {
-	RequestTxHash [32]byte
-	PrepareTxHash [32]byte
+	RequestTxHash common.Hash
+	PrepareTxHash common.Hash
 	Requester     common.Address
 	Receiver      string
 	Amount        *big.Int
-	OutpointTxIds [][32]byte
+	OutpointTxIds []common.Hash
 	OutpointIdxs  []uint16
 }
 
 type MintedEvent struct {
-	MintedTxHash [32]byte
-	BtcTxId      [32]byte
+	MintedTxHash common.Hash
+	BtcTxId      common.Hash
 	Receiver     common.Address
 	Amount       *big.Int
 }

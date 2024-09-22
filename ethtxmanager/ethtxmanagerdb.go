@@ -4,8 +4,8 @@ import (
 	"database/sql"
 	"errors"
 
-	"github.com/TEENet-io/bridge-go/common"
 	"github.com/TEENet-io/bridge-go/database"
+	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 var (
@@ -50,11 +50,13 @@ func (db *EthTxManagerDB) insertSignatureRequest(sr *SignatureRequest) error {
 	return nil
 }
 
-func (db *EthTxManagerDB) GetSignatureRequestByRequestTxHash(requestTxHash [32]byte) (*SignatureRequest, error) {
+func (db *EthTxManagerDB) GetSignatureRequestByRequestTxHash(
+	requestTxHash ethcommon.Hash,
+) (*SignatureRequest, bool, error) {
 	query := `SELECT * FROM signatureRequest WHERE requestTxHash = ?`
 	stmt := db.stmtCache.MustPrepare(query)
 
-	txHashStr := common.Bytes32ToHexStr(requestTxHash)[2:]
+	txHashStr := requestTxHash.String()[2:]
 
 	var sqlSr sqlSignatureRequest
 	if err := stmt.QueryRow(txHashStr).Scan(
@@ -64,13 +66,13 @@ func (db *EthTxManagerDB) GetSignatureRequestByRequestTxHash(requestTxHash [32]b
 		&sqlSr.S,
 	); err != nil {
 		if err == sql.ErrNoRows {
-			return nil, nil
+			return nil, false, nil
 		}
-		return nil, err
+		return nil, false, err
 	}
 
 	sr := &SignatureRequest{}
-	return sr.restore(&sqlSr), nil
+	return sr.restore(&sqlSr), true, nil
 }
 
 func (db *EthTxManagerDB) insertMonitoredTx(mt *monitoredTx) error {
@@ -111,11 +113,13 @@ func (db *EthTxManagerDB) updateMonitoredTxAfterMined(mt *monitoredTx) error {
 	return nil
 }
 
-func (db *EthTxManagerDB) GetMonitoredTxByRequestTxHash(RequestTxHash [32]byte) (*monitoredTx, error) {
+func (db *EthTxManagerDB) GetMonitoredTxByRequestTxHash(
+	RequestTxHash ethcommon.Hash,
+) (*monitoredTx, bool, error) {
 	query := `SELECT * FROM monitoredTx WHERE requestTxHash = ?`
 	stmt := db.stmtCache.MustPrepare(query)
 
-	hashStr := common.Bytes32ToHexStr(RequestTxHash)[2:]
+	hashStr := RequestTxHash.String()[2:]
 
 	var sqlMt sqlmonitoredTx
 	if err := stmt.QueryRow(hashStr).Scan(
@@ -125,11 +129,11 @@ func (db *EthTxManagerDB) GetMonitoredTxByRequestTxHash(RequestTxHash [32]byte) 
 		&sqlMt.MinedAt,
 	); err != nil {
 		if err == sql.ErrNoRows {
-			return nil, nil
+			return nil, false, nil
 		}
-		return nil, err
+		return nil, false, err
 	}
 
 	mt := &monitoredTx{}
-	return mt.restore(&sqlMt), nil
+	return mt.restore(&sqlMt), true, nil
 }

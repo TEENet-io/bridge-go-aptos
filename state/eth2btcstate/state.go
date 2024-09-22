@@ -10,12 +10,11 @@ import (
 	logger "github.com/0xPolygonHermez/zkevm-node/log"
 	"github.com/TEENet-io/bridge-go/common"
 	"github.com/TEENet-io/bridge-go/ethsync"
-	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
 var (
-	KeyLastFinalizedBlock = crypto.Keccak256Hash([]byte("lastFinalizedBlock")).Bytes()
+	KeyLastFinalizedBlock = crypto.Keccak256Hash([]byte("lastFinalizedBlock"))
 
 	ErrRedeemInvalid                     = errors.New("redeem is invalid")
 	ErrStoredFinalizedBlockNumberInvalid = errors.New("stored finalized block number is invalid")
@@ -52,7 +51,7 @@ func New(db *StateDB, cfg *Config) (*State, error) {
 		newRedeemPreparedEvCh:  make(chan *ethsync.RedeemPreparedEvent, cfg.ChannelSize),
 	}
 
-	storedBytes, err := st.db.GetKeyedValue(KeyLastFinalizedBlock)
+	storedBytes32, err := st.db.GetKeyedValue(KeyLastFinalizedBlock)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, ErrGetFinalizedBlockNumber
 	}
@@ -60,13 +59,13 @@ func New(db *StateDB, cfg *Config) (*State, error) {
 	if err == sql.ErrNoRows {
 		logger.Warnf("no stored last finalized block number found, using the default value %v", common.EthStartingBlock)
 		// save the default value
-		err := db.setKeyedValue(KeyLastFinalizedBlock, common.EthStartingBlock.Bytes())
+		err := db.setKeyedValue(KeyLastFinalizedBlock, common.BigInt2Bytes32(common.EthStartingBlock))
 		if err != nil {
 			return nil, ErrSetFinalizedBlockNumber
 		}
 		st.cache.lastFinalized.Store(common.EthStartingBlock.Bytes())
 	} else {
-		stored := new(big.Int).SetBytes(storedBytes)
+		stored := new(big.Int).SetBytes(storedBytes32[:])
 
 		// stored value must not be less than the starting block number
 		if stored.Cmp(common.EthStartingBlock) == -1 {
@@ -108,11 +107,11 @@ func (st *State) Start(ctx context.Context) error {
 		// 3.	Insert a new redeem record in state db
 		case ev := <-st.newRedeemRequestedEvCh:
 			newLogger := logger.WithFields(
-				"reqTx", common.Bytes32ToHexStr(ev.RequestTxHash),
+				"reqTx", ev.RequestTxHash.String(),
 			)
 
 			// Check if the redeem already exists
-			ok, _, err := st.db.Has(ev.RequestTxHash[:])
+			ok, _, err := st.db.Has(ev.RequestTxHash)
 			if err != nil {
 				newLogger.Errorf("failed to check redeem existence: err=%v", err)
 				return ErrCheckRedeemExistence
@@ -143,11 +142,11 @@ func (st *State) Start(ctx context.Context) error {
 		// its corresponding requested event
 		case ev := <-st.newRedeemPreparedEvCh:
 			newLogger := logger.WithFields(
-				"reqTx", common.Bytes32ToHexStr(ev.RequestTxHash),
-				"prepTx", common.Bytes32ToHexStr(ev.PrepareTxHash),
+				"reqTx", ev.RequestTxHash.String(),
+				"prepTx", ev.PrepareTxHash.String(),
 			)
 
-			ok, status, err := st.db.Has(ev.RequestTxHash[:])
+			ok, status, err := st.db.Has(ev.RequestTxHash)
 			if err != nil {
 				newLogger.Errorf("error when checking existence: err=%v", err)
 				return ErrCheckRedeemExistence
@@ -201,9 +200,9 @@ func (st *State) GetFinalizedBlockNumber() (*big.Int, error) {
 	if err != nil {
 		return nil, err
 	}
-	st.cache.lastFinalized.Store(ethcommon.TrimLeftZeroes(b))
+	st.cache.lastFinalized.Store(b.Big().Bytes())
 
-	return new(big.Int).SetBytes(b), nil
+	return b.Big(), nil
 }
 
 func (st *State) GetNewFinalizedBlockChannel() chan<- *big.Int {
@@ -219,7 +218,7 @@ func (st *State) GetNewRedeemPreparedEventChannel() chan<- *ethsync.RedeemPrepar
 }
 
 func (st *State) setFinalizedBlockNumber(fbNum *big.Int) error {
-	if err := st.db.setKeyedValue(KeyLastFinalizedBlock, fbNum.Bytes()); err != nil {
+	if err := st.db.setKeyedValue(KeyLastFinalizedBlock, common.BigInt2Bytes32(fbNum)); err != nil {
 		return err
 	}
 	st.cache.lastFinalized.Store(fbNum.Bytes())

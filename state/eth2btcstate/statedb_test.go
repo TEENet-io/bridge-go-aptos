@@ -41,8 +41,8 @@ func TestInsertAfterRequested(t *testing.T) {
 	assert.Equal(t, r1.Receiver, r0.Receiver)
 	assert.Equal(t, r1.Amount, r0.Amount)
 	assert.Equal(t, r1.Status, r0.Status)
-	assert.Equal(t, r1.BtcTxId, [32]byte{})
-	assert.Equal(t, r1.PrepareTxHash, [32]byte{})
+	assert.Equal(t, r1.BtcTxId, ethcommon.Hash{})
+	assert.Equal(t, r1.PrepareTxHash, ethcommon.Hash{})
 	assert.Nil(t, r1.Outpoints)
 
 	// Cannot insert two redeems with the same request tx hash
@@ -117,13 +117,13 @@ func TestHas(t *testing.T) {
 
 	r := randRedeem(RedeemStatusRequested)
 
-	ok, _, err := db.Has(r.RequestTxHash[:])
+	ok, _, err := db.Has(r.RequestTxHash)
 	assert.NoError(t, err)
 	assert.False(t, ok)
 
 	err = db.insertAfterRequested(r)
 	assert.NoError(t, err)
-	ok, status, err := db.Has(r.RequestTxHash[:])
+	ok, status, err := db.Has(r.RequestTxHash)
 	assert.NoError(t, err)
 	assert.True(t, ok)
 	assert.Equal(t, RedeemStatusRequested, status)
@@ -141,17 +141,22 @@ func TestKV(t *testing.T) {
 	}()
 
 	// insert
-	err = db.setKeyedValue([]byte("key"), []byte("value1"))
+	key := ethcommon.Hash{}
+	key.SetBytes([]byte("key"))
+	val := ethcommon.Hash{}
+	val.SetBytes([]byte("value1"))
+	err = db.setKeyedValue(key, val)
 	assert.NoError(t, err)
 
 	// get
-	v, err := db.GetKeyedValue([]byte("key"))
+	v, err := db.GetKeyedValue(key)
 	assert.NoError(t, err)
-	assert.Equal(t, []byte("value1"), ethcommon.TrimLeftZeroes(v))
+	assert.Equal(t, []byte("value1"), ethcommon.TrimLeftZeroes(v[:]))
 
-	err = db.setKeyedValue([]byte("key"), []byte("value2"))
+	val.SetBytes([]byte("value2"))
+	err = db.setKeyedValue(key, val)
 	assert.NoError(t, err)
-	v, err = db.GetKeyedValue([]byte("key"))
+	v, err = db.GetKeyedValue(key)
 	assert.NoError(t, err)
-	assert.Equal(t, []byte("value2"), ethcommon.TrimLeftZeroes(v))
+	assert.Equal(t, []byte("value2"), ethcommon.TrimLeftZeroes(v[:]))
 }

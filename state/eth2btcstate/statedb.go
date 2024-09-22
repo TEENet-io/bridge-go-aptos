@@ -3,6 +3,7 @@ package eth2btcstate
 import (
 	"database/sql"
 
+	"github.com/TEENet-io/bridge-go/common"
 	"github.com/TEENet-io/bridge-go/database"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 )
@@ -222,11 +223,11 @@ func (st *StateDB) Get(requestTxHash []byte, status RedeemStatus) (*Redeem, bool
 	return redeem, true, nil
 }
 
-func (st *StateDB) Has(requestTxHash []byte) (bool, RedeemStatus, error) {
+func (st *StateDB) Has(requestTxHash ethcommon.Hash) (bool, RedeemStatus, error) {
 	query := `SELECT status FROM redeem WHERE requestTxHash = ?`
 	stmt := st.stmtCache.MustPrepare(query)
 
-	hash := ethcommon.Bytes2Hex(requestTxHash)
+	hash := requestTxHash.String()[2:]
 	var status string
 	if err := stmt.QueryRow(hash).Scan(&status); err != nil {
 		if err == sql.ErrNoRows {
@@ -238,25 +239,25 @@ func (st *StateDB) Has(requestTxHash []byte) (bool, RedeemStatus, error) {
 	return true, RedeemStatus(status), nil
 }
 
-func (st *StateDB) GetKeyedValue(key []byte) ([]byte, error) {
+func (st *StateDB) GetKeyedValue(key ethcommon.Hash) (ethcommon.Hash, error) {
 	query := `SELECT value FROM kv WHERE key = ?`
 	stmt := st.stmtCache.MustPrepare(query)
 
 	var value string
-	keyHex := ethcommon.Bytes2Hex(ethcommon.LeftPadBytes(key, 32))
+	keyHex := key.String()[2:]
 	if err := stmt.QueryRow(keyHex).Scan(&value); err != nil {
-		return nil, err
+		return [32]byte{}, err
 	}
 
-	return ethcommon.Hex2BytesFixed(value, 32), nil
+	return common.HexStrToBytes32(value), nil
 }
 
-func (st *StateDB) setKeyedValue(key, value []byte) error {
+func (st *StateDB) setKeyedValue(key, value ethcommon.Hash) error {
 	query := `INSERT OR REPLACE INTO kv (key, value) VALUES (?, ?)`
 	stmt := st.stmtCache.MustPrepare(query)
 
-	keyHex := ethcommon.Bytes2Hex(ethcommon.LeftPadBytes(key, 32))
-	valueHex := ethcommon.Bytes2Hex(ethcommon.LeftPadBytes(value, 32))
+	keyHex := key.String()[2:]
+	valueHex := value.String()[2:]
 	if _, err := stmt.Exec(keyHex, valueHex); err != nil {
 		return err
 	}

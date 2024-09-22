@@ -12,7 +12,7 @@ import (
 )
 
 type Outpoint struct {
-	TxId [32]byte
+	TxId ethcommon.Hash
 	Idx  uint16
 }
 
@@ -40,9 +40,9 @@ var (
 )
 
 type Redeem struct {
-	RequestTxHash [32]byte
-	PrepareTxHash [32]byte
-	BtcTxId       [32]byte
+	RequestTxHash ethcommon.Hash
+	PrepareTxHash ethcommon.Hash
+	BtcTxId       ethcommon.Hash
 	Requester     ethcommon.Address
 	Receiver      string // receiver btc address
 	Amount        *big.Int
@@ -148,16 +148,16 @@ func (r *Redeem) MarshalJSON() ([]byte, error) {
 	jOutpoint := []JSONOutpoint{}
 	for _, outpoint := range r.Outpoints {
 		jOutpoint = append(jOutpoint, JSONOutpoint{
-			TxId: common.Bytes32ToHexStr(outpoint.TxId),
+			TxId: outpoint.TxId.String(),
 			Idx:  outpoint.Idx,
 		})
 	}
 
 	return json.Marshal(&JSONRedeem{
-		RequestTxHash: common.Bytes32ToHexStr(r.RequestTxHash),
-		PrepareTxHash: common.Bytes32ToHexStr(r.PrepareTxHash),
-		BtcTxId:       common.Bytes32ToHexStr(r.BtcTxId),
-		Requester:     r.Requester.Hex(),
+		RequestTxHash: r.RequestTxHash.String(),
+		PrepareTxHash: r.PrepareTxHash.String(),
+		BtcTxId:       r.BtcTxId.String(),
+		Requester:     r.Requester.String(),
 		Amount:        common.BigIntToHexStr(r.Amount),
 		Outpoints:     jOutpoint,
 		Receiver:      r.Receiver,

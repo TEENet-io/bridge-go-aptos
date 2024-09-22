@@ -34,11 +34,6 @@ func BigIntToHexStr(bigInt *big.Int) string {
 	return appendHexPrefix(bigInt.Text(16))
 }
 
-// Bytes32ToHexStr converts [32]byte to hex string with prefix 0x
-func Bytes32ToHexStr(bytes32 [32]byte) string {
-	return appendHexPrefix(ethcommon.Bytes2Hex(bytes32[:]))
-}
-
 func trimHexPrefix(str string) string {
 	s := strings.TrimPrefix(str, "0x")
 	return strings.TrimPrefix(s, "0X")

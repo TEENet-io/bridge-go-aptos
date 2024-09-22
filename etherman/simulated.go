@@ -221,7 +221,7 @@ func (env *SimEtherman) GenPrepareParams(cfg *ParamConfig) (p *PrepareParams) {
 	requester := env.Chain.Accounts[idx].From
 
 	txHash := common.RandBytes32()
-	outpointTxIds := [][32]byte{}
+	outpointTxIds := []ethcommon.Hash{}
 	outpointIdxs := []uint16{}
 
 	for i := 0; i < cfg.OutpointNum; i++ {

@@ -204,17 +204,17 @@ func curentBlockNum(t *testing.T, env *SimEtherman) *big.Int {
 }
 
 func checkMintedEvent(t *testing.T, ev *MintedEvent, params *MintParams) {
-	assert.Equal(t, ev.BtcTxId, params.BtcTxId)
-	assert.Equal(t, ev.Receiver.String(), params.Receiver.String())
+	assert.Equal(t, ev.BtcTxId[:], params.BtcTxId.Bytes())
+	assert.Equal(t, ev.Receiver, params.Receiver)
 	assert.Equal(t, ev.Amount, params.Amount)
 }
 
 func checkPreparedEvent(t *testing.T, ev *RedeemPreparedEvent, params *PrepareParams) {
-	assert.Equal(t, ev.EthTxHash, params.RequestTxHash)
+	assert.Equal(t, ev.EthTxHash[:], params.RequestTxHash.Bytes())
 	assert.Equal(t, ev.Requester.String(), params.Requester.String())
 	assert.Equal(t, ev.Amount, params.Amount)
 	for i, txId := range ev.OutpointTxIds {
-		assert.Equal(t, txId, params.OutpointTxIds[i])
+		assert.Equal(t, txId[:], params.OutpointTxIds[i].Bytes())
 	}
 	for i, idx := range ev.OutpointIdxs {
 		assert.Equal(t, idx, params.OutpointIdxs[i])
@@ -222,7 +222,7 @@ func checkPreparedEvent(t *testing.T, ev *RedeemPreparedEvent, params *PreparePa
 }
 
 func checkRequestedEvent(t *testing.T, ev *RedeemRequestedEvent, params *RequestParams) {
-	assert.Equal(t, ev.Sender.String(), params.Auth.From.String())
+	assert.Equal(t, ev.Sender, params.Auth.From)
 	assert.Equal(t, ev.Amount, params.Amount)
-	assert.Equal(t, ev.Receiver, string(params.Receiver))
+	assert.Equal(t, ev.Receiver, params.Receiver)
 }
