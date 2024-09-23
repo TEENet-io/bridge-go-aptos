@@ -9,7 +9,6 @@ import (
 )
 
 type StateDB struct {
-	db        *sql.DB
 	stmtCache *database.StmtCache
 }
 
@@ -19,7 +18,6 @@ func NewStateDB(db *sql.DB) (*StateDB, error) {
 	}
 
 	return &StateDB{
-		db:        db,
 		stmtCache: database.NewStmtCache(db),
 	}, nil
 }
