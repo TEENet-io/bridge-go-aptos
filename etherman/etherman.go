@@ -374,3 +374,21 @@ func (etherman *Etherman) getAuthNonce() (uint64, error) {
 	}
 	return nonce, nil
 }
+
+func (etherman *Etherman) OnCanonicalChain(hash ethcommon.Hash) (bool, error) {
+	// get the block number of the given hash
+	header, err := etherman.ethClient.HeaderByHash(context.Background(), hash)
+	if err != nil {
+		return false, err
+	}
+	blkNum := header.Number
+
+	// get the canonical block header of the given block number
+	canonicalHeader, err := etherman.ethClient.HeaderByNumber(context.Background(), blkNum)
+	if err != nil {
+		return false, err
+	}
+
+	// compare the given hash with the canonical block header hash
+	return hash == canonicalHeader.Hash(), nil
+}
