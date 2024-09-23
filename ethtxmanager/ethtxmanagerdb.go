@@ -77,7 +77,7 @@ func (db *EthTxManagerDB) GetSignatureRequestByRequestTxHash(
 }
 
 func (db *EthTxManagerDB) insertMonitoredTx(mt *monitoredTx) error {
-	query := `INSERT OR IGNORE INTO monitoredTx (txHash, requestTxHash, sentAfter, minedAt, status) VALUES (?, ?, ?, ?, ?)`
+	query := `INSERT OR IGNORE INTO monitoredTx (txHash, requestTxHash, sentAfter) VALUES (?, ?, ?)`
 	stmt := db.stmtCache.MustPrepare(query)
 
 	sqlMt := mt.covert()
@@ -86,8 +86,6 @@ func (db *EthTxManagerDB) insertMonitoredTx(mt *monitoredTx) error {
 		sqlMt.TxHash,
 		sqlMt.RequestTxHash,
 		sqlMt.SentAfter,
-		strZeroBytes32,
-		MonitoredTxStatusPending,
 	); err != nil {
 		return err
 	}
@@ -95,25 +93,11 @@ func (db *EthTxManagerDB) insertMonitoredTx(mt *monitoredTx) error {
 	return nil
 }
 
-func (db *EthTxManagerDB) updateMonitoredTxAfterMined(mt *monitoredTx) error {
-	if mt.MinedAt == [32]byte{} {
-		return ErrMintedAtNotSet
-	}
-
-	if mt.Status != MonitoredTxStatusSuccess && mt.Status != MonitoredTxStatusReverted {
-		return ErrInvalidStatus
-	}
-
-	query := `UPDATE monitoredTx SET minedAt = ?, status = ? WHERE txHash = ?`
+func (db *EthTxManagerDB) removeMonitoredTxAfterMined(txHash ethcommon.Hash) error {
+	query := `DELET FROM monitoredTx WHERE txHash = ?`
 	stmt := db.stmtCache.MustPrepare(query)
 
-	sqlMt := mt.covert()
-
-	if _, err := stmt.Exec(
-		sqlMt.MinedAt,
-		sqlMt.Status,
-		sqlMt.TxHash,
-	); err != nil {
+	if _, err := stmt.Exec(txHash.String()[2:]); err != nil {
 		return err
 	}
 
@@ -133,8 +117,6 @@ func (db *EthTxManagerDB) GetMonitoredTxByRequestTxHash(
 		&sqlMt.TxHash,
 		&sqlMt.RequestTxHash,
 		&sqlMt.SentAfter,
-		&sqlMt.MinedAt,
-		&sqlMt.Status,
 	); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, false, nil
@@ -146,11 +128,11 @@ func (db *EthTxManagerDB) GetMonitoredTxByRequestTxHash(
 	return mt.restore(&sqlMt), true, nil
 }
 
-func (db *EthTxManagerDB) GetMonitoredTxByStatus(status MonitoredTxStatus) ([]*monitoredTx, error) {
-	query := `SELECT * FROM monitoredTx WHERE status = ?`
+func (db *EthTxManagerDB) GetAllMonitoredTx() ([]*monitoredTx, error) {
+	query := `SELECT * FROM monitoredTx`
 	stmt := db.stmtCache.MustPrepare(query)
 
-	rows, err := stmt.Query(string(status))
+	rows, err := stmt.Query()
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil // No rows found, return nil slice
@@ -166,8 +148,6 @@ func (db *EthTxManagerDB) GetMonitoredTxByStatus(status MonitoredTxStatus) ([]*m
 			&sqlMt.TxHash,
 			&sqlMt.RequestTxHash,
 			&sqlMt.SentAfter,
-			&sqlMt.MinedAt,
-			&sqlMt.Status,
 		); err != nil {
 			return nil, err
 		}
