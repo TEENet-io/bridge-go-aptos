@@ -7,6 +7,7 @@ import (
 
 	logger "github.com/0xPolygonHermez/zkevm-node/log"
 	"github.com/TEENet-io/bridge-go/common"
+	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/stretchr/testify/assert"
 )
@@ -14,15 +15,15 @@ import (
 func TestIsPrepared(t *testing.T) {
 	env, err := NewSimEtherman()
 	assert.NoError(t, err)
-	sim := env.Chain
 	etherman := env.Etherman
+	commit := env.Chain.Backend.Commit
 
 	params := env.GenPrepareParams(&ParamConfig{Requester: 1, Amount: big.NewInt(100), OutpointNum: 2})
 	assert.NotNil(t, params)
 
 	_, err = etherman.RedeemPrepare(params)
 	assert.NoError(t, err)
-	sim.Backend.Commit()
+	commit()
 
 	prepared, err := etherman.IsPrepared(params.RequestTxHash)
 	assert.NoError(t, err)
@@ -32,14 +33,14 @@ func TestIsPrepared(t *testing.T) {
 func TestIsMinted(t *testing.T) {
 	env, err := NewSimEtherman()
 	assert.NoError(t, err)
-	sim := env.Chain
 	etherman := env.Etherman
+	commit := env.Chain.Backend.Commit
 
 	params := env.GenMintParams(&ParamConfig{Receiver: 1, Amount: big.NewInt(100)})
 	assert.NotNil(t, params)
 	_, err = etherman.Mint(params)
 	assert.NoError(t, err)
-	sim.Backend.Commit()
+	commit()
 
 	minted, err := etherman.IsMinted(params.BtcTxId)
 	assert.NoError(t, err)
@@ -49,85 +50,70 @@ func TestIsMinted(t *testing.T) {
 func TestGetEventLogs(t *testing.T) {
 	env, err := NewSimEtherman()
 	assert.NoError(t, err)
-	sim := env.Chain
-	etherman := env.Etherman
 
-	mintParams := env.GenMintParams(&ParamConfig{Receiver: 1, Amount: big.NewInt(100)})
-	assert.NotNil(t, mintParams)
-	_, err = etherman.Mint(mintParams)
-	assert.NoError(t, err)
+	commit := env.Chain.Backend.Commit
 
-	prepareParams := env.GenPrepareParams(&ParamConfig{Requester: 4, Amount: big.NewInt(400), OutpointNum: 1})
-	assert.NotNil(t, prepareParams)
-	tx, err := etherman.RedeemPrepare(prepareParams)
-	assert.NoError(t, err)
-	sim.Backend.Commit()
+	_, mintParams := env.Mint(1, 100)
+	txHash, prepareParams := env.Prepare(4, 400, 0, 1)
+	commit()
 
 	num := curentBlockNum(t, env)
 
-	minted, requested, prepared, err := etherman.GetEventLogs(num)
+	minted, requested, prepared, err := env.Etherman.GetEventLogs(num)
 	assert.NoError(t, err)
 	assert.Len(t, minted, 1)
 	assert.Len(t, requested, 0)
 	assert.Len(t, prepared, 1)
 
-	assert.Equal(t, [32]byte(tx.Hash().Bytes()), prepared[0].TxHash)
+	assert.Equal(t, txHash, ethcommon.BytesToHash(prepared[0].TxHash[:]))
 	checkMintedEvent(t, &minted[0], mintParams)
 	checkPreparedEvent(t, &prepared[0], prepareParams)
 
-	err = etherman.TWBTCApprove(sim.Accounts[1], big.NewInt(80))
-	assert.NoError(t, err)
-	sim.Backend.Commit()
+	env.Approve(1, 80)
+	commit()
 
-	requestParams := env.GenRequestParams(&ParamConfig{Requester: 1, Amount: big.NewInt(80)})
-	assert.NotNil(t, requestParams)
-	tx, err = etherman.RedeemRequest(requestParams)
-	assert.NoError(t, err)
-	sim.Backend.Commit()
+	txHash, requestParams := env.Request(1, 80, 0)
+	commit()
 
 	num = curentBlockNum(t, env)
-	minted, requested, prepared, err = etherman.GetEventLogs(num)
+	minted, requested, prepared, err = env.Etherman.GetEventLogs(num)
 	assert.NoError(t, err)
 	assert.Len(t, minted, 0)
 	assert.Len(t, requested, 1)
 	assert.Len(t, prepared, 0)
 
-	assert.Equal(t, [32]byte(tx.Hash().Bytes()), requested[0].TxHash)
+	assert.Equal(t, txHash, ethcommon.BytesToHash(requested[0].TxHash[:]))
 	checkRequestedEvent(t, &requested[0], requestParams)
 }
 
 func TestRedeemPrepare(t *testing.T) {
 	env, err := NewSimEtherman()
 	assert.NoError(t, err)
-	sim := env.Chain
 	etherman := env.Etherman
+	commit := env.Chain.Backend.Commit
 
 	params := env.GenPrepareParams(&ParamConfig{Requester: 1, Amount: big.NewInt(100), OutpointNum: 3})
 	assert.NotNil(t, params)
 	_, err = etherman.RedeemPrepare(params)
 	assert.NoError(t, err)
-	sim.Backend.Commit()
+	commit()
 }
 
 func TestRedeemRequest(t *testing.T) {
 	env, err := NewSimEtherman()
 	assert.NoError(t, err)
-	sim := env.Chain
 	etherman := env.Etherman
+	commit := env.Chain.Backend.Commit
 
 	// Mint tokens
-	mintParams := env.GenMintParams(&ParamConfig{Receiver: 1, Amount: big.NewInt(100)})
-	assert.NotNil(t, mintParams)
-	_, err = etherman.Mint(mintParams)
-	assert.NoError(t, err)
-	sim.Backend.Commit()
+	env.Mint(1, 100)
+	commit()
 
 	// Approve tokens to bridge
-	err = etherman.TWBTCApprove(sim.Accounts[1], big.NewInt(80))
-	assert.NoError(t, err)
-	sim.Backend.Commit()
+	env.Approve(1, 80)
+	commit()
 
-	allowance, err := etherman.TWBTCAllowance(sim.Accounts[1].From)
+	allowance, err := etherman.TWBTCAllowance(env.Chain.Accounts[1].From)
 	assert.NoError(t, err)
 	assert.Equal(t, big.NewInt(80), allowance)
 
@@ -138,9 +124,9 @@ func TestRedeemRequest(t *testing.T) {
 	}
 	_, err = etherman.RedeemRequest(requestParams)
 	assert.NoError(t, err)
-	sim.Backend.Commit()
+	commit()
 
-	balance, err := etherman.TWBTCBalanceOf(sim.Accounts[1].From)
+	balance, err := etherman.TWBTCBalanceOf(env.Chain.Accounts[1].From)
 	assert.NoError(t, err)
 	assert.Equal(t, big.NewInt(20), balance)
 }
@@ -148,14 +134,14 @@ func TestRedeemRequest(t *testing.T) {
 func TestMint(t *testing.T) {
 	env, err := NewSimEtherman()
 	assert.NoError(t, err)
-	sim := env.Chain
 	etherman := env.Etherman
+	commit := env.Chain.Backend.Commit
 
 	params := env.GenMintParams(&ParamConfig{Receiver: 1, Amount: big.NewInt(100)})
 	assert.NotNil(t, params)
 	_, err = etherman.Mint(params)
 	assert.NoError(t, err)
-	sim.Backend.Commit()
+	commit()
 
 	balance, err := etherman.TWBTCBalanceOf(params.Receiver)
 	assert.NoError(t, err)
