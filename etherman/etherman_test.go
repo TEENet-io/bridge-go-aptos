@@ -12,6 +12,21 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestNonce(t *testing.T) {
+	env, err := NewSimEtherman()
+	assert.NoError(t, err)
+
+	env.Mint(1, 100)
+	env.Chain.Backend.Commit()
+	nonce, err := env.Etherman.ethClient.PendingNonceAt(context.Background(), env.Chain.Accounts[0].From)
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(2), nonce)
+	env.Mint(2, 100)
+	nonce, err = env.Etherman.ethClient.PendingNonceAt(context.Background(), env.Chain.Accounts[0].From)
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(3), nonce)
+}
+
 func TestIsPrepared(t *testing.T) {
 	env, err := NewSimEtherman()
 	assert.NoError(t, err)
@@ -69,10 +84,12 @@ func TestGetEventLogs(t *testing.T) {
 	checkMintedEvent(t, &minted[0], mintParams)
 	checkPreparedEvent(t, &prepared[0], prepareParams)
 
+	requester := 1
+
 	env.Approve(1, 80)
 	commit()
 
-	txHash, requestParams := env.Request(1, 80, 0)
+	txHash, requestParams := env.Request(env.GetAuth(requester), 1, 80, 0)
 	commit()
 
 	num = curentBlockNum(t, env)
@@ -118,11 +135,12 @@ func TestRedeemRequest(t *testing.T) {
 	assert.Equal(t, big.NewInt(80), allowance)
 
 	// Request redeem
-	requestParams := env.GenRequestParams(&ParamConfig{Requester: 1, Amount: big.NewInt(80)})
+	requester := 1
+	requestParams := env.GenRequestParams(&ParamConfig{Requester: requester, Amount: big.NewInt(80)})
 	if requestParams == nil {
 		t.Fatal("failed to generate request params")
 	}
-	_, err = etherman.RedeemRequest(requestParams)
+	_, err = etherman.RedeemRequest(env.GetAuth(requester), requestParams)
 	assert.NoError(t, err)
 	commit()
 
@@ -208,7 +226,6 @@ func checkPreparedEvent(t *testing.T, ev *RedeemPreparedEvent, params *PreparePa
 }
 
 func checkRequestedEvent(t *testing.T, ev *RedeemRequestedEvent, params *RequestParams) {
-	assert.Equal(t, ev.Sender, params.Auth.From)
 	assert.Equal(t, ev.Amount, params.Amount)
 	assert.Equal(t, ev.Receiver, params.Receiver)
 }

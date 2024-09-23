@@ -1,6 +1,7 @@
 package etherman
 
 import (
+	"context"
 	"math/big"
 
 	"github.com/TEENet-io/bridge-go/common"
@@ -188,13 +189,11 @@ func (env *SimEtherman) GenRequestParams(cfg *ParamConfig) *RequestParams {
 
 	if cfg.BtcAddrIdx < 0 {
 		return &RequestParams{
-			Auth:     env.Chain.Accounts[idx1],
 			Amount:   cfg.Amount,
 			Receiver: "invalid_btc_address",
 		}
 	} else {
 		return &RequestParams{
-			Auth:     env.Chain.Accounts[idx1],
 			Amount:   cfg.Amount,
 			Receiver: btcAddrs[idx2],
 		}
@@ -290,7 +289,7 @@ func (env *SimEtherman) Approve(requester int, amount int) ethcommon.Hash {
 	return txHash
 }
 
-func (env *SimEtherman) Request(requester int, amount int, btcAddrIdx int) (ethcommon.Hash, *RequestParams) {
+func (env *SimEtherman) Request(auth *bind.TransactOpts, requester int, amount int, btcAddrIdx int) (ethcommon.Hash, *RequestParams) {
 	allowed, err := env.Etherman.TWBTCAllowance(env.Chain.Accounts[requester].From)
 	if err != nil {
 		panic(err)
@@ -304,7 +303,7 @@ func (env *SimEtherman) Request(requester int, amount int, btcAddrIdx int) (ethc
 		Amount:     big.NewInt(int64(amount)),
 		BtcAddrIdx: btcAddrIdx,
 	})
-	tx, err := env.Etherman.RedeemRequest(params)
+	tx, err := env.Etherman.RedeemRequest(auth, params)
 	if err != nil {
 		panic(err)
 	}
@@ -327,4 +326,28 @@ func (env *SimEtherman) Prepare(
 	}
 
 	return tx.Hash(), params
+}
+
+func (env *SimEtherman) GetAuth(idx int) *bind.TransactOpts {
+	if idx < 0 || idx > 9 {
+		panic("invalid account index")
+	}
+
+	auth := env.Chain.Accounts[idx]
+	nonce, err := env.Chain.Backend.Client().PendingNonceAt(context.Background(), auth.From)
+	if err != nil {
+		panic(err)
+	}
+
+	auth.Nonce = big.NewInt(int64(nonce))
+
+	return auth
+}
+
+func (env *SimEtherman) UpdateBackendAccountNonce() {
+	nonce, err := env.Chain.Backend.Client().PendingNonceAt(context.Background(), env.Chain.Accounts[0].From)
+	if err != nil {
+		panic(err)
+	}
+	env.Etherman.SetNonce(nonce)
 }

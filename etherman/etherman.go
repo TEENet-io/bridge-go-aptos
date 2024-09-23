@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
+	"sync"
 
 	logger "github.com/0xPolygonHermez/zkevm-node/log"
 	"github.com/TEENet-io/bridge-go/common"
@@ -49,6 +50,7 @@ type Etherman struct {
 	cfg *Config
 
 	auth *bind.TransactOpts
+	mu   sync.Mutex
 }
 
 func NewEtherman(cfg *Config, auth *bind.TransactOpts) (*Etherman, error) {
@@ -173,6 +175,10 @@ func (etherman *Etherman) Mint(params *MintParams) (*types.Transaction, error) {
 		return nil, err
 	}
 
+	// Prevent auth from being modified by other goroutines
+	etherman.mu.Lock()
+	defer etherman.mu.Unlock()
+
 	tx, err := contract.Mint(
 		etherman.auth,
 		params.BtcTxId,
@@ -188,13 +194,13 @@ func (etherman *Etherman) Mint(params *MintParams) (*types.Transaction, error) {
 	return tx, nil
 }
 
-func (etherman *Etherman) RedeemRequest(params *RequestParams) (*types.Transaction, error) {
+func (etherman *Etherman) RedeemRequest(auth *bind.TransactOpts, params *RequestParams) (*types.Transaction, error) {
 	contract, err := etherman.getBridgeContract()
 	if err != nil {
 		return nil, err
 	}
 
-	tx, err := contract.RedeemRequest(params.Auth, params.Amount, string(params.Receiver))
+	tx, err := contract.RedeemRequest(auth, params.Amount, string(params.Receiver))
 	if err != nil {
 		return nil, err
 	}
@@ -212,6 +218,10 @@ func (etherman *Etherman) RedeemPrepare(params *PrepareParams) (*types.Transacti
 	for _, txid := range params.OutpointTxIds {
 		outpointTxIds = append(outpointTxIds, txid)
 	}
+
+	// Prevent auth from being modified by other goroutines
+	etherman.mu.Lock()
+	defer etherman.mu.Unlock()
 
 	tx, err := contract.RedeemPrepare(
 		etherman.auth,
@@ -345,4 +355,35 @@ func (etherman *Etherman) IsMinted(btcTxId [32]byte) (bool, error) {
 	}
 
 	return ok, nil
+}
+func (etherman *Etherman) SetNonce(nonce uint64) {
+	etherman.mu.Lock()
+	defer etherman.mu.Unlock()
+
+	etherman.auth.Nonce = big.NewInt(int64(nonce))
+}
+
+func (etherman *Etherman) SetGasLimit(limit uint64) {
+	etherman.mu.Lock()
+	defer etherman.mu.Unlock()
+
+	etherman.auth.GasLimit = limit
+}
+
+func (etherman *Etherman) SetGasPrice(price *big.Int) {
+	etherman.mu.Lock()
+	defer etherman.mu.Unlock()
+
+	etherman.auth.GasPrice = common.BigIntClone(price)
+}
+
+func (etherman *Etherman) UpdateBackendAccountNonce() error {
+	nonce, err := etherman.ethClient.PendingNonceAt(context.Background(), etherman.auth.From)
+	if err != nil {
+		return err
+	}
+
+	etherman.SetNonce(nonce)
+
+	return nil
 }
