@@ -259,18 +259,18 @@ func (etherman *Etherman) TWBTCBalanceOf(addr ethcommon.Address) (*big.Int, erro
 	return balance, nil
 }
 
-func (etherman *Etherman) TWBTCApprove(auth *bind.TransactOpts, amount *big.Int) error {
+func (etherman *Etherman) TWBTCApprove(auth *bind.TransactOpts, amount *big.Int) (ethcommon.Hash, error) {
 	contract, err := etherman.getTWBTCContract()
 	if err != nil {
-		return err
+		return ethcommon.Hash{}, err
 	}
 
-	_, err = contract.Approve(auth, etherman.cfg.BridgeContractAddress, amount)
+	tx, err := contract.Approve(auth, etherman.cfg.BridgeContractAddress, amount)
 	if err != nil {
-		return err
+		return ethcommon.Hash{}, err
 	}
 
-	return nil
+	return tx.Hash(), nil
 }
 
 func (etherman *Etherman) TWBTCAllowance(owner ethcommon.Address) (*big.Int, error) {
