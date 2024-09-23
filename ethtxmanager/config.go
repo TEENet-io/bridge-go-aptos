@@ -14,4 +14,6 @@ type Config struct {
 
 	// Frequency to monitor pending transactions
 	FrequencyToMonitorPendingTxs time.Duration
+
+	TimeoutOnMonitoringPendingTxs uint64 // in blocks
 }
