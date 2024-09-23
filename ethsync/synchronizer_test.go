@@ -80,17 +80,24 @@ func TestSync(t *testing.T) {
 	assert.Equal(t, 1, len(mockE2BState.preparedEv))
 	assert.Equal(t, 1, len(mockB2EState.mintedEv))
 
-	assert.Equal(t, mintedEvs[0], mockB2EState.mintedEv[0])
-	assert.Equal(t, reqeustedEvs[0], mockE2BState.requestedEv[0])
-	assert.Equal(t, reqeustedEvs[1], mockE2BState.requestedEv[1])
-	assert.Equal(t, preparedEvs[0], mockE2BState.preparedEv[0])
+	assert.Equal(t, mintedEvs[0].String(), mockB2EState.mintedEv[0].String())
+	assert.Equal(t, reqeustedEvs[0].String(), mockE2BState.requestedEv[0].String())
+	assert.Equal(t, reqeustedEvs[1].String(), mockE2BState.requestedEv[1].String())
+	assert.Equal(t, preparedEvs[0].String(), mockE2BState.preparedEv[0].String())
 }
 
+// sendTxs sends the following txs:
+// 1. Mint 100 TWBTC to account [1]
+// 2. Prepare redeem for account [4]
+// 3. Approve 100 TWBTC for account [1]
+// 4. Request 80 TWBTC for account [1] with a valid btc address
+// 5. Request 20 TWBTC for account [1] with an invalid btc address
 func sendTxs(t *testing.T, env *etherman.SimEtherman) (
 	mintedEvs []*MintedEvent,
 	requestedEvs []*RedeemRequestedEvent,
 	preparedEvs []*RedeemPreparedEvent,
 ) {
+	// 1
 	mintParams := env.GenMintParams(&etherman.ParamConfig{Receiver: 1, Amount: big.NewInt(100)})
 	tx, err := env.Etherman.Mint(mintParams)
 	if err != nil {
@@ -98,12 +105,13 @@ func sendTxs(t *testing.T, env *etherman.SimEtherman) (
 	}
 
 	mintedEvs = append(mintedEvs, &MintedEvent{
-		MintedTxHash: [32]byte(tx.Hash().Bytes()),
+		MintedTxHash: tx.Hash(),
 		BtcTxId:      mintParams.BtcTxId,
 		Amount:       new(big.Int).Set(mintParams.Amount),
 		Receiver:     mintParams.Receiver,
 	})
 
+	// 2
 	prepareParams := env.GenPrepareParams(
 		&etherman.ParamConfig{Requester: 4, Amount: big.NewInt(400), OutpointNum: 1})
 	tx, err = env.Etherman.RedeemPrepare(prepareParams)
@@ -112,7 +120,7 @@ func sendTxs(t *testing.T, env *etherman.SimEtherman) (
 	env.Chain.Backend.Commit()
 
 	preparedEvs = append(preparedEvs, &RedeemPreparedEvent{
-		PrepareTxHash: [32]byte(tx.Hash().Bytes()),
+		PrepareTxHash: tx.Hash(),
 		RequestTxHash: prepareParams.RequestTxHash,
 		Amount:        new(big.Int).Set(prepareParams.Amount),
 		Requester:     prepareParams.Requester,
@@ -121,44 +129,38 @@ func sendTxs(t *testing.T, env *etherman.SimEtherman) (
 		OutpointIdxs:  prepareParams.OutpointIdxs,
 	})
 
-	_, err = env.Etherman.TWBTCApprove(env.Chain.Accounts[1], big.NewInt(100))
-	if err != nil {
-		t.Fatal(err)
-	}
+	// 3
+	_, err = env.Etherman.TWBTCApprove(env.GetAuth(1), big.NewInt(100))
+	assert.NoError(t, err)
 	time.Sleep(200 * time.Millisecond)
 	env.Chain.Backend.Commit()
 
+	// 4
 	requestParams := env.GenRequestParams(&etherman.ParamConfig{Requester: 1, Amount: big.NewInt(80)})
-	if requestParams == nil {
-		t.Fatal("failed to generate request params")
-	}
-	tx, err = env.Etherman.RedeemRequest(requestParams)
+	tx, err = env.Etherman.RedeemRequest(env.GetAuth(1), requestParams)
 	assert.NoError(t, err)
 	time.Sleep(200 * time.Millisecond)
 	env.Chain.Backend.Commit()
 
 	requestedEvs = append(requestedEvs, &RedeemRequestedEvent{
-		RequestTxHash:   [32]byte(tx.Hash().Bytes()),
-		Requester:       requestParams.Auth.From,
+		RequestTxHash:   tx.Hash(),
+		Requester:       env.Chain.Accounts[1].From,
 		Amount:          new(big.Int).Set(requestParams.Amount),
 		Receiver:        string(requestParams.Receiver),
 		IsValidReceiver: true,
 	})
 
+	// 5
 	requestParams = env.GenRequestParams(&etherman.ParamConfig{Requester: 1, Amount: big.NewInt(20)})
-	if requestParams == nil {
-		t.Fatal("failed to generate request params")
-	}
-	// set invalid btc address
-	requestParams.Receiver = "abcd"
-	tx, err = env.Etherman.RedeemRequest(requestParams)
+	requestParams.Receiver = "invalid_btc_address"
+	tx, err = env.Etherman.RedeemRequest(env.GetAuth(1), requestParams)
 	assert.NoError(t, err)
 	time.Sleep(200 * time.Millisecond)
 	env.Chain.Backend.Commit()
 
 	requestedEvs = append(requestedEvs, &RedeemRequestedEvent{
-		RequestTxHash:   [32]byte(tx.Hash().Bytes()),
-		Requester:       requestParams.Auth.From,
+		RequestTxHash:   tx.Hash(),
+		Requester:       env.Chain.Accounts[1].From,
 		Amount:          new(big.Int).Set(requestParams.Amount),
 		Receiver:        requestParams.Receiver,
 		IsValidReceiver: false,

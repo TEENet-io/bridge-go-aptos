@@ -5,7 +5,6 @@ import (
 
 	"github.com/TEENet-io/bridge-go/common"
 	bridge "github.com/TEENet-io/bridge-go/contracts/TEENetBtcBridge"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 )
@@ -19,7 +18,6 @@ type MintParams struct {
 }
 
 type RequestParams struct {
-	Auth     *bind.TransactOpts
 	Amount   *big.Int
 	Receiver string
 }
