@@ -94,31 +94,66 @@ func (txmgr *EthTxManager) Start(ctx context.Context) error {
 				continue
 			}
 
-			go func() {
-				for _, mtx := range mtxs {
-					logger1 := logger.WithFields("requestTxHash", mtx.RequestTxHash.String())
+			for _, mtx := range mtxs {
+				go func() {
+					logger1 := logger.WithFields(
+						"txHash", mtx.TxHash.String(),
+						"requestTxHash", mtx.RequestTxHash.String(),
+					)
+
+					removeMonitoredTx := func() {
+						err = txmgr.mgrdb.removeMonitoredTxAfterMined(mtx.TxHash)
+						if err != nil {
+							logger1.Error("failed to remove monitored tx after mined: err=%v", err)
+							return
+						}
+						logger1.Debug("removed monitored tx after mined")
+					}
+
 					receipt, err := txmgr.etherman.Client().TransactionReceipt(ctx, mtx.TxHash)
 					if err != nil && err.Error() != ErrMsgNotFound {
 						logger1.Errorf("failed to get transaction receipt: err=%v", err)
-						continue
+						return
 					}
 
-					if receipt == nil {
-						continue
+					// if the tx is mined, remove it from db
+					if receipt != nil && receipt.BlockNumber != nil {
+						removeMonitoredTx()
+						return
 					}
 
-					if receipt.BlockNumber == nil {
-						continue
-					}
-
-					// Once the tx is mined, remove it from the monitored pending tx table.
-					err = txmgr.mgrdb.removeMonitoredTxAfterMined(receipt.TxHash)
+					// check if the tx is on canonical chain
+					ok, err := txmgr.etherman.OnCanonicalChain(mtx.SentAfter)
 					if err != nil {
-						logger1.Error("failed to remove monitored tx after mined: err=%v", err)
+						logger1.Errorf("failed to check if on canonical chain: err=%v", err)
+						return
 					}
-					logger1.Debug("removed monitored tx after mined")
-				}
-			}()
+					// if the tx is not on canonical chain, remove it from db
+					if !ok {
+						logger1.Debug("tx is not on canonical chain")
+						removeMonitoredTx()
+						return
+					}
+
+					// check timeout for monitoring the tx
+					sentAfter, err := txmgr.etherman.Client().HeaderByHash(ctx, mtx.SentAfter)
+					if err != nil {
+						logger1.Errorf("failed to get sentAfter block: err=%v", err)
+					}
+					latest, err := txmgr.etherman.Client().HeaderByNumber(ctx, nil)
+					if err != nil {
+						logger1.Errorf("failed to get latest block: err=%v", err)
+						return
+					}
+
+					diff := latest.Number.Uint64() - sentAfter.Number.Uint64()
+					if diff > txmgr.cfg.TimeoutOnMonitoringPendingTxs {
+						logger1.Errorf("tx has not been mined for %d blocks", txmgr.cfg.TimeoutOnMonitoringPendingTxs)
+						removeMonitoredTx()
+						return
+					}
+				}()
+			}
 		case <-tickerToGetUppreparedRedeem.C:
 			redeems, err := txmgr.statedb.GetByStatus(eth2btcstate.RedeemStatusRequested)
 			if err != nil {
