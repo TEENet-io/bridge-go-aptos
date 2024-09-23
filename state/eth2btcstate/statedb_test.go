@@ -83,7 +83,7 @@ func TestUpdateAfterPrepared(t *testing.T) {
 	r0.BtcTxId = [32]byte{}
 	err = db.updateAfterPrepared(r0)
 	assert.NoError(t, err)
-	actual, ok, err := db.Get(r0.RequestTxHash[:], RedeemStatusPrepared)
+	actual, ok, err := db.Get(r0.RequestTxHash, RedeemStatusPrepared)
 	assert.NoError(t, err)
 	assert.True(t, ok)
 	assert.Equal(t, r0, actual)
@@ -98,7 +98,7 @@ func TestUpdateAfterPrepared(t *testing.T) {
 	r1.Outpoints = []Outpoint{{TxId: common.RandBytes32(), Idx: 0}}
 	err = db.updateAfterPrepared(r1)
 	assert.NoError(t, err)
-	actual, ok, err = db.Get(r1.RequestTxHash[:], RedeemStatusPrepared)
+	actual, ok, err = db.Get(r1.RequestTxHash, RedeemStatusPrepared)
 	assert.NoError(t, err)
 	assert.True(t, ok)
 	assert.Equal(t, r1, actual)

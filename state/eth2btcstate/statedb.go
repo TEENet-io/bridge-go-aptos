@@ -57,7 +57,7 @@ func (st *StateDB) updateAfterPrepared(redeem *Redeem) error {
 	// Update after receiving a new redeem prepared event. Only fields
 	// prepareTxHash, outpoints, and status are required.
 	var query string
-	_, ok, err := st.Get(redeem.RequestTxHash[:], RedeemStatusRequested)
+	_, ok, err := st.Get(redeem.RequestTxHash, RedeemStatusRequested)
 	if err != nil {
 		return err
 	}
@@ -165,7 +165,7 @@ func (st *StateDB) GetByStatus(status RedeemStatus) ([]*Redeem, error) {
 	return redeems, nil
 }
 
-func (st *StateDB) Get(requestTxHash []byte, status RedeemStatus) (*Redeem, bool, error) {
+func (st *StateDB) Get(requestTxHash ethcommon.Hash, status RedeemStatus) (*Redeem, bool, error) {
 	var query string
 	if status == RedeemStatusRequested || status == RedeemStatusInvalid {
 		query = `SELECT` + statusRequestedParamList + `FROM redeem WHERE requestTxHash = ? AND status = ?`
@@ -176,8 +176,7 @@ func (st *StateDB) Get(requestTxHash []byte, status RedeemStatus) (*Redeem, bool
 	}
 	stmt := st.stmtCache.MustPrepare(query)
 
-	hash := ethcommon.Bytes2Hex(requestTxHash)
-	row := stmt.QueryRow(hash, string(status))
+	row := stmt.QueryRow(requestTxHash.String()[2:], string(status))
 	var r sqlRedeem
 	var err error
 	if status == RedeemStatusRequested || status == RedeemStatusInvalid {

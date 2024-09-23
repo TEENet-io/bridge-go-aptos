@@ -138,7 +138,7 @@ func TestNewRedeemPreparedEvent(t *testing.T) {
 	// Insert without a corresponding request redeem stored
 	ch2 <- ev1                         // send the prepared event
 	time.Sleep(100 * time.Millisecond) // wait for the state to process the event
-	actual, ok, err := st.db.Get(ev1.RequestTxHash[:], RedeemStatusPrepared)
+	actual, ok, err := st.db.Get(ev1.RequestTxHash, RedeemStatusPrepared)
 	assert.NoError(t, err)
 	assert.True(t, ok)
 	assert.Equal(t, expected, actual)
@@ -158,7 +158,7 @@ func TestNewRedeemPreparedEvent(t *testing.T) {
 	time.Sleep(100 * time.Millisecond) // wait for the state to process the event
 	expected, err = createRedeemFromPreparedEvent(ev2)
 	assert.NoError(t, err)
-	actual, ok, err = st.db.Get(ev2.RequestTxHash[:], RedeemStatusPrepared)
+	actual, ok, err = st.db.Get(ev2.RequestTxHash, RedeemStatusPrepared)
 	assert.NoError(t, err)
 	assert.True(t, ok)
 	assert.Equal(t, expected, actual)

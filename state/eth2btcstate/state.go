@@ -164,7 +164,7 @@ func (st *State) Start(ctx context.Context) error {
 					return ErrRedeemInvalid
 				}
 
-				redeem, ok, err = st.db.Get(ev.RequestTxHash[:], RedeemStatusRequested)
+				redeem, ok, err = st.db.Get(ev.RequestTxHash, RedeemStatusRequested)
 				if err != nil || !ok {
 					newLogger.Errorf("failed to get stored redeem: err=%v", err)
 					return ErrGetRedeem
