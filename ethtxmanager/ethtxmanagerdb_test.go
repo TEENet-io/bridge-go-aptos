@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/TEENet-io/bridge-go/common"
-	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -60,8 +59,6 @@ func TestMonitoredTxOps(t *testing.T) {
 		TxHash:        common.RandBytes32(),
 		RequestTxHash: common.RandBytes32(),
 		SentAfter:     common.RandBytes32(),
-		MinedAt:       common.RandBytes32(),
-		Status:        MonitoredTxStatusSuccess,
 	}
 
 	err = etm.insertMonitoredTx(mt)
@@ -69,20 +66,11 @@ func TestMonitoredTxOps(t *testing.T) {
 	mt1, ok, err := etm.GetMonitoredTxByRequestTxHash(mt.RequestTxHash)
 	assert.NoError(t, err)
 	assert.True(t, ok)
-	assert.Equal(t, mt1.MinedAt, ethcommon.BytesToHash([]byte{}))
-	assert.Equal(t, mt1.Status, MonitoredTxStatusPending)
-	mt1.MinedAt = mt.MinedAt
-	mt1.Status = mt.Status
 	assert.Equal(t, mt, mt1)
 
-	err = etm.updateMonitoredTxAfterMined(mt)
+	err = etm.removeMonitoredTxAfterMined(mt.TxHash)
 	assert.NoError(t, err)
-	mt2, ok, err := etm.GetMonitoredTxByRequestTxHash(mt.RequestTxHash)
+	_, ok, err = etm.GetMonitoredTxByRequestTxHash(mt.RequestTxHash)
 	assert.NoError(t, err)
-	assert.True(t, ok)
-	assert.Equal(t, mt, mt2)
-
-	mt.MinedAt = [32]byte{}
-	err = etm.updateMonitoredTxAfterMined(mt)
-	assert.Equal(t, ErrMintedAtNotSet, err)
+	assert.False(t, ok)
 }
