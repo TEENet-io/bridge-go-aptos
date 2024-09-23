@@ -7,6 +7,7 @@ import (
 
 	"github.com/TEENet-io/bridge-go/common"
 	"github.com/TEENet-io/bridge-go/ethsync"
+	"github.com/TEENet-io/bridge-go/state"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 )
@@ -154,7 +155,7 @@ func randRedeem(status RedeemStatus) *Redeem {
 		BtcTxId:       common.RandBytes32(),
 		Requester:     common.RandEthAddress(),
 		Amount:        big.NewInt(100),
-		Outpoints: []Outpoint{
+		Outpoints: []state.Outpoint{
 			{
 				TxId: common.RandBytes32(),
 				Idx:  0,

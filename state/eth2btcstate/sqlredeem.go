@@ -1,12 +1,10 @@
 package eth2btcstate
 
 import (
-	"bytes"
-	"encoding/gob"
-	"errors"
 	"math/big"
 
 	"github.com/TEENet-io/bridge-go/common"
+	"github.com/TEENet-io/bridge-go/state"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
@@ -21,12 +19,12 @@ type sqlRedeem struct {
 	Status        string
 }
 
-// encodeRedeem converts fields of an eth2btcstate.Redeem object to
+// encode converts fields of an eth2btcstate.Redeem object to
 // relevant types that can be stored in sql db. It only checks field
 // Outpoints for non-emptyness since it is difficult to do the check
 // in db level.
 func encode(r *Redeem) (*sqlRedeem, error) {
-	outpoints, err := encodeOutpoints(r.Outpoints)
+	outpoints, err := state.EncodeOutpoints(r.Outpoints)
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +48,7 @@ func (r *sqlRedeem) decode() (*Redeem, error) {
 	requester := ethcommon.HexToAddress("0x" + r.Requester)
 	amount := new(big.Int).SetUint64(r.Amount)
 
-	outpoints, err := decodeOutpoints(r.Outpoints)
+	outpoints, err := state.DecodeOutpoints(r.Outpoints)
 	if err != nil {
 		return nil, err
 	}
@@ -65,36 +63,4 @@ func (r *sqlRedeem) decode() (*Redeem, error) {
 		Outpoints:     outpoints,
 		Status:        RedeemStatus(r.Status),
 	}, nil
-}
-
-func encodeOutpoints(outpoints []Outpoint) ([]byte, error) {
-	if outpoints == nil {
-		return nil, nil
-	}
-
-	var buf bytes.Buffer
-	encoder := gob.NewEncoder(&buf)
-	if err := encoder.Encode(outpoints); err != nil {
-		return nil, err
-	}
-
-	return buf.Bytes(), nil
-}
-
-func decodeOutpoints(data []byte) ([]Outpoint, error) {
-	if data == nil {
-		return nil, nil
-	}
-
-	if len(data) == 0 {
-		return nil, errors.New("expect non-empty bytes")
-	}
-
-	decoder := gob.NewDecoder(bytes.NewReader(data))
-	var outpoints []Outpoint
-	if err := decoder.Decode(&outpoints); err != nil {
-		return nil, err
-	}
-
-	return outpoints, nil
 }

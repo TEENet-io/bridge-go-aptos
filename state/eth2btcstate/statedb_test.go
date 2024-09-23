@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/TEENet-io/bridge-go/common"
+	"github.com/TEENet-io/bridge-go/state"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
@@ -95,7 +96,7 @@ func TestUpdateAfterPrepared(t *testing.T) {
 	err = db.insertAfterRequested(r1)
 	assert.NoError(t, err)
 	r1.Status = RedeemStatusPrepared
-	r1.Outpoints = []Outpoint{{TxId: common.RandBytes32(), Idx: 0}}
+	r1.Outpoints = []state.Outpoint{{TxId: common.RandBytes32(), Idx: 0}}
 	err = db.updateAfterPrepared(r1)
 	assert.NoError(t, err)
 	actual, ok, err = db.Get(r1.RequestTxHash, RedeemStatusPrepared)
