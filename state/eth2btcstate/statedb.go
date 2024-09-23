@@ -33,7 +33,7 @@ func (st *StateDB) insertAfterRequested(redeem *Redeem) error {
 	// requestTxHash, requester, receiver, amount, and status are required.
 	query := `INSERT OR IGNORE INTO redeem (` + statusRequestedParamList + `) VALUES (?, ?, ?, ?, ?)`
 
-	stmt := st.stmtCache.MustPrepare(query)
+	stmt, err := st.stmtCache.Prepare(query)
 
 	r, err := encode(redeem)
 	if err != nil {
@@ -67,7 +67,7 @@ func (st *StateDB) updateAfterPrepared(redeem *Redeem) error {
 		query = `INSERT OR IGNORE INTO redeem (` + statusPreparedParamList + `) VALUES (?, ?, ?, ?, ?, ?, ?)`
 	}
 
-	stmt := st.stmtCache.MustPrepare(query)
+	stmt, err := st.stmtCache.Prepare(query)
 
 	r, err := encode(redeem)
 	if err != nil {
@@ -104,7 +104,10 @@ func (st *StateDB) GetByStatus(status RedeemStatus) ([]*Redeem, error) {
 	} else {
 		query = `SELECT * FROM redeem WHERE status = ?`
 	}
-	stmt := st.stmtCache.MustPrepare(query)
+	stmt, err := st.stmtCache.Prepare(query)
+	if err != nil {
+		return []*Redeem{}, err
+	}
 
 	rows, err := stmt.Query(status)
 	if err != nil {
@@ -174,11 +177,13 @@ func (st *StateDB) Get(requestTxHash ethcommon.Hash, status RedeemStatus) (*Rede
 	} else {
 		query = `SELECT * FROM redeem WHERE requestTxHash = ? AND status = ?`
 	}
-	stmt := st.stmtCache.MustPrepare(query)
+	stmt, err := st.stmtCache.Prepare(query)
+	if err != nil {
+		return nil, false, err
+	}
 
 	row := stmt.QueryRow(requestTxHash.String()[2:], string(status))
 	var r sqlRedeem
-	var err error
 	if status == RedeemStatusRequested || status == RedeemStatusInvalid {
 		err = row.Scan(
 			&r.RequestTxHash,
@@ -227,7 +232,10 @@ func (st *StateDB) Get(requestTxHash ethcommon.Hash, status RedeemStatus) (*Rede
 
 func (st *StateDB) Has(requestTxHash ethcommon.Hash) (bool, RedeemStatus, error) {
 	query := `SELECT status FROM redeem WHERE requestTxHash = ?`
-	stmt := st.stmtCache.MustPrepare(query)
+	stmt, err := st.stmtCache.Prepare(query)
+	if err != nil {
+		return false, "", err
+	}
 
 	hash := requestTxHash.String()[2:]
 	var status string
@@ -243,7 +251,10 @@ func (st *StateDB) Has(requestTxHash ethcommon.Hash) (bool, RedeemStatus, error)
 
 func (st *StateDB) GetKeyedValue(key ethcommon.Hash) (ethcommon.Hash, error) {
 	query := `SELECT value FROM kv WHERE key = ?`
-	stmt := st.stmtCache.MustPrepare(query)
+	stmt, err := st.stmtCache.Prepare(query)
+	if err != nil {
+		return ethcommon.Hash{}, err
+	}
 
 	var value string
 	keyHex := key.String()[2:]
@@ -256,7 +267,10 @@ func (st *StateDB) GetKeyedValue(key ethcommon.Hash) (ethcommon.Hash, error) {
 
 func (st *StateDB) setKeyedValue(key, value ethcommon.Hash) error {
 	query := `INSERT OR REPLACE INTO kv (key, value) VALUES (?, ?)`
-	stmt := st.stmtCache.MustPrepare(query)
+	stmt, err := st.stmtCache.Prepare(query)
+	if err != nil {
+		return err
+	}
 
 	keyHex := key.String()[2:]
 	valueHex := value.String()[2:]

@@ -35,7 +35,10 @@ func (db *EthTxManagerDB) Close() {
 
 func (db *EthTxManagerDB) insertSignatureRequest(sr *SignatureRequest) error {
 	query := `INSERT OR IGNORE INTO signatureRequest (requestTxHash, signingHash, rx, s) VALUES (?, ?, ?, ?)`
-	stmt := db.stmtCache.MustPrepare(query)
+	stmt, err := db.stmtCache.Prepare(query)
+	if err != nil {
+		return err
+	}
 
 	sqlSr := sr.convert()
 
@@ -55,7 +58,10 @@ func (db *EthTxManagerDB) GetSignatureRequestByRequestTxHash(
 	requestTxHash ethcommon.Hash,
 ) (*SignatureRequest, bool, error) {
 	query := `SELECT * FROM signatureRequest WHERE requestTxHash = ?`
-	stmt := db.stmtCache.MustPrepare(query)
+	stmt, err := db.stmtCache.Prepare(query)
+	if err != nil {
+		return nil, false, err
+	}
 
 	txHashStr := requestTxHash.String()[2:]
 
@@ -78,7 +84,10 @@ func (db *EthTxManagerDB) GetSignatureRequestByRequestTxHash(
 
 func (db *EthTxManagerDB) insertMonitoredTx(mt *monitoredTx) error {
 	query := `INSERT OR IGNORE INTO monitoredTx (txHash, requestTxHash, sentAfter) VALUES (?, ?, ?)`
-	stmt := db.stmtCache.MustPrepare(query)
+	stmt, err := db.stmtCache.Prepare(query)
+	if err != nil {
+		return err
+	}
 
 	sqlMt := mt.covert()
 
@@ -94,8 +103,11 @@ func (db *EthTxManagerDB) insertMonitoredTx(mt *monitoredTx) error {
 }
 
 func (db *EthTxManagerDB) removeMonitoredTxAfterMined(txHash ethcommon.Hash) error {
-	query := `DELET FROM monitoredTx WHERE txHash = ?`
-	stmt := db.stmtCache.MustPrepare(query)
+	query := `DELETE FROM monitoredTx WHERE txHash = ?`
+	stmt, err := db.stmtCache.Prepare(query)
+	if err != nil {
+		return err
+	}
 
 	if _, err := stmt.Exec(txHash.String()[2:]); err != nil {
 		return err
@@ -108,7 +120,10 @@ func (db *EthTxManagerDB) GetMonitoredTxByRequestTxHash(
 	RequestTxHash ethcommon.Hash,
 ) (*monitoredTx, bool, error) {
 	query := `SELECT * FROM monitoredTx WHERE requestTxHash = ?`
-	stmt := db.stmtCache.MustPrepare(query)
+	stmt, err := db.stmtCache.Prepare(query)
+	if err != nil {
+		return nil, false, err
+	}
 
 	hashStr := RequestTxHash.String()[2:]
 
@@ -130,7 +145,10 @@ func (db *EthTxManagerDB) GetMonitoredTxByRequestTxHash(
 
 func (db *EthTxManagerDB) GetAllMonitoredTx() ([]*monitoredTx, error) {
 	query := `SELECT * FROM monitoredTx`
-	stmt := db.stmtCache.MustPrepare(query)
+	stmt, err := db.stmtCache.Prepare(query)
+	if err != nil {
+		return []*monitoredTx{}, err
+	}
 
 	rows, err := stmt.Query()
 	if err != nil {
