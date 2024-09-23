@@ -175,9 +175,14 @@ func (etherman *Etherman) Mint(params *MintParams) (*types.Transaction, error) {
 		return nil, err
 	}
 
-	// Prevent auth from being modified by other goroutines
+	// update nonce before sending tx
 	etherman.mu.Lock()
 	defer etherman.mu.Unlock()
+	nonce, err := etherman.getAuthNonce()
+	if err != nil {
+		return nil, err
+	}
+	etherman.auth.Nonce = new(big.Int).SetUint64(nonce)
 
 	tx, err := contract.Mint(
 		etherman.auth,
@@ -219,9 +224,14 @@ func (etherman *Etherman) RedeemPrepare(params *PrepareParams) (*types.Transacti
 		outpointTxIds = append(outpointTxIds, txid)
 	}
 
-	// Prevent auth from being modified by other goroutines
+	// udpate nonce before sending tx
 	etherman.mu.Lock()
 	defer etherman.mu.Unlock()
+	nonce, err := etherman.getAuthNonce()
+	if err != nil {
+		return nil, err
+	}
+	etherman.auth.Nonce = new(big.Int).SetUint64(nonce)
 
 	tx, err := contract.RedeemPrepare(
 		etherman.auth,
@@ -356,34 +366,11 @@ func (etherman *Etherman) IsMinted(btcTxId [32]byte) (bool, error) {
 
 	return ok, nil
 }
-func (etherman *Etherman) SetNonce(nonce uint64) {
-	etherman.mu.Lock()
-	defer etherman.mu.Unlock()
 
-	etherman.auth.Nonce = big.NewInt(int64(nonce))
-}
-
-func (etherman *Etherman) SetGasLimit(limit uint64) {
-	etherman.mu.Lock()
-	defer etherman.mu.Unlock()
-
-	etherman.auth.GasLimit = limit
-}
-
-func (etherman *Etherman) SetGasPrice(price *big.Int) {
-	etherman.mu.Lock()
-	defer etherman.mu.Unlock()
-
-	etherman.auth.GasPrice = common.BigIntClone(price)
-}
-
-func (etherman *Etherman) UpdateBackendAccountNonce() error {
+func (etherman *Etherman) getAuthNonce() (uint64, error) {
 	nonce, err := etherman.ethClient.PendingNonceAt(context.Background(), etherman.auth.From)
 	if err != nil {
-		return err
+		return 0, err
 	}
-
-	etherman.SetNonce(nonce)
-
-	return nil
+	return nonce, nil
 }
