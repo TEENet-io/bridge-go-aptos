@@ -11,7 +11,7 @@ var (
 		requestTxHash CHAR(64) PRIMARY KEY NOT NULL,
 		prepareTxHash CHAR(64) UNIQUE,
 		btcTxId CHAR(64) UNIQUE,
-		requester VARCHAR(40) NOT NULL,
+		requester CHAR(40) NOT NULL,
 		receiver VARCHAR(62) NOT NULL,
 		amount BIGINT UNSIGNED NOT NULL,
 		outpoints BLOB,
