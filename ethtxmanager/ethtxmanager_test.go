@@ -11,16 +11,18 @@ import (
 	"github.com/TEENet-io/bridge-go/etherman"
 	"github.com/TEENet-io/bridge-go/ethsync"
 	"github.com/TEENet-io/bridge-go/state/eth2btcstate"
+	ethcommon "github.com/ethereum/go-ethereum/common"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
 )
 
 const (
 	frequencyToGetUnpreparedRedeem = 500 * time.Millisecond
+	frequencyToCheckFinalizedBlock = 500 * time.Millisecond
+	frequencyToMonitorPendingTxs   = 500 * time.Millisecond
 	timeoutOnWaitingForSignature   = 1 * time.Second
 	timtoutOnWaitingForOutpoints   = 1 * time.Second
-	frequencyToCheckFinalizedBlock = 100 * time.Millisecond
-	blockInterval                  = 100 * time.Millisecond
+	blockInterval                  = 10 * time.Second
 )
 
 type testEnv struct {
@@ -52,9 +54,21 @@ func newTestEnv(t *testing.T) *testEnv {
 	statedb, err := eth2btcstate.NewStateDB(sqldb)
 	assert.NoError(t, err)
 
+	// test statedb
+	_, _, err = statedb.Get(ethcommon.Hash{}, eth2btcstate.RedeemStatusCompleted)
+	assert.NoError(t, err)
+
 	e2bst, err := eth2btcstate.New(statedb, &eth2btcstate.Config{ChannelSize: 1})
 	assert.NoError(t, err)
 	b2est := ethsync.NewMockBtc2EthState()
+
+	mgrdb, err := NewEthTxManagerDB(sqldb)
+	assert.NoError(t, err)
+	// test mgrdb
+	_, _, err = mgrdb.GetSignatureRequestByRequestTxHash(ethcommon.Hash{})
+	assert.NoError(t, err)
+	_, _, err = mgrdb.GetMonitoredTxByRequestTxHash(ethcommon.Hash{})
+	assert.NoError(t, err)
 
 	sync, err := ethsync.New(
 		sim.Etherman,
@@ -68,11 +82,9 @@ func newTestEnv(t *testing.T) *testEnv {
 	)
 	assert.NoError(t, err)
 
-	mgrdb, err := NewEthTxManagerDB(sqldb)
-	assert.NoError(t, err)
-
 	cfg := &Config{
 		FrequencyToGetUnpreparedRedeem: frequencyToGetUnpreparedRedeem,
+		FrequencyToMonitorPendingTxs:   frequencyToMonitorPendingTxs,
 		TimeoutOnWaitingForSignature:   timeoutOnWaitingForSignature,
 		TimeoutOnWaitingForOutpoints:   timtoutOnWaitingForOutpoints,
 	}
@@ -95,7 +107,23 @@ func (env *testEnv) close() {
 	env.statedb.Close()
 }
 
-func TestPrepareRedeem(t *testing.T) {
+// Main routine test procedures:
+//  1. Start main routines of eth2btc state, eth tx manager, eth synchronizer, and mock wallet
+//  2. Mint twbtc tokens for account [1] and [2]
+//  3. Approve twbtc tokens for the two users
+//  4. Request redeem
+//     [tx1]: from [1] with valid btc address
+//     [tx2]: from [1] with invalid btc address
+//     [tx3]: from [2] with valid btc address
+//  5. Check for signature request
+//     have row for [tx1, tx3]
+//     no row for [tx2]
+//  6. Check for monitored tx -- Here we do not commit a new block for the sent txs
+//     have row for [tx1, tx3]
+//  7. commit a new block
+//  8. Monitor pending txs
+//     no rows after observing the txs are mined
+func TestMainRoutine(t *testing.T) {
 	common.Debug = true
 	defer func() {
 		common.Debug = false
@@ -103,14 +131,11 @@ func TestPrepareRedeem(t *testing.T) {
 
 	env := newTestEnv(t)
 	defer env.close()
+	commit := env.sim.Chain.Backend.Commit
 
 	wg := &sync.WaitGroup{}
 
-	// Start
-	// 		eth2btc state for storing redeem info;
-	// 		eth tx manager for preparing redeem;
-	// 		eth synchronizer for monitoring bridge events; and
-	// 		mock wallet for generating schnorr signature
+	// 1. start main routines
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -129,60 +154,78 @@ func TestPrepareRedeem(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		growChain(env)
-	}()
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
 		env.sync.Sync(env.ctx)
 	}()
 
-	// mint twbtc tokens
+	// 2. mint twbtc tokens
 	env.sim.Mint(1, 100)
 	env.sim.Mint(2, 200)
+	commit()
 
-	// request redeem
-	tx1, _ := env.sim.Request(1, 60, 0)  // valid btc address
-	tx2, _ := env.sim.Request(1, 30, -1) // invalid btc address
-	tx3, _ := env.sim.Request(2, 100, 1) // valid btc address
+	// 3. approve twbtc tokens
+	env.sim.Approve(1, 90)
+	env.sim.Approve(2, 100)
+	commit()
 
-	time.Sleep(2 * time.Second)
+	// 4. request redeem
+	tx1, _ := env.sim.Request(env.sim.GetAuth(1), 1, 60, 0)  // valid btc address
+	tx2, _ := env.sim.Request(env.sim.GetAuth(1), 1, 30, -1) // invalid btc address
+	tx3, _ := env.sim.Request(env.sim.GetAuth(2), 2, 100, 1) // valid btc address
+	commit()
 
-	// Check for signature request
+	// give time to process
+	time.Sleep(10 * time.Second)
+
+	// 5. check for signature request
+	// tx1
 	sr1, ok, err := env.mgrdb.GetSignatureRequestByRequestTxHash(tx1)
 	assert.NoError(t, err)
 	assert.True(t, ok)
 	assert.True(t, common.Verify(env.sim.Sk.PubKey().X().Bytes(), sr1.SigningHash[:], sr1.Rx, sr1.S))
-
+	// tx2
 	_, ok, err = env.mgrdb.GetSignatureRequestByRequestTxHash(tx2)
 	assert.NoError(t, err)
 	assert.False(t, ok)
-
+	// tx3
 	_, ok, err = env.mgrdb.GetSignatureRequestByRequestTxHash(tx3)
 	assert.NoError(t, err)
 	assert.True(t, ok)
 
+	// 6. check for monitored tx
+	// tx1
 	_, ok, err = env.mgrdb.GetMonitoredTxByRequestTxHash(tx1)
 	assert.NoError(t, err)
 	assert.True(t, ok)
-
+	// tx2
+	_, ok, err = env.mgrdb.GetMonitoredTxByRequestTxHash(tx2)
+	assert.NoError(t, err)
+	assert.False(t, ok)
+	// tx3
 	_, ok, err = env.mgrdb.GetMonitoredTxByRequestTxHash(tx3)
 	assert.NoError(t, err)
 	assert.True(t, ok)
 
-	time.Sleep(2 * time.Second)
+	// 7. commit a new block to allow the txs to be mined
+	commit()
+
+	time.Sleep(10 * time.Second)
+
+	// 8. monitor pending txs
+	mtxs, err := env.mgrdb.GetAllMonitoredTx()
+	assert.NoError(t, err)
+	assert.Len(t, mtxs, 0)
 
 	env.cancel()
 	wg.Wait()
 }
 
-func growChain(env *testEnv) {
-	for {
-		select {
-		case <-env.ctx.Done():
-			return
-		case <-time.After(blockInterval):
-			env.sim.Chain.Backend.Commit()
-		}
-	}
-}
+// func growChain(env *testEnv) {
+// 	for {
+// 		select {
+// 		case <-env.ctx.Done():
+// 			return
+// 		case <-time.After(blockInterval):
+// 			env.sim.Chain.Backend.Commit()
+// 		}
+// 	}
+// }
