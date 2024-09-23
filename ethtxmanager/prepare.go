@@ -106,7 +106,6 @@ func (txmgr *EthTxManager) prepareRedeem(ctx context.Context, redeem *eth2btcsta
 
 	params.Rx = common.BigIntClone(req.Rx)
 	params.S = common.BigIntClone(req.S)
-	logger.Debugf("To prepare redeem with params=%+v", params)
 	txmgr.handleRequestedSignature(params, logger)
 }
 
@@ -162,15 +161,6 @@ func (txmgr *EthTxManager) handleRequestedSignature(
 		return err
 	}
 	logger.Debugf("latest block: num=%d", latestBlock.Number())
-
-	// Update the backend account nonce. It is necessary since there
-	// might be other transactions sent by the backend account in the
-	// mempool.
-	err = txmgr.etherman.UpdateBackendAccountNonce()
-	if err != nil {
-		logger.Errorf("failed to update backend account nonce: err=%v", err)
-		return err
-	}
 
 	// Send the tx to prepare the requested redeem
 	tx, err := txmgr.etherman.RedeemPrepare(params)

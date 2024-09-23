@@ -116,12 +116,13 @@ func (txmgr *EthTxManager) Start(ctx context.Context) error {
 					if err != nil {
 						logger1.Error("failed to remove monitored tx after mined: err=%v", err)
 					}
+					logger1.Debug("removed monitored tx after mined")
 				}
 			}()
 		case <-tickerToGetUppreparedRedeem.C:
 			redeems, err := txmgr.statedb.GetByStatus(eth2btcstate.RedeemStatusRequested)
 			if err != nil {
-				logger.Error("failed to get redeems by status")
+				logger.Errorf("failed to get redeems by status: err=%v", err)
 				return err
 			}
 
@@ -137,7 +138,7 @@ func (txmgr *EthTxManager) Start(ctx context.Context) error {
 				// has been handled or there is a pending tx that tries to prepare the redeem.
 				ok, err := txmgr.etherman.IsPrepared(redeem.RequestTxHash)
 				if err != nil {
-					logger1.Error("Etherman: failed to check if prepared")
+					logger1.Errorf("Etherman: failed to check if prepared: err=%v", err)
 					return err
 				}
 				if ok {
@@ -147,7 +148,7 @@ func (txmgr *EthTxManager) Start(ctx context.Context) error {
 				// Check whether there is any pending tx that tries to prepare the redeem
 				_, ok, err = txmgr.mgrdb.GetMonitoredTxByRequestTxHash(redeem.RequestTxHash)
 				if err != nil {
-					logger1.Error("failed to get monitored tx by request tx hash")
+					logger1.Error("failed to get monitored tx by request tx hash: err=%v", err)
 					return err
 				}
 				if ok {

@@ -3,6 +3,7 @@ package ethtxmanager
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -18,11 +19,11 @@ import (
 
 const (
 	frequencyToGetUnpreparedRedeem = 500 * time.Millisecond
-	frequencyToCheckFinalizedBlock = 500 * time.Millisecond
-	frequencyToMonitorPendingTxs   = 500 * time.Millisecond
+	frequencyToCheckFinalizedBlock = 100 * time.Millisecond
+	frequencyToMonitorPendingTxs   = 100 * time.Millisecond
 	timeoutOnWaitingForSignature   = 1 * time.Second
 	timtoutOnWaitingForOutpoints   = 1 * time.Second
-	blockInterval                  = 10 * time.Second
+	// blockInterval                  = 10 * time.Second
 )
 
 type testEnv struct {
@@ -101,7 +102,7 @@ func newTestEnv(t *testing.T) *testEnv {
 }
 
 func (env *testEnv) close() {
-	env.cancel()
+	// env.cancel()
 	env.sqldb.Close()
 	env.mgrdb.Close()
 	env.statedb.Close()
@@ -121,7 +122,7 @@ func (env *testEnv) close() {
 //  6. Check for monitored tx -- Here we do not commit a new block for the sent txs
 //     have row for [tx1, tx3]
 //  7. commit a new block
-//  8. Monitor pending txs
+//  8. Check monitor pending txs
 //     no rows after observing the txs are mined
 func TestMainRoutine(t *testing.T) {
 	common.Debug = true
@@ -158,23 +159,29 @@ func TestMainRoutine(t *testing.T) {
 	}()
 
 	// 2. mint twbtc tokens
+	fmt.Println("minting twbtc tokens")
 	env.sim.Mint(1, 100)
 	env.sim.Mint(2, 200)
 	commit()
 
 	// 3. approve twbtc tokens
+	fmt.Println("approving twbtc tokens")
 	env.sim.Approve(1, 90)
 	env.sim.Approve(2, 100)
+	fmt.Println("committing")
 	commit()
 
 	// 4. request redeem
+	fmt.Println("requesting redeem")
 	tx1, _ := env.sim.Request(env.sim.GetAuth(1), 1, 60, 0)  // valid btc address
 	tx2, _ := env.sim.Request(env.sim.GetAuth(1), 1, 30, -1) // invalid btc address
 	tx3, _ := env.sim.Request(env.sim.GetAuth(2), 2, 100, 1) // valid btc address
+	fmt.Println("committing")
 	commit()
 
 	// give time to process
-	time.Sleep(10 * time.Second)
+	fmt.Println("wait for 5 seconds")
+	time.Sleep(5 * time.Second)
 
 	// 5. check for signature request
 	// tx1
@@ -206,11 +213,13 @@ func TestMainRoutine(t *testing.T) {
 	assert.True(t, ok)
 
 	// 7. commit a new block to allow the txs to be mined
+	fmt.Println("committing")
 	commit()
 
-	time.Sleep(10 * time.Second)
+	fmt.Println("wait for 5 seconds")
+	time.Sleep(5 * time.Second)
 
-	// 8. monitor pending txs
+	// 8. check monitor pending txs
 	mtxs, err := env.mgrdb.GetAllMonitoredTx()
 	assert.NoError(t, err)
 	assert.Len(t, mtxs, 0)
