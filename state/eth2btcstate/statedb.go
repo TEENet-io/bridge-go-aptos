@@ -34,6 +34,9 @@ func (st *StateDB) insertAfterRequested(redeem *Redeem) error {
 	query := `INSERT OR IGNORE INTO redeem (` + statusRequestedParamList + `) VALUES (?, ?, ?, ?, ?)`
 
 	stmt, err := st.stmtCache.Prepare(query)
+	if err != nil {
+		return err
+	}
 
 	r, err := encode(redeem)
 	if err != nil {
@@ -68,6 +71,9 @@ func (st *StateDB) updateAfterPrepared(redeem *Redeem) error {
 	}
 
 	stmt, err := st.stmtCache.Prepare(query)
+	if err != nil {
+		return err
+	}
 
 	r, err := encode(redeem)
 	if err != nil {
