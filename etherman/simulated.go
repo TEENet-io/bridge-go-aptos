@@ -343,11 +343,3 @@ func (env *SimEtherman) GetAuth(idx int) *bind.TransactOpts {
 
 	return auth
 }
-
-func (env *SimEtherman) UpdateBackendAccountNonce() {
-	nonce, err := env.Chain.Backend.Client().PendingNonceAt(context.Background(), env.Chain.Accounts[0].From)
-	if err != nil {
-		panic(err)
-	}
-	env.Etherman.SetNonce(nonce)
-}
