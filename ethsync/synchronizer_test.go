@@ -121,7 +121,7 @@ func sendTxs(t *testing.T, env *etherman.SimEtherman) (
 		OutpointIdxs:  prepareParams.OutpointIdxs,
 	})
 
-	err = env.Etherman.TWBTCApprove(env.Chain.Accounts[1], big.NewInt(100))
+	_, err = env.Etherman.TWBTCApprove(env.Chain.Accounts[1], big.NewInt(100))
 	if err != nil {
 		t.Fatal(err)
 	}
