@@ -4,6 +4,7 @@ import (
 	"context"
 	"math/big"
 
+	logger "github.com/0xPolygonHermez/zkevm-node/log"
 	"github.com/TEENet-io/bridge-go/common"
 	bridge "github.com/TEENet-io/bridge-go/contracts/TEENetBtcBridge"
 	"github.com/btcsuite/btcd/btcec/v2"
@@ -266,7 +267,7 @@ func (env *SimEtherman) Mint(receiver int, amount int) (ethcommon.Hash, *MintPar
 	})
 	tx, err := env.Etherman.Mint(params)
 	if err != nil {
-		panic(err)
+		logger.Fatal(err)
 	}
 
 	return tx.Hash(), params
@@ -275,15 +276,15 @@ func (env *SimEtherman) Mint(receiver int, amount int) (ethcommon.Hash, *MintPar
 func (env *SimEtherman) Approve(requester int, amount int) ethcommon.Hash {
 	balBefore, err := env.Etherman.TWBTCBalanceOf(env.Chain.Accounts[requester].From)
 	if err != nil {
-		panic(err)
+		logger.Fatal(err)
 	}
 	if balBefore.Uint64() < uint64(amount) {
-		panic("insufficient balance")
+		logger.Fatal("insufficient balance")
 	}
 
 	txHash, err := env.Etherman.TWBTCApprove(env.Chain.Accounts[requester], big.NewInt(int64(amount)))
 	if err != nil {
-		panic(err)
+		logger.Fatal(err)
 	}
 
 	return txHash
@@ -292,10 +293,10 @@ func (env *SimEtherman) Approve(requester int, amount int) ethcommon.Hash {
 func (env *SimEtherman) Request(auth *bind.TransactOpts, requester int, amount int, btcAddrIdx int) (ethcommon.Hash, *RequestParams) {
 	allowed, err := env.Etherman.TWBTCAllowance(env.Chain.Accounts[requester].From)
 	if err != nil {
-		panic(err)
+		logger.Fatal(err)
 	}
 	if allowed.Uint64() < uint64(amount) {
-		panic("insufficient allowance")
+		logger.Fatal("insufficient allowance")
 	}
 
 	params := env.GenRequestParams(&ParamConfig{
@@ -305,7 +306,7 @@ func (env *SimEtherman) Request(auth *bind.TransactOpts, requester int, amount i
 	})
 	tx, err := env.Etherman.RedeemRequest(auth, params)
 	if err != nil {
-		panic(err)
+		logger.Fatal(err)
 	}
 
 	return tx.Hash(), params
@@ -322,7 +323,7 @@ func (env *SimEtherman) Prepare(
 	})
 	tx, err := env.Etherman.RedeemPrepare(params)
 	if err != nil {
-		panic(err)
+		logger.Fatal(err)
 	}
 
 	return tx.Hash(), params
@@ -330,13 +331,13 @@ func (env *SimEtherman) Prepare(
 
 func (env *SimEtherman) GetAuth(idx int) *bind.TransactOpts {
 	if idx < 0 || idx > 9 {
-		panic("invalid account index")
+		logger.Fatal("invalid account index")
 	}
 
 	auth := env.Chain.Accounts[idx]
 	nonce, err := env.Chain.Backend.Client().PendingNonceAt(context.Background(), auth.From)
 	if err != nil {
-		panic(err)
+		logger.Fatal(err)
 	}
 
 	auth.Nonce = big.NewInt(int64(nonce))
