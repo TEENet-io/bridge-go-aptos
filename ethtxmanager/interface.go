@@ -3,7 +3,7 @@ package ethtxmanager
 import (
 	"math/big"
 
-	"github.com/TEENet-io/bridge-go/state/eth2btcstate"
+	"github.com/TEENet-io/bridge-go/state"
 )
 
 type SchnorrThresholdWallet interface {
@@ -21,6 +21,6 @@ type BtcWallet interface {
 	Request(
 		requestRedeemTxHash [32]byte,
 		amount *big.Int,
-		ch chan<- []eth2btcstate.Outpoint,
+		ch chan<- []state.Outpoint,
 	) error
 }
