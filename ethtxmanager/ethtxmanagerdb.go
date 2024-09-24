@@ -3,6 +3,7 @@ package ethtxmanager
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 
 	"github.com/TEENet-io/bridge-go/database"
 	ethcommon "github.com/ethereum/go-ethereum/common"
@@ -38,7 +39,8 @@ func (db *EthTxManagerDB) insertSignatureRequest(sr *SignatureRequest) error {
 		return err
 	}
 
-	sqlSr := sr.convert()
+	sqlSr := &sqlSignatureRequest{}
+	sqlSr.encode(sr)
 
 	if _, err := stmt.Exec(
 		sqlSr.RequestTxHash,
@@ -76,8 +78,7 @@ func (db *EthTxManagerDB) GetSignatureRequestByRequestTxHash(
 		return nil, false, err
 	}
 
-	sr := &SignatureRequest{}
-	return sr.restore(&sqlSr), true, nil
+	return sqlSr.decode(), true, nil
 }
 
 func (db *EthTxManagerDB) insertMonitoredTx(mt *monitoredTx) error {
@@ -87,7 +88,8 @@ func (db *EthTxManagerDB) insertMonitoredTx(mt *monitoredTx) error {
 		return err
 	}
 
-	sqlMt := mt.covert()
+	sqlMt := &sqlMonitoredTx{}
+	sqlMt.encode(mt)
 
 	if _, err := stmt.Exec(
 		sqlMt.TxHash,
@@ -125,7 +127,7 @@ func (db *EthTxManagerDB) GetMonitoredTxByRequestTxHash(
 
 	hashStr := RequestTxHash.String()[2:]
 
-	var sqlMt sqlmonitoredTx
+	var sqlMt sqlMonitoredTx
 	if err := stmt.QueryRow(hashStr).Scan(
 		&sqlMt.TxHash,
 		&sqlMt.RequestTxHash,
@@ -137,21 +139,20 @@ func (db *EthTxManagerDB) GetMonitoredTxByRequestTxHash(
 		return nil, false, err
 	}
 
-	mt := &monitoredTx{}
-	return mt.restore(&sqlMt), true, nil
+	return sqlMt.decode(), true, nil
 }
 
 func (db *EthTxManagerDB) GetAllMonitoredTx() ([]*monitoredTx, error) {
 	query := `SELECT * FROM monitoredTx`
 	stmt, err := db.stmtCache.Prepare(query)
 	if err != nil {
-		return []*monitoredTx{}, err
+		return nil, err
 	}
 
 	rows, err := stmt.Query()
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, nil // No rows found, return nil slice
+			return []*monitoredTx{}, nil
 		}
 		return nil, err
 	}
@@ -159,7 +160,7 @@ func (db *EthTxManagerDB) GetAllMonitoredTx() ([]*monitoredTx, error) {
 
 	var mts []*monitoredTx
 	for rows.Next() {
-		var sqlMt sqlmonitoredTx
+		var sqlMt sqlMonitoredTx
 		if err := rows.Scan(
 			&sqlMt.TxHash,
 			&sqlMt.RequestTxHash,
@@ -168,8 +169,11 @@ func (db *EthTxManagerDB) GetAllMonitoredTx() ([]*monitoredTx, error) {
 			return nil, err
 		}
 
-		mt := &monitoredTx{}
-		mts = append(mts, mt.restore(&sqlMt))
+		mts = append(mts, sqlMt.decode())
+
+		if mts[len(mts)-1].TxHash == (ethcommon.Hash{}) {
+			fmt.Println("empty txHash")
+		}
 	}
 
 	return mts, nil
