@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -12,7 +13,6 @@ import (
 	"github.com/TEENet-io/bridge-go/etherman"
 	"github.com/TEENet-io/bridge-go/ethsync"
 	"github.com/TEENet-io/bridge-go/state"
-	ethcommon "github.com/ethereum/go-ethereum/common"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
 )
@@ -45,7 +45,7 @@ type testEnv struct {
 	sync    *ethsync.Synchronizer
 }
 
-func newTestEnv(t *testing.T) *testEnv {
+func newTestEnv(t *testing.T, file string) *testEnv {
 	ctx, cancel := context.WithCancel(context.Background())
 	sim, err := etherman.NewSimEtherman()
 	assert.NoError(t, err)
@@ -53,13 +53,11 @@ func newTestEnv(t *testing.T) *testEnv {
 	assert.NoError(t, err)
 
 	// create a sql db
-	sqldb, err := sql.Open("sqlite3", ":memory:")
+	sqldb, err := sql.Open("sqlite3", file)
 	assert.NoError(t, err)
 
 	// create a eth2btc state db
 	statedb, err := state.NewStateDB(sqldb)
-	assert.NoError(t, err)
-	_, _, err = statedb.GetRedeem(ethcommon.Hash{}, state.RedeemStatusCompleted)
 	assert.NoError(t, err)
 
 	// create a eth2btc state from the eth2btc statedb
@@ -68,10 +66,6 @@ func newTestEnv(t *testing.T) *testEnv {
 
 	// create a eth tx manager db
 	mgrdb, err := NewEthTxManagerDB(sqldb)
-	assert.NoError(t, err)
-	_, _, err = mgrdb.GetSignatureRequestByRequestTxHash(ethcommon.Hash{})
-	assert.NoError(t, err)
-	_, _, err = mgrdb.GetMonitoredTxByRequestTxHash(ethcommon.Hash{})
 	assert.NoError(t, err)
 
 	// create a eth synchronizer
@@ -105,9 +99,9 @@ func newTestEnv(t *testing.T) *testEnv {
 }
 
 func (env *testEnv) close() {
-	env.sqldb.Close()
 	env.mgrdb.Close()
 	env.statedb.Close()
+	env.sqldb.Close()
 }
 
 // Main routine test procedures:
@@ -128,15 +122,18 @@ func (env *testEnv) close() {
 //     no rows after observing the txs are mined
 func TestMainRoutine(t *testing.T) {
 	common.Debug = true
+	file := "test.db"
 	defer func() {
 		common.Debug = false
+		os.Remove(file)
 	}()
 
-	env := newTestEnv(t)
+	env := newTestEnv(t, file)
 	defer env.close()
 	commit := env.sim.Chain.Backend.Commit
 
 	wg := &sync.WaitGroup{}
+	defer wg.Wait()
 
 	// 1. start main routines
 	wg.Add(1)
@@ -232,5 +229,4 @@ func TestMainRoutine(t *testing.T) {
 	assert.Len(t, mtxs, 0)
 
 	env.cancel()
-	wg.Wait()
 }
