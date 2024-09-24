@@ -2,7 +2,6 @@ package ethtxmanager
 
 import (
 	"context"
-	"errors"
 	"sync"
 	"time"
 
@@ -11,17 +10,6 @@ import (
 	"github.com/TEENet-io/bridge-go/etherman"
 	"github.com/TEENet-io/bridge-go/state"
 	ethcommon "github.com/ethereum/go-ethereum/common"
-)
-
-var (
-	// error when the eth tx manager times out on waiting for a signature request
-	ErrTimedOutOnWaitingForSignature = errors.New("timed out on waiting for signature")
-
-	ErrInvalidSchnorrSignature = errors.New("invalid schnorr signature")
-
-	ErrEmptyOutpointsReturned = errors.New("empty outpoints returned")
-
-	ErrMsgNotFound = "not found"
 )
 
 type EthTxManager struct {
@@ -84,6 +72,9 @@ func (txmgr *EthTxManager) Start(ctx context.Context) error {
 	tickerToMint := time.NewTicker(txmgr.cfg.FrequencyToMint)
 	defer tickerToMint.Stop()
 
+	var wg sync.WaitGroup
+	defer wg.Wait()
+
 	for {
 		select {
 		case <-txmgr.ctx.Done():
@@ -92,8 +83,7 @@ func (txmgr *EthTxManager) Start(ctx context.Context) error {
 		case <-tickerToMonitor.C:
 			mtxs, err := txmgr.mgrdb.GetAllMonitoredTx()
 			if err != nil {
-				logger.Errorf("failed to get monitored tx by status: err=%v", err)
-				panic(err)
+				logger.Fatal("failed to get monitored tx by status: err=%v", err)
 			}
 
 			if len(mtxs) == 0 {
@@ -101,18 +91,16 @@ func (txmgr *EthTxManager) Start(ctx context.Context) error {
 			}
 
 			for _, mtx := range mtxs {
-				// Disable go routine due to unknown reason for db error
-				// "no such table"
-				// TODO: Investigate the root cause of the error
-
-				// go func() {
-				// 	defer func() {
-				// 		if r := recover(); r != nil {
-				// 			logger.Errorf("panic: %v", r)
-				// 		}
-				// 	}()
-				err = txmgr.monitor(mtx, ctx)
-				// }()
+				wg.Add(1)
+				go func() {
+					defer func() {
+						if r := recover(); r != nil {
+							logger.Errorf("panic: %v", r)
+						}
+						wg.Done()
+					}()
+					err = txmgr.monitor(mtx, ctx)
+				}()
 
 				if err != nil {
 					switch err {
@@ -124,7 +112,7 @@ func (txmgr *EthTxManager) Start(ctx context.Context) error {
 					case ErrHeaderByHash:
 					case ErrHeaderByNumber:
 					default:
-						panic(err)
+						logger.Fatal(err)
 					}
 				}
 			}
@@ -141,19 +129,16 @@ func (txmgr *EthTxManager) Start(ctx context.Context) error {
 					continue
 				}
 
-				// Disable go routine due to unknown reason for db error
-				// "no such table"
-				// TODO: Investigate the root cause of the error
-
-				// go func() {
-				// 	defer func() {
-				// 		if r := recover(); r != nil {
-				// 			logger.Errorf("panic: %v", r)
-				// 			txmgr.redeemLock.Delete(redeem.RequestTxHash)
-				// 		}
-				// 	}()
-				err = txmgr.prepareRedeem(ctx, redeem)
-				// }()
+				wg.Add(1)
+				go func() {
+					defer func() {
+						if r := recover(); r != nil {
+							txmgr.redeemLock.Delete(redeem.RequestTxHash)
+						}
+						wg.Done()
+					}()
+					err = txmgr.prepareRedeem(ctx, redeem)
+				}()
 
 				if err != nil {
 					switch err {
@@ -173,16 +158,10 @@ func (txmgr *EthTxManager) Start(ctx context.Context) error {
 					case ErrBtcWalletRequest:
 					case ErrSchnorrWalletSign:
 					default:
-						panic(err)
+						logger.Fatal(err)
 					}
 				}
 			}
 		}
-	}
-}
-
-func (txmgr *EthTxManager) Close() {
-	if txmgr.mgrdb != nil {
-		txmgr.mgrdb.Close()
 	}
 }
