@@ -11,19 +11,24 @@ import (
 	"github.com/TEENet-io/bridge-go/common"
 	"github.com/TEENet-io/bridge-go/etherman"
 	"github.com/TEENet-io/bridge-go/ethsync"
-	"github.com/TEENet-io/bridge-go/state/eth2btcstate"
+	"github.com/TEENet-io/bridge-go/state"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
 )
 
 const (
-	frequencyToGetUnpreparedRedeem = 500 * time.Millisecond
-	frequencyToCheckFinalizedBlock = 100 * time.Millisecond
-	frequencyToMonitorPendingTxs   = 100 * time.Millisecond
-	timeoutOnWaitingForSignature   = 1 * time.Second
-	timtoutOnWaitingForOutpoints   = 1 * time.Second
-	// blockInterval                  = 10 * time.Second
+	// eth synchronizer config
+	frequencyToCheckEthFinalizedBlock = 100 * time.Millisecond
+	frequencyToCheckBtcFinalizedBlock = 100 * time.Millisecond
+
+	// eth tx manager config
+	frequencyToPrepareRedeem      = 500 * time.Millisecond
+	frequencyToMint               = 500 * time.Millisecond
+	frequencyToMonitorPendingTxs  = 800 * time.Millisecond
+	timeoutOnWaitingForSignature  = 1 * time.Second
+	timtoutOnWaitingForOutpoints  = 1 * time.Second
+	timeoutOnMonitoringPendingTxs = 1
 )
 
 type testEnv struct {
@@ -33,12 +38,10 @@ type testEnv struct {
 	sim *etherman.SimEtherman
 
 	sqldb   *sql.DB
-	statedb *eth2btcstate.StateDB
-	e2bst   *eth2btcstate.State
-	b2est   *ethsync.MockBtc2EthState
+	statedb *state.StateDB
+	st      *state.State
 	mgrdb   *EthTxManagerDB
 	mgr     *EthTxManager
-	ch      chan *SignatureRequest
 	sync    *ethsync.Synchronizer
 }
 
@@ -49,60 +52,59 @@ func newTestEnv(t *testing.T) *testEnv {
 	chainID, err := sim.Etherman.Client().ChainID(ctx)
 	assert.NoError(t, err)
 
+	// create a sql db
 	sqldb, err := sql.Open("sqlite3", ":memory:")
 	assert.NoError(t, err)
 
-	statedb, err := eth2btcstate.NewStateDB(sqldb)
+	// create a eth2btc state db
+	statedb, err := state.NewStateDB(sqldb)
+	assert.NoError(t, err)
+	_, _, err = statedb.GetRedeem(ethcommon.Hash{}, state.RedeemStatusCompleted)
 	assert.NoError(t, err)
 
-	// test statedb
-	_, _, err = statedb.Get(ethcommon.Hash{}, eth2btcstate.RedeemStatusCompleted)
+	// create a eth2btc state from the eth2btc statedb
+	st, err := state.New(statedb, &state.Config{ChannelSize: 1})
 	assert.NoError(t, err)
 
-	e2bst, err := eth2btcstate.New(statedb, &eth2btcstate.Config{ChannelSize: 1})
-	assert.NoError(t, err)
-	b2est := ethsync.NewMockBtc2EthState()
-
+	// create a eth tx manager db
 	mgrdb, err := NewEthTxManagerDB(sqldb)
 	assert.NoError(t, err)
-	// test mgrdb
 	_, _, err = mgrdb.GetSignatureRequestByRequestTxHash(ethcommon.Hash{})
 	assert.NoError(t, err)
 	_, _, err = mgrdb.GetMonitoredTxByRequestTxHash(ethcommon.Hash{})
 	assert.NoError(t, err)
 
+	// create a eth synchronizer
 	sync, err := ethsync.New(
 		sim.Etherman,
-		e2bst,
-		b2est,
+		st,
 		&ethsync.Config{
-			FrequencyToCheckFinalizedBlock: frequencyToCheckFinalizedBlock,
-			BtcChainConfig:                 common.MainNetParams(),
-			EthChainID:                     chainID,
+			FrequencyToCheckEthFinalizedBlock: frequencyToCheckEthFinalizedBlock,
+			FrequencyToCheckBtcFinalizedBlock: frequencyToCheckBtcFinalizedBlock,
+			BtcChainConfig:                    common.MainNetParams(),
+			EthChainID:                        chainID,
 		},
 	)
 	assert.NoError(t, err)
 
+	// create a eth tx manager
 	cfg := &Config{
-		FrequencyToGetUnpreparedRedeem: frequencyToGetUnpreparedRedeem,
-		FrequencyToMonitorPendingTxs:   frequencyToMonitorPendingTxs,
-		TimeoutOnWaitingForSignature:   timeoutOnWaitingForSignature,
-		TimeoutOnWaitingForOutpoints:   timtoutOnWaitingForOutpoints,
+		FrequencyToPrepareRedeem:      frequencyToPrepareRedeem,
+		FrequencyToMint:               frequencyToMint,
+		FrequencyToMonitorPendingTxs:  frequencyToMonitorPendingTxs,
+		TimeoutOnWaitingForSignature:  timeoutOnWaitingForSignature,
+		TimeoutOnWaitingForOutpoints:  timtoutOnWaitingForOutpoints,
+		TimeoutOnMonitoringPendingTxs: timeoutOnMonitoringPendingTxs,
 	}
-
-	ch := make(chan *SignatureRequest, 1)
-
 	btcWallet := &MockBtcWallet{}
 	schnorrWallet := &MockSchnorrThresholdWallet{sim}
-
 	mgr, err := New(ctx, cfg, sim.Etherman, statedb, mgrdb, schnorrWallet, btcWallet)
 	assert.NoError(t, err)
 
-	return &testEnv{ctx, cancel, sim, sqldb, statedb, e2bst, b2est, mgrdb, mgr, ch, sync}
+	return &testEnv{ctx, cancel, sim, sqldb, statedb, st, mgrdb, mgr, sync}
 }
 
 func (env *testEnv) close() {
-	// env.cancel()
 	env.sqldb.Close()
 	env.mgrdb.Close()
 	env.statedb.Close()
@@ -140,12 +142,7 @@ func TestMainRoutine(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		env.e2bst.Start(env.ctx)
-	}()
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		env.b2est.Start(env.ctx)
+		env.st.Start(env.ctx)
 	}()
 	wg.Add(1)
 	go func() {
@@ -160,8 +157,18 @@ func TestMainRoutine(t *testing.T) {
 
 	// 2. mint twbtc tokens
 	fmt.Println("minting twbtc tokens")
-	env.sim.Mint(1, 100)
-	env.sim.Mint(2, 200)
+	_, params := env.sim.Mint(1, 100)
+	env.statedb.InsertMint(&state.Mint{
+		BtcTxID:  params.BtcTxId,
+		Receiver: params.Receiver,
+		Amount:   common.BigIntClone(params.Amount),
+	})
+	_, params = env.sim.Mint(2, 200)
+	env.statedb.InsertMint(&state.Mint{
+		BtcTxID:  params.BtcTxId,
+		Receiver: params.Receiver,
+		Amount:   common.BigIntClone(params.Amount),
+	})
 	commit()
 
 	// 3. approve twbtc tokens
@@ -227,14 +234,3 @@ func TestMainRoutine(t *testing.T) {
 	env.cancel()
 	wg.Wait()
 }
-
-// func growChain(env *testEnv) {
-// 	for {
-// 		select {
-// 		case <-env.ctx.Done():
-// 			return
-// 		case <-time.After(blockInterval):
-// 			env.sim.Chain.Backend.Commit()
-// 		}
-// 	}
-// }

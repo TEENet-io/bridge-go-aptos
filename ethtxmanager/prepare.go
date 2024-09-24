@@ -2,36 +2,66 @@ package ethtxmanager
 
 import (
 	"context"
+	"errors"
 
 	logger "github.com/0xPolygonHermez/zkevm-node/log"
 	"github.com/TEENet-io/bridge-go/common"
 	"github.com/TEENet-io/bridge-go/etherman"
 	"github.com/TEENet-io/bridge-go/state"
-	"github.com/TEENet-io/bridge-go/state/eth2btcstate"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
-func (txmgr *EthTxManager) prepareRedeem(ctx context.Context, redeem *eth2btcstate.Redeem, logger *logger.Logger) {
-	// lock the request tx hash to prevent multiple routines from handling
-	// the same redeem
-	txmgr.redeemLock.Store(redeem.RequestTxHash, true)
+var (
+	ErrIsPrepared                         = errors.New("failed to call bridge.IsPrepared")
+	ErrGetMonitoredTxByRequestTxHash      = errors.New("failed to get monitored tx by request tx hash")
+	ErrGetSignatureRequestByRequestTxHash = errors.New("failed to get signature request by request tx hash")
+	ErrBtcWalletRequest                   = errors.New("failed to request spendable outpoints from btc wallet")
+	ErrSchnorrWalletSign                  = errors.New("failed to request signature from schnorr wallet")
+	ErrInsertSignatureRequest             = errors.New("failed to insert signature request in db")
+	ErrRedeemPrepare                      = errors.New("failed to call bridge.RedeemPrepare")
+	ErrInsertMonitoredTx                  = errors.New("failed to insert monitored tx in db")
+)
 
-	// release the lock on the request tx hash due to failure
-	// to get outpoints
+func (txmgr *EthTxManager) prepareRedeem(ctx context.Context, redeem *state.Redeem) error {
+	// lock the request tx hash to prevent multiple routines from handling
+	// the same redeem when entering.
+	txmgr.redeemLock.Store(redeem.RequestTxHash, true)
 	defer txmgr.redeemLock.Delete(redeem.RequestTxHash)
+
+	newLogger := logger.WithFields("requestTxHash", redeem.RequestTxHash.String())
+
+	// Check the redeem status on bridge contract. If false, either the redeem
+	// has been handled or there is a pending tx that tries to prepare the redeem.
+	ok, err := txmgr.etherman.IsPrepared(redeem.RequestTxHash)
+	if err != nil {
+		newLogger.Errorf("Etherman: failed to check if prepared: err=%v", err)
+		return ErrIsPrepared
+	}
+	if ok {
+		return nil
+	}
+
+	// Check whether there is any pending tx that is preparing the redeem
+	_, ok, err = txmgr.mgrdb.GetMonitoredTxByRequestTxHash(redeem.RequestTxHash)
+	if err != nil {
+		newLogger.Errorf("failed to get monitored tx by request tx hash: err=%v", err)
+		return ErrGetMonitoredTxByRequestTxHash
+	}
+	if ok {
+		return nil
+	}
 
 	// It is possible that the request for signature is successful but the
 	// redeem prepare tx is failed. In this case, we should resend a tx
 	// right away to prepare the redeem.
-	_, ok, err := txmgr.mgrdb.GetSignatureRequestByRequestTxHash(redeem.RequestTxHash)
+	_, ok, err = txmgr.mgrdb.GetSignatureRequestByRequestTxHash(redeem.RequestTxHash)
 	if err != nil {
-		logger.Error("failed to get signature request by request tx hash")
-		return
+		newLogger.Error("failed to get signature request by request tx hash")
+		return ErrGetSignatureRequestByRequestTxHash
 	}
 	if ok {
-		logger.Debug("signature request already exists, resend a tx for preparing redeem")
-		txmgr.handleRequestedSignature(createPrepareParams(redeem), logger)
-		return
+		newLogger.Debug("signature request already exists, resend a tx for preparing redeem")
+		return txmgr.handleRequestedSignature(createPrepareParams(redeem), newLogger)
 	}
 
 	// request spendable outpoints from btc wallet
@@ -42,27 +72,15 @@ func (txmgr *EthTxManager) prepareRedeem(ctx context.Context, redeem *eth2btcsta
 		chForOutpoints,
 	)
 	if err != nil {
-		logger.Errorf("failed to request spendable outpoints with err=%v", err)
-		return
+		newLogger.Errorf("failed to request spendable outpoints with err=%v", err)
+		return ErrBtcWalletRequest
 	}
 
-	logger.Debug("waiting for outpoints...")
 	outpoints, err := txmgr.waitforOutpoints(ctx, chForOutpoints)
 	if err != nil {
-		switch err {
-		case context.Canceled:
-			logger.Debug("context canceled")
-			return
-		case context.DeadlineExceeded:
-			logger.Debug("timedout on waiting for outpoints")
-			return
-		case ErrEmptyOutpointsReturned:
-			logger.Debug("empty outpoints returned")
-			return
-		default:
-			panic(err)
-		}
+		return err
 	}
+	newLogger.Debug("outpoints received")
 
 	// Compute the signing hash
 	redeem.Outpoints = append([]state.Outpoint{}, outpoints...)
@@ -71,43 +89,35 @@ func (txmgr *EthTxManager) prepareRedeem(ctx context.Context, redeem *eth2btcsta
 
 	// request signature
 	chForSignature := make(chan *SignatureRequest, 1)
-	txmgr.schnorrWallet.Sign(
+	err = txmgr.schnorrWallet.Sign(
 		&SignatureRequest{
 			RequestTxHash: redeem.RequestTxHash,
 			SigningHash:   signingHash,
 		},
 		chForSignature,
 	)
-
-	logger.Debug("waiting for signature...")
+	if err != nil {
+		newLogger.Errorf("failed to request signature with err=%v", err)
+		return ErrSchnorrWalletSign
+	}
 
 	// wait for the signature to be sent by the schnorr wallet
 	req, err := txmgr.waitForSignature(ctx, signingHash, chForSignature)
 	if err != nil {
-		switch err {
-		case context.DeadlineExceeded:
-			logger.Debug("timedout on waiting for signature")
-			return
-		case ErrInvalidSchnorrSignature:
-			logger.Debugf("received invalid schnorr signature: rx=0x%x, s=0x%x", req.Rx, req.S)
-			return
-		case context.Canceled:
-			logger.Debug("context canceled")
-			return
-		default:
-			panic(err)
-		}
+		return err
 	}
+	newLogger.Debug("schnorr signature received")
 
 	err = txmgr.mgrdb.insertSignatureRequest(req)
 	if err != nil {
-		logger.Error("failed to insert signature request in db")
-		return
+		newLogger.Errorf("failed to insert signature request in db: err=%v", err)
+		return ErrInsertSignatureRequest
 	}
+	newLogger.Debug("inserted signature request in db")
 
 	params.Rx = common.BigIntClone(req.Rx)
 	params.S = common.BigIntClone(req.S)
-	txmgr.handleRequestedSignature(params, logger)
+	return txmgr.handleRequestedSignature(params, newLogger)
 }
 
 func (txmgr *EthTxManager) waitforOutpoints(
@@ -156,18 +166,18 @@ func (txmgr *EthTxManager) handleRequestedSignature(
 	logger *logger.Logger,
 ) error {
 	// Get the latest block
-	latestBlock, err := txmgr.etherman.Client().BlockByNumber(context.Background(), nil)
+	latest, err := txmgr.etherman.Client().HeaderByNumber(context.Background(), nil)
 	if err != nil {
 		logger.Errorf("failed to get latest block: err=%v", err)
-		return err
+		return ErrHeaderByNumber
 	}
-	logger.Debugf("latest block: num=%d", latestBlock.Number())
+	logger.Debugf("got latest block: num=%d", latest.Number)
 
 	// Send the tx to prepare the requested redeem
 	tx, err := txmgr.etherman.RedeemPrepare(params)
 	if err != nil {
 		logger.Errorf("failed to prepare redeem, err=%v", err)
-		return err
+		return ErrRedeemPrepare
 	}
 
 	logger1 := logger.WithFields("prepareTx", tx.Hash().String())
@@ -176,19 +186,19 @@ func (txmgr *EthTxManager) handleRequestedSignature(
 	mt := &monitoredTx{
 		TxHash:        tx.Hash(),
 		RequestTxHash: params.RequestTxHash,
-		SentAfter:     latestBlock.Hash(),
+		SentAfter:     latest.Hash(),
 	}
 	err = txmgr.mgrdb.insertMonitoredTx(mt)
 	if err != nil {
 		logger1.Errorf("failed to insert monitored tx in db, err=%v", err)
-		return err
+		return ErrInsertMonitoredTx
 	}
-	logger1.Debugf("inserted tx for monitoring after blk=0x%x", mt.SentAfter)
+	logger1.Debugf("inserted monitored tx: sentAfter=0x%x", mt.SentAfter)
 
 	return nil
 }
 
-func createPrepareParams(redeem *eth2btcstate.Redeem) *etherman.PrepareParams {
+func createPrepareParams(redeem *state.Redeem) *etherman.PrepareParams {
 	outpointTxIds := []ethcommon.Hash{}
 	outpointIdxs := []uint16{}
 
