@@ -78,18 +78,20 @@ func (st *State) Start(ctx context.Context) error {
 			return ctx.Err()
 		// TODO: case <-newBtcFinalizedBlockCh
 		case blkNum := <-st.newEthFinalizedBlockCh:
+			newLogger := logger.WithFields("newFinalized", blkNum.String())
+
 			handleNewBlockNumber := func() error {
 				// Get the stored last finalized block number
 				lastFinalized, err := st.GetEthFinalizedBlockNumber()
 				if err != nil {
-					logger.Errorf("failed to get last finalized block number: err=%v", err)
+					newLogger.Errorf("failed to get last finalized block number: err=%v", err)
 					return ErrGetEthFinalizedBlockNumber
 				}
 
 				// Update the last finalized block number if the new one is larger
 				if lastFinalized.Cmp(blkNum) <= 0 {
 					if err := st.setFinalizedBlockNumber(blkNum); err != nil {
-						logger.Errorf("failed to set last finalized block number: err=%v", err)
+						newLogger.Errorf("failed to set last finalized block number: err=%v", err)
 						return ErrSetEthFinalizedBlockNumber
 					}
 				}
@@ -102,17 +104,17 @@ func (st *State) Start(ctx context.Context) error {
 				case ErrGetEthFinalizedBlockNumber:
 				case ErrSetEthFinalizedBlockNumber:
 				default:
-					panic(err)
+					newLogger.Fatal(err)
 				}
 			}
 		// After receiving a new minted event, udpate statedb
 		case ev := <-st.newMintedEventCh:
-			handleEvent := func() error {
-				newLogger := logger.WithFields(
-					"mintTx", ev.MintTxHash.String(),
-					"btcTxId", ev.BtcTxId.String(),
-				)
+			newLogger := logger.WithFields(
+				"mintTx", ev.MintTxHash.String(),
+				"btcTxId", ev.BtcTxId.String(),
+			)
 
+			handleEvent := func() error {
 				mint := createMintFromMintedEvent(ev)
 
 				err := st.statedb.UpdateMint(mint)
@@ -129,20 +131,19 @@ func (st *State) Start(ctx context.Context) error {
 				switch err {
 				case ErrUpdateMint:
 				default:
-					panic(err)
+					newLogger.Fatal(err)
 				}
-				panic(err)
 			}
 		// After receiving a redeem request event
 		// 1. 	Check the existence of the redeem request tx hash
 		// 2.	Skip if found
 		// 3.	Insert a new redeem record in state db
 		case ev := <-st.newRedeemRequestedEvCh:
-			handleEvent := func() error {
-				newLogger := logger.WithFields(
-					"reqTx", ev.RequestTxHash.String(),
-				)
+			newLogger := logger.WithFields(
+				"reqTx", ev.RequestTxHash.String(),
+			)
 
+			handleEvent := func() error {
 				// Check if the redeem already exists
 				ok, _, err := st.statedb.HasRedeem(ev.RequestTxHash)
 				if err != nil {
@@ -176,9 +177,8 @@ func (st *State) Start(ctx context.Context) error {
 				case ErrCheckRedeemExistence, ErrInsertRedeem:
 				case ErrRequestedEventInvalid:
 				default:
-					panic(err)
+					newLogger.Fatal(err)
 				}
-				panic(err)
 			}
 		// After receiving a redeem prepared event
 		// 1. 	Check the existence of the tx hash
@@ -189,12 +189,12 @@ func (st *State) Start(ctx context.Context) error {
 		// NOTE that it is possible that a prepared event arrives earlier than
 		// its corresponding requested event
 		case ev := <-st.newRedeemPreparedEvCh:
-			handleEvent := func() error {
-				newLogger := logger.WithFields(
-					"reqTx", ev.RequestTxHash.String(),
-					"prepTx", ev.PrepareTxHash.String(),
-				)
+			newLogger := logger.WithFields(
+				"reqTx", ev.RequestTxHash.String(),
+				"prepTx", ev.PrepareTxHash.String(),
+			)
 
+			handleEvent := func() error {
 				ok, status, err := st.statedb.HasRedeem(ev.RequestTxHash)
 				if err != nil {
 					newLogger.Errorf("error when checking existence: err=%v", err)
@@ -244,13 +244,16 @@ func (st *State) Start(ctx context.Context) error {
 			if err != nil {
 				switch err {
 				// statedb errors
-				case ErrCheckRedeemExistence, ErrGetRedeem, ErrPreparedEventInvalid, ErrUpdateRedeem:
+				case ErrCheckRedeemExistence:
+				case ErrGetRedeem:
+				case ErrPreparedEventInvalid:
+				case ErrUpdateRedeem:
+				// other errors
 				case ErrPreparedEventUnmatched:
 				case ErrUpdateInvalidRedeem:
 				default:
-					panic(err)
+					newLogger.Fatal(err)
 				}
-				panic(err)
 			}
 		}
 	}

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"math/big"
 
+	logger "github.com/0xPolygonHermez/zkevm-node/log"
 	"github.com/TEENet-io/bridge-go/common"
 )
 
@@ -42,7 +43,7 @@ func randMint(status MintStatus) *Mint {
 func getMemoryDB() *sql.DB {
 	db, err := sql.Open("sqlite3", ":memory:")
 	if err != nil {
-		panic(err)
+		logger.Fatal(err)
 	}
 	return db
 }
