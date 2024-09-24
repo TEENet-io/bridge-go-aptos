@@ -34,10 +34,10 @@ func (ev *RedeemPreparedEvent) String() string {
 }
 
 type MintedEvent struct {
-	MintedTxHash common.Hash
-	BtcTxId      common.Hash
-	Receiver     common.Address
-	Amount       *big.Int
+	MintTxHash common.Hash
+	BtcTxId    common.Hash
+	Receiver   common.Address
+	Amount     *big.Int
 }
 
 func (ev *MintedEvent) String() string {
