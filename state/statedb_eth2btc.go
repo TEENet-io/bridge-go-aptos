@@ -16,7 +16,8 @@ func (st *StateDB) InsertAfterRequested(redeem *Redeem) error {
 		return err
 	}
 
-	r, err := encode(redeem)
+	r := &sqlRedeem{}
+	r, err = r.encode(redeem)
 	if err != nil {
 		return err
 	}
@@ -53,7 +54,8 @@ func (st *StateDB) UpdateAfterPrepared(redeem *Redeem) error {
 		return err
 	}
 
-	r, err := encode(redeem)
+	r := &sqlRedeem{}
+	r, err = r.encode(redeem)
 	if err != nil {
 		return err
 	}
