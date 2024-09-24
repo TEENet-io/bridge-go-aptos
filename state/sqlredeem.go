@@ -22,22 +22,22 @@ type sqlRedeem struct {
 // relevant types that can be stored in sql db. It only checks field
 // Outpoints for non-emptyness since it is difficult to do the check
 // in db level.
-func encode(r *Redeem) (*sqlRedeem, error) {
+func (s *sqlRedeem) encode(r *Redeem) (*sqlRedeem, error) {
 	outpoints, err := encodeOutpoints(r.Outpoints)
 	if err != nil {
 		return nil, err
 	}
 
-	return &sqlRedeem{
-		RequestTxHash: r.RequestTxHash.String()[2:],
-		PrepareTxHash: r.PrepareTxHash.String()[2:],
-		BtcTxId:       r.BtcTxId.String()[2:],
-		Requester:     r.Requester.String()[2:],
-		Receiver:      r.Receiver,
-		Amount:        r.Amount.Uint64(),
-		Outpoints:     outpoints,
-		Status:        string(r.Status),
-	}, nil
+	s.RequestTxHash = r.RequestTxHash.String()[2:]
+	s.PrepareTxHash = r.PrepareTxHash.String()[2:]
+	s.BtcTxId = r.BtcTxId.String()[2:]
+	s.Requester = r.Requester.String()[2:]
+	s.Receiver = r.Receiver
+	s.Amount = r.Amount.Uint64()
+	s.Outpoints = outpoints
+	s.Status = string(r.Status)
+
+	return s, nil
 }
 
 func (r *sqlRedeem) decode() (*Redeem, error) {

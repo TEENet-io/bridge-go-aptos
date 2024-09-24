@@ -21,23 +21,21 @@ type sqlSignatureRequest struct {
 	S             string
 }
 
-func (s *SignatureRequest) convert() *sqlSignatureRequest {
-	return &sqlSignatureRequest{
-		RequestTxHash: s.RequestTxHash.String()[2:],
-		SigningHash:   s.SigningHash.String()[2:],
-		Rx:            common.BigIntToHexStr(s.Rx)[2:],
-		S:             common.BigIntToHexStr(s.S)[2:],
-	}
+func (s *sqlSignatureRequest) encode(sr *SignatureRequest) *sqlSignatureRequest {
+	s.RequestTxHash = sr.RequestTxHash.String()[2:]
+	s.SigningHash = sr.SigningHash.String()[2:]
+	s.Rx = common.BigIntToHexStr(sr.Rx)[2:]
+	s.S = common.BigIntToHexStr(sr.S)[2:]
+	return s
 }
 
-func (s *SignatureRequest) restore(sqlSr *sqlSignatureRequest) *SignatureRequest {
-	s = &SignatureRequest{
-		RequestTxHash: common.HexStrToBytes32(sqlSr.RequestTxHash),
-		SigningHash:   common.HexStrToBytes32(sqlSr.SigningHash),
-		Rx:            common.HexStrToBigInt(sqlSr.Rx),
-		S:             common.HexStrToBigInt(sqlSr.S),
+func (s *sqlSignatureRequest) decode() *SignatureRequest {
+	return &SignatureRequest{
+		RequestTxHash: common.HexStrToBytes32(s.RequestTxHash),
+		SigningHash:   common.HexStrToBytes32(s.SigningHash),
+		Rx:            common.HexStrToBigInt(s.Rx),
+		S:             common.HexStrToBigInt(s.S),
 	}
-	return s
 }
 
 type monitoredTx struct {
@@ -46,25 +44,24 @@ type monitoredTx struct {
 	SentAfter     ethcommon.Hash // hash of the latest block before sending the tx
 }
 
-type sqlmonitoredTx struct {
+type sqlMonitoredTx struct {
 	TxHash        string
 	RequestTxHash string
 	SentAfter     string
 }
 
-func (mt *monitoredTx) covert() *sqlmonitoredTx {
-	return &sqlmonitoredTx{
-		TxHash:        mt.TxHash.String()[2:],
-		RequestTxHash: mt.RequestTxHash.String()[2:],
-		SentAfter:     mt.SentAfter.String()[2:],
-	}
+func (s *sqlMonitoredTx) encode(mt *monitoredTx) *sqlMonitoredTx {
+	s.TxHash = mt.TxHash.String()[2:]
+	s.RequestTxHash = mt.RequestTxHash.String()[2:]
+	s.SentAfter = mt.SentAfter.String()[2:]
+
+	return s
 }
 
-func (mt *monitoredTx) restore(sqlMt *sqlmonitoredTx) *monitoredTx {
-	mt = &monitoredTx{
-		TxHash:        common.HexStrToBytes32(sqlMt.TxHash),
-		RequestTxHash: common.HexStrToBytes32(sqlMt.RequestTxHash),
-		SentAfter:     common.HexStrToBytes32(sqlMt.SentAfter),
+func (s *sqlMonitoredTx) decode() *monitoredTx {
+	return &monitoredTx{
+		TxHash:        common.HexStrToBytes32(s.TxHash),
+		RequestTxHash: common.HexStrToBytes32(s.RequestTxHash),
+		SentAfter:     common.HexStrToBytes32(s.SentAfter),
 	}
-	return mt
 }
