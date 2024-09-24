@@ -14,7 +14,6 @@ var (
 )
 
 type EthTxManagerDB struct {
-	db        *sql.DB
 	stmtCache *database.StmtCache
 }
 
@@ -24,7 +23,6 @@ func NewEthTxManagerDB(db *sql.DB) (*EthTxManagerDB, error) {
 	}
 
 	return &EthTxManagerDB{
-		db:        db,
 		stmtCache: database.NewStmtCache(db),
 	}, nil
 }
