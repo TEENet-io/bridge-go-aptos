@@ -101,10 +101,10 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 				for _, ev := range minted {
 					logger.Debugf("found event Minted: mintTx=0x%x, amount=%v, receiver=%s", ev.TxHash, ev.Amount, ev.Receiver)
 					s.st.GetNewMintedEventChannel() <- &MintedEvent{
-						MintedTxHash: ev.TxHash,
-						BtcTxId:      ev.BtcTxId,
-						Amount:       new(big.Int).Set(ev.Amount),
-						Receiver:     ev.Receiver,
+						MintTxHash: ev.TxHash,
+						BtcTxId:    ev.BtcTxId,
+						Amount:     new(big.Int).Set(ev.Amount),
+						Receiver:   ev.Receiver,
 					}
 				}
 
