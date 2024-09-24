@@ -1,4 +1,4 @@
-package eth2btcstate
+package state
 
 import "strings"
 

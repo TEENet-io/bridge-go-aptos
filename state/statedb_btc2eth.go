@@ -1,30 +1,11 @@
-package btc2ethstate
+package state
 
 import (
 	"database/sql"
 	"fmt"
 
-	"github.com/TEENet-io/bridge-go/database"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 )
-
-type StateDB struct {
-	stmtCache *database.StmtCache
-}
-
-func NewStateDB(db *sql.DB) (*StateDB, error) {
-	if _, err := db.Exec(mintTable); err != nil {
-		return nil, err
-	}
-
-	return &StateDB{
-		stmtCache: database.NewStmtCache(db),
-	}, nil
-}
-
-func (stdb *StateDB) Close() {
-	stdb.stmtCache.Clear()
-}
 
 func (stdb *StateDB) Insert(m *Mint) error {
 	query := `INSERT INTO mint (btcTxId, receiver, amount, status) VALUES (?, ?, ?, ?)`
@@ -33,7 +14,8 @@ func (stdb *StateDB) Insert(m *Mint) error {
 		return err
 	}
 
-	s, err := encode(m)
+	s := &sqlMint{}
+	s, err = s.encode(m)
 	if err != nil {
 		return err
 	}
@@ -130,7 +112,8 @@ func (stdb *StateDB) Update(m *Mint) error {
 		return err
 	}
 
-	s, err := encode(m)
+	s := &sqlMint{}
+	s, err = s.encode(m)
 	if err != nil {
 		return err
 	}

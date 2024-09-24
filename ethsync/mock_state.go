@@ -10,88 +10,84 @@ import (
 
 const MaxEvNum = 32
 
-type MockEth2BtcState struct {
-	newFinalizedCh chan *big.Int
-	requestedEvCh  chan *RedeemRequestedEvent
-	preparedEvCh   chan *RedeemPreparedEvent
+type MockState struct {
+	newEthFinalizedCh chan *big.Int
+	newBtcFinalizedCh chan *big.Int
+	mintedEvCh        chan *MintedEvent
+	requestedEvCh     chan *RedeemRequestedEvent
+	preparedEvCh      chan *RedeemPreparedEvent
 
-	lastFinalized *big.Int
-	requestedEv   []*RedeemRequestedEvent
-	preparedEv    []*RedeemPreparedEvent
+	lastEthFinalized *big.Int
+	lastBtcFinalized *big.Int
+
+	mintedEv    []*MintedEvent
+	requestedEv []*RedeemRequestedEvent
+	preparedEv  []*RedeemPreparedEvent
 }
 
-func NewMockEth2BtcState() *MockEth2BtcState {
-	return &MockEth2BtcState{
-		newFinalizedCh: make(chan *big.Int, 1),
-		requestedEvCh:  make(chan *RedeemRequestedEvent, 1),
-		preparedEvCh:   make(chan *RedeemPreparedEvent, 1),
+func NewMockState() *MockState {
+	return &MockState{
+		newEthFinalizedCh: make(chan *big.Int, 1),
+		newBtcFinalizedCh: make(chan *big.Int, 1),
+		mintedEvCh:        make(chan *MintedEvent, 1),
+		requestedEvCh:     make(chan *RedeemRequestedEvent, 1),
+		preparedEvCh:      make(chan *RedeemPreparedEvent, 1),
 
-		lastFinalized: new(big.Int).Set(common.EthStartingBlock),
-		requestedEv:   make([]*RedeemRequestedEvent, 0, MaxEvNum),
-		preparedEv:    make([]*RedeemPreparedEvent, 0, MaxEvNum),
+		lastEthFinalized: new(big.Int).Set(common.EthStartingBlock),
+		lastBtcFinalized: big.NewInt(0),
+		mintedEv:         []*MintedEvent{},
+		requestedEv:      []*RedeemRequestedEvent{},
+		preparedEv:       []*RedeemPreparedEvent{},
 	}
 }
 
-func (st *MockEth2BtcState) GetNewRedeemRequestedEventChannel() chan<- *RedeemRequestedEvent {
+func (st *MockState) GetNewEthFinalizedBlockChannel() chan<- *big.Int {
+	return st.newEthFinalizedCh
+}
+
+func (st *MockState) GetNewBtcFinalizedBlockChannel() chan<- *big.Int {
+	return st.newBtcFinalizedCh
+}
+func (st *MockState) GetNewMintedEventChannel() chan<- *MintedEvent {
+	return st.mintedEvCh
+}
+
+func (st *MockState) GetNewRedeemRequestedEventChannel() chan<- *RedeemRequestedEvent {
 	return st.requestedEvCh
 }
 
-func (st *MockEth2BtcState) GetNewRedeemPreparedEventChannel() chan<- *RedeemPreparedEvent {
+func (st *MockState) GetNewRedeemPreparedEventChannel() chan<- *RedeemPreparedEvent {
 	return st.preparedEvCh
 }
 
-func (st *MockEth2BtcState) GetFinalizedBlockNumber() (*big.Int, error) {
-	return st.lastFinalized, nil
+func (st *MockState) GetEthFinalizedBlockNumber() (*big.Int, error) {
+	return st.lastEthFinalized, nil
 }
 
-func (st *MockEth2BtcState) Start(ctx context.Context) error {
-	logger.Info("starting mock eth2btc state")
-	defer logger.Info("stopping mock eth2btc state")
+func (st *MockState) GetBtcFinalizedBlockNumber() (*big.Int, error) {
+	return st.lastBtcFinalized, nil
+}
+
+func (st *MockState) Start(ctx context.Context) error {
+	logger.Info("starting mock state")
+	defer logger.Info("stopping mock state")
 
 	for {
 		select {
 		case <-ctx.Done():
 			return (ctx).Err()
-		case n := <-st.newFinalizedCh:
-			st.lastFinalized = new(big.Int).Set(n)
+		case n := <-st.newEthFinalizedCh:
+			logger.Infof("new eth finalized block: %v", n)
+			st.lastEthFinalized = new(big.Int).Set(n)
+		case ev := <-st.mintedEvCh:
+			logger.Infof("new minted event: %v", ev)
+			st.mintedEv = append(st.mintedEv, ev)
 		case ev := <-st.requestedEvCh:
+			logger.Infof("new requested event: %v", ev)
 			st.requestedEv = append(st.requestedEv, ev)
 		case ev := <-st.preparedEvCh:
+			logger.Infof("new prepared event: %v", ev)
 			st.preparedEv = append(st.preparedEv, ev)
 		}
 	}
-}
-
-func (st *MockEth2BtcState) GetNewFinalizedBlockChannel() chan<- *big.Int {
-	return st.newFinalizedCh
-}
-
-type MockBtc2EthState struct {
-	mintedEvCh chan *MintedEvent
-	mintedEv   []*MintedEvent
-}
-
-func NewMockBtc2EthState() *MockBtc2EthState {
-	return &MockBtc2EthState{
-		mintedEvCh: make(chan *MintedEvent, 1),
-		mintedEv:   []*MintedEvent{},
-	}
-}
-
-func (st *MockBtc2EthState) Start(ctx context.Context) error {
-	logger.Info("starting mock btc2eth state")
-	defer logger.Info("stopping mock btc2eth state")
-
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case ev := <-st.mintedEvCh:
-			st.mintedEv = append(st.mintedEv, ev)
-		}
-	}
-}
-
-func (st *MockBtc2EthState) GetNewMintedEventChannel() chan<- *MintedEvent {
-	return st.mintedEvCh
 }

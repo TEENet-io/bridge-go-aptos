@@ -1,4 +1,4 @@
-package eth2btcstate
+package state
 
 type Config struct {
 	ChannelSize int

@@ -1,10 +1,9 @@
-package eth2btcstate
+package state
 
 import (
 	"math/big"
 
 	"github.com/TEENet-io/bridge-go/common"
-	"github.com/TEENet-io/bridge-go/state"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
@@ -19,12 +18,12 @@ type sqlRedeem struct {
 	Status        string
 }
 
-// encode converts fields of an eth2btcstate.Redeem object to
+// encode converts fields of an eth2btcRedeem object to
 // relevant types that can be stored in sql db. It only checks field
 // Outpoints for non-emptyness since it is difficult to do the check
 // in db level.
 func encode(r *Redeem) (*sqlRedeem, error) {
-	outpoints, err := state.EncodeOutpoints(r.Outpoints)
+	outpoints, err := encodeOutpoints(r.Outpoints)
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +47,7 @@ func (r *sqlRedeem) decode() (*Redeem, error) {
 	requester := ethcommon.HexToAddress("0x" + r.Requester)
 	amount := new(big.Int).SetUint64(r.Amount)
 
-	outpoints, err := state.DecodeOutpoints(r.Outpoints)
+	outpoints, err := decodeOutpoints(r.Outpoints)
 	if err != nil {
 		return nil, err
 	}

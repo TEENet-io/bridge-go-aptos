@@ -4,14 +4,13 @@ import (
 	"math/big"
 )
 
-type Eth2BtcState interface {
-	GetNewFinalizedBlockChannel() chan<- *big.Int
+type State interface {
+	GetNewEthFinalizedBlockChannel() chan<- *big.Int
+	GetNewBtcFinalizedBlockChannel() chan<- *big.Int
 	GetNewRedeemRequestedEventChannel() chan<- *RedeemRequestedEvent
 	GetNewRedeemPreparedEventChannel() chan<- *RedeemPreparedEvent
-
-	GetFinalizedBlockNumber() (*big.Int, error)
-}
-
-type Btc2EthState interface {
 	GetNewMintedEventChannel() chan<- *MintedEvent
+
+	GetEthFinalizedBlockNumber() (*big.Int, error)
+	GetBtcFinalizedBlockNumber() (*big.Int, error)
 }

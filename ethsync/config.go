@@ -8,7 +8,8 @@ import (
 )
 
 type Config struct {
-	FrequencyToCheckFinalizedBlock time.Duration
-	BtcChainConfig                 *chaincfg.Params
-	EthChainID                     *big.Int
+	FrequencyToCheckEthFinalizedBlock time.Duration
+	FrequencyToCheckBtcFinalizedBlock time.Duration
+	BtcChainConfig                    *chaincfg.Params
+	EthChainID                        *big.Int
 }

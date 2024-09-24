@@ -1,4 +1,4 @@
-package eth2btcstate
+package state
 
 import (
 	"encoding/json"
@@ -8,7 +8,6 @@ import (
 
 	"github.com/TEENet-io/bridge-go/common"
 	"github.com/TEENet-io/bridge-go/ethsync"
-	"github.com/TEENet-io/bridge-go/state"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
@@ -42,7 +41,7 @@ type Redeem struct {
 	Requester     ethcommon.Address
 	Receiver      string // receiver btc address
 	Amount        *big.Int
-	Outpoints     []state.Outpoint
+	Outpoints     []Outpoint
 	Status        RedeemStatus
 }
 
@@ -113,7 +112,7 @@ func (r *Redeem) updateFromPreparedEvent(ev *ethsync.RedeemPreparedEvent) (*Rede
 			return nil, errors.New(ErrorOutpointTxIdInvalid)
 		}
 
-		r.Outpoints = append(r.Outpoints, state.Outpoint{
+		r.Outpoints = append(r.Outpoints, Outpoint{
 			TxId: ev.OutpointTxIds[i],
 			Idx:  ev.OutpointIdxs[i],
 		})
@@ -176,7 +175,7 @@ func (r *Redeem) UnmarshalJSON(data []byte) error {
 	r.Status = RedeemStatus(jRedeem.Status)
 
 	for _, jOutpoint := range jRedeem.Outpoints {
-		r.Outpoints = append(r.Outpoints, state.Outpoint{
+		r.Outpoints = append(r.Outpoints, Outpoint{
 			TxId: common.HexStrToBytes32(jOutpoint.TxId),
 			Idx:  jOutpoint.Idx,
 		})
