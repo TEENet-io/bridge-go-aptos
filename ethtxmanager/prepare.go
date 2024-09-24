@@ -20,6 +20,8 @@ var (
 	ErrInsertSignatureRequest             = errors.New("failed to insert signature request in db")
 	ErrRedeemPrepare                      = errors.New("failed to call bridge.RedeemPrepare")
 	ErrInsertMonitoredTx                  = errors.New("failed to insert monitored tx in db")
+	ErrEmptyOutpointsReturned             = errors.New("empty outpoints returned")
+	ErrInvalidSchnorrSignature            = errors.New("invalid schnorr signature")
 )
 
 func (txmgr *EthTxManager) prepareRedeem(ctx context.Context, redeem *state.Redeem) error {

@@ -13,6 +13,8 @@ var (
 	ErrOnCanonicalChain   = errors.New("failed to check if on canonical chain")
 	ErrHeaderByNumber     = errors.New("failed to get latest block header by number")
 	ErrHeaderByHash       = errors.New("failed to get latest block header by hash")
+
+	ErrMsgNotFound = "not found"
 )
 
 // monitor monitors the tx until it is mined or timeout
