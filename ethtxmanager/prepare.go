@@ -6,6 +6,7 @@ import (
 	logger "github.com/0xPolygonHermez/zkevm-node/log"
 	"github.com/TEENet-io/bridge-go/common"
 	"github.com/TEENet-io/bridge-go/etherman"
+	"github.com/TEENet-io/bridge-go/state"
 	"github.com/TEENet-io/bridge-go/state/eth2btcstate"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 )
@@ -34,7 +35,7 @@ func (txmgr *EthTxManager) prepareRedeem(ctx context.Context, redeem *eth2btcsta
 	}
 
 	// request spendable outpoints from btc wallet
-	chForOutpoints := make(chan []eth2btcstate.Outpoint, 1)
+	chForOutpoints := make(chan []state.Outpoint, 1)
 	err = txmgr.btcWallet.Request(
 		redeem.RequestTxHash,
 		redeem.Amount,
@@ -64,7 +65,7 @@ func (txmgr *EthTxManager) prepareRedeem(ctx context.Context, redeem *eth2btcsta
 	}
 
 	// Compute the signing hash
-	redeem.Outpoints = append([]eth2btcstate.Outpoint{}, outpoints...)
+	redeem.Outpoints = append([]state.Outpoint{}, outpoints...)
 	params := createPrepareParams(redeem)
 	signingHash := params.SigningHash()
 
@@ -111,8 +112,8 @@ func (txmgr *EthTxManager) prepareRedeem(ctx context.Context, redeem *eth2btcsta
 
 func (txmgr *EthTxManager) waitforOutpoints(
 	ctx context.Context,
-	ch <-chan []eth2btcstate.Outpoint,
-) ([]eth2btcstate.Outpoint, error) {
+	ch <-chan []state.Outpoint,
+) ([]state.Outpoint, error) {
 	newCtx, cancel := context.WithTimeout(ctx, txmgr.cfg.TimeoutOnWaitingForOutpoints)
 	defer cancel()
 

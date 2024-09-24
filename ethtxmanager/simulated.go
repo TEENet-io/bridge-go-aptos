@@ -5,7 +5,7 @@ import (
 
 	"github.com/TEENet-io/bridge-go/common"
 	"github.com/TEENet-io/bridge-go/etherman"
-	"github.com/TEENet-io/bridge-go/state/eth2btcstate"
+	"github.com/TEENet-io/bridge-go/state"
 )
 
 type MockBtcWallet struct {
@@ -14,9 +14,9 @@ type MockBtcWallet struct {
 func (w *MockBtcWallet) Request(
 	requestRedeemTxHash [32]byte,
 	amount *big.Int,
-	ch chan<- []eth2btcstate.Outpoint,
+	ch chan<- []state.Outpoint,
 ) error {
-	outpoints := []eth2btcstate.Outpoint{
+	outpoints := []state.Outpoint{
 		{
 			TxId: common.RandBytes32(),
 			Idx:  0,
