@@ -28,14 +28,6 @@ func (sc *StmtCache) Prepare(query string) (*sql.Stmt, error) {
 	return cached.(*sql.Stmt), nil
 }
 
-func (sc *StmtCache) MustPrepare(query string) *sql.Stmt {
-	stmt, err := sc.Prepare(query)
-	if err != nil {
-		panic(err)
-	}
-	return stmt
-}
-
 func (sc *StmtCache) Clear() {
 	sc.m.Range(func(k, v interface{}) bool {
 		_ = v.(*sql.Stmt).Close()
