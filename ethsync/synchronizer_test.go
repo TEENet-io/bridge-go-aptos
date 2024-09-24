@@ -103,10 +103,10 @@ func sendTxs(t *testing.T, env *etherman.SimEtherman) (
 	}
 
 	mintedEvs = append(mintedEvs, &MintedEvent{
-		MintedTxHash: tx.Hash(),
-		BtcTxId:      mintParams.BtcTxId,
-		Amount:       new(big.Int).Set(mintParams.Amount),
-		Receiver:     mintParams.Receiver,
+		MintTxHash: tx.Hash(),
+		BtcTxId:    mintParams.BtcTxId,
+		Amount:     new(big.Int).Set(mintParams.Amount),
+		Receiver:   mintParams.Receiver,
 	})
 
 	// 2
