@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"strings"
 
+	logger "github.com/0xPolygonHermez/zkevm-node/log"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
 )
@@ -101,23 +102,7 @@ func encodeRawString(v string) []byte {
 func encodeHexString(v string) []byte {
 	decoded, err := hex.DecodeString(strings.TrimPrefix(v, "0x"))
 	if err != nil {
-		panic(err)
+		logger.Fatal(err)
 	}
 	return decoded
-}
-
-func encodeUint256(v string) []byte {
-	bn := new(big.Int)
-	bn.SetString(v, 10)
-	return math.U256Bytes(bn)
-}
-
-func encodeUint256Array(arr []string) []byte {
-	var res [][]byte
-	for _, v := range arr {
-		b := encodeUint256(v)
-		res = append(res, b)
-	}
-
-	return bytes.Join(res, nil)
 }
