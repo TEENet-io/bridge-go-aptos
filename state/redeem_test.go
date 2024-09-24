@@ -72,22 +72,22 @@ func TestSetFromRequestEvent(t *testing.T) {
 	ev := &ethsync.RedeemRequestedEvent{}
 
 	_, err := createRedeemFromRequestedEvent(ev)
-	assert.Equal(t, ErrorRequestTxHashInvalid, err.Error())
+	assert.Equal(t, ErrorRequestTxHashInvalid.Error(), err.Error())
 
 	// invalid requester
 	ev.RequestTxHash = common.RandBytes32()
 	_, err = createRedeemFromRequestedEvent(ev)
-	assert.Equal(t, ErrorRequesterInvalid, err.Error())
+	assert.Equal(t, ErrorRequesterInvalid.Error(), err.Error())
 
 	// nil amount
 	ev.Requester = common.RandEthAddress()
 	_, err = createRedeemFromRequestedEvent(ev)
-	assert.Equal(t, ErrorAmountInvalid, err.Error())
+	assert.Equal(t, ErrorAmountInvalid.Error(), err.Error())
 
 	// zero amount
 	ev.Amount = big.NewInt(0)
 	_, err = createRedeemFromRequestedEvent(ev)
-	assert.Equal(t, ErrorAmountInvalid, err.Error())
+	assert.Equal(t, ErrorAmountInvalid.Error(), err.Error())
 
 	// success
 	ev.Amount = big.NewInt(100)
@@ -104,42 +104,42 @@ func TestUpdateFromPrepareEvent(t *testing.T) {
 
 	// invalid request tx hash
 	_, err := redeem.updateFromPreparedEvent(ev)
-	assert.Equal(t, ErrorRedeemPrepareTxHashInvalid, err.Error())
+	assert.Equal(t, ErrorRedeemPrepareTxHashInvalid.Error(), err.Error())
 
 	// unmatch request tx hash
 	ev.PrepareTxHash = common.RandBytes32()
 	ev.RequestTxHash = common.RandBytes32()
 	_, err = redeem.updateFromPreparedEvent(ev)
-	assert.Equal(t, ErrorRequestTxHashUnmatched, err.Error())
+	assert.Equal(t, ErrorRequestTxHashUnmatched.Error(), err.Error())
 
 	// unmatched requester
 	ev.RequestTxHash = redeem.RequestTxHash
 	ev.Requester = common.RandEthAddress()
 	_, err = redeem.updateFromPreparedEvent(ev)
-	assert.Equal(t, ErrorRequesterUnmatched, err.Error())
+	assert.Equal(t, ErrorRequesterUnmatched.Error(), err.Error())
 
 	// nil amount
 	ev.Requester = redeem.Requester
 	_, err = redeem.updateFromPreparedEvent(ev)
-	assert.Equal(t, ErrorAmountInvalid, err.Error())
+	assert.Equal(t, ErrorAmountInvalid.Error(), err.Error())
 
 	// unmatch amount
 	ev.Amount = new(big.Int).Add(redeem.Amount, big.NewInt(1))
 	_, err = redeem.updateFromPreparedEvent(ev)
-	assert.Equal(t, ErrorAmountUnmatched, err.Error())
+	assert.Equal(t, ErrorAmountUnmatched.Error(), err.Error())
 
 	// receiver unmatched
 	ev.Amount = new(big.Int).Set(redeem.Amount)
 	_, err = redeem.updateFromPreparedEvent(ev)
-	assert.Equal(t, ErrorReceiverUnmatched, err.Error())
+	assert.Equal(t, ErrorReceiverUnmatched.Error(), err.Error())
 
 	// empty outpoints
 	ev.Receiver = redeem.Receiver
 	_, err = redeem.updateFromPreparedEvent(ev)
-	assert.Equal(t, ErrorOutpointsInvalid, err.Error())
+	assert.Equal(t, ErrorOutpointsInvalid.Error(), err.Error())
 	ev.OutpointTxIds = append([]ethcommon.Hash{}, common.RandBytes32())
 	_, err = redeem.updateFromPreparedEvent(ev)
-	assert.Equal(t, ErrorOutpointsInvalid, err.Error())
+	assert.Equal(t, ErrorOutpointsInvalid.Error(), err.Error())
 
 	// success
 	ev.OutpointIdxs = []uint16{0}

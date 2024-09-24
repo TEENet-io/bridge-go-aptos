@@ -1,7 +1,6 @@
 package state
 
 import (
-	"database/sql"
 	"testing"
 
 	"github.com/TEENet-io/bridge-go/common"
@@ -10,13 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func getMemoryDB() *sql.DB {
-	db, err := sql.Open("sqlite3", ":memory:")
-	if err != nil {
-		panic(err)
-	}
-	return db
-}
 func TestInsertAfterRequested(t *testing.T) {
 	sqlDB := getMemoryDB()
 	db, err := NewStateDB(sqlDB)

@@ -13,7 +13,7 @@ type StateDB struct {
 }
 
 func NewStateDB(db *sql.DB) (*StateDB, error) {
-	if _, err := db.Exec(redeemTable + kvTable); err != nil {
+	if _, err := db.Exec(redeemTable + kvTable + mintTable); err != nil {
 		return nil, err
 	}
 
