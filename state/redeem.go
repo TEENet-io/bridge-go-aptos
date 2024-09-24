@@ -21,17 +21,17 @@ const (
 )
 
 var (
-	ErrorAmountInvalid              = "amount invalid"
-	ErrorRequesterInvalid           = "requester address invalid"
-	ErrorRequestTxHashInvalid       = "redeem request tx hash invalid"
-	ErrorRedeemPrepareTxHashInvalid = "redeem prepare tx hash invalid"
-	ErrorRequestTxHashUnmatched     = "redeem request tx hash unmatched"
-	ErrorRequesterUnmatched         = "requester unmatched"
-	ErrorAmountUnmatched            = "amount unmatched"
-	ErrorReceiverUnmatched          = "receiver unmatched"
-	ErrorOutpointsInvalid           = "outpoints invalid"
-	ErrorOutpointTxIdInvalid        = "outpoint tx id invalid"
-	ErrorRequireStatusRequested     = "require status == requested"
+	ErrorAmountInvalid              = errors.New("amount invalid")
+	ErrorRequesterInvalid           = errors.New("requester address invalid")
+	ErrorRequestTxHashInvalid       = errors.New("redeem request tx hash invalid")
+	ErrorRedeemPrepareTxHashInvalid = errors.New("redeem prepare tx hash invalid")
+	ErrorRequestTxHashUnmatched     = errors.New("redeem request tx hash unmatched")
+	ErrorRequesterUnmatched         = errors.New("requester unmatched")
+	ErrorAmountUnmatched            = errors.New("amount unmatched")
+	ErrorReceiverUnmatched          = errors.New("receiver unmatched")
+	ErrorOutpointsInvalid           = errors.New("outpoints invalid")
+	ErrorOutpointTxIdInvalid        = errors.New("outpoint tx id invalid")
+	ErrorRequireStatusRequested     = errors.New("require status == requested")
 )
 
 type Redeem struct {
@@ -49,15 +49,15 @@ func createRedeemFromRequestedEvent(ev *ethsync.RedeemRequestedEvent) (*Redeem, 
 	r := &Redeem{}
 
 	if ev.RequestTxHash == [32]byte{} {
-		return nil, errors.New(ErrorRequestTxHashInvalid)
+		return nil, ErrorRequestTxHashInvalid
 	}
 
 	if ev.Requester == [20]byte{} {
-		return nil, errors.New(ErrorRequesterInvalid)
+		return nil, ErrorRequesterInvalid
 	}
 
 	if ev.Amount == nil || ev.Amount.Sign() <= 0 {
-		return nil, errors.New(ErrorAmountInvalid)
+		return nil, ErrorAmountInvalid
 	}
 
 	r.RequestTxHash = ev.RequestTxHash
@@ -75,41 +75,41 @@ func createRedeemFromRequestedEvent(ev *ethsync.RedeemRequestedEvent) (*Redeem, 
 
 func (r *Redeem) updateFromPreparedEvent(ev *ethsync.RedeemPreparedEvent) (*Redeem, error) {
 	if r.Status != RedeemStatusRequested {
-		return nil, errors.New(ErrorRequireStatusRequested)
+		return nil, ErrorRequireStatusRequested
 	}
 
 	if ev.PrepareTxHash == [32]byte{} {
-		return nil, errors.New(ErrorRedeemPrepareTxHashInvalid)
+		return nil, ErrorRedeemPrepareTxHashInvalid
 	}
 
 	if ev.RequestTxHash != r.RequestTxHash {
-		return nil, errors.New(ErrorRequestTxHashUnmatched)
+		return nil, ErrorRequestTxHashUnmatched
 	}
 
 	if ev.Requester != r.Requester {
-		return nil, errors.New(ErrorRequesterUnmatched)
+		return nil, ErrorRequesterUnmatched
 	}
 
 	if ev.Amount == nil {
-		return nil, errors.New(ErrorAmountInvalid)
+		return nil, ErrorAmountInvalid
 	}
 
 	if ev.Amount.Cmp(r.Amount) != 0 {
-		return nil, errors.New(ErrorAmountUnmatched)
+		return nil, ErrorAmountUnmatched
 	}
 
 	if ev.Receiver != r.Receiver {
-		return nil, errors.New(ErrorReceiverUnmatched)
+		return nil, ErrorReceiverUnmatched
 	}
 
 	if ev.OutpointTxIds == nil || ev.OutpointIdxs == nil || len(ev.OutpointTxIds) == 0 || len(ev.OutpointIdxs) == 0 {
-		return nil, errors.New(ErrorOutpointsInvalid)
+		return nil, ErrorOutpointsInvalid
 	}
 
 	r.PrepareTxHash = ev.PrepareTxHash
 	for i := range ev.OutpointIdxs {
 		if ev.OutpointTxIds[i] == [32]byte{} {
-			return nil, errors.New(ErrorOutpointTxIdInvalid)
+			return nil, ErrorOutpointTxIdInvalid
 		}
 
 		r.Outpoints = append(r.Outpoints, Outpoint{

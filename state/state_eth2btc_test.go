@@ -39,7 +39,7 @@ func TestNewState(t *testing.T) {
 	assert.Equal(t, err, ErrStoredEthFinalizedBlockNumberInvalid)
 }
 
-func TestNewFinalizedBlockNumber(t *testing.T) {
+func TestNewEthFinalizedBlockNumber(t *testing.T) {
 	sqlDB := getMemoryDB()
 	defer sqlDB.Close()
 
@@ -116,11 +116,12 @@ func TestNewRedeemRequestedEvent(t *testing.T) {
 
 func TestNewRedeemPreparedEvent(t *testing.T) {
 	sqlDB := getMemoryDB()
-	defer sqlDB.Close()
-
 	statedb, err := NewStateDB(sqlDB)
 	assert.NoError(t, err)
-	defer statedb.Close()
+	defer func() {
+		sqlDB.Close()
+		statedb.Close()
+	}()
 
 	st, err := New(statedb, &Config{ChannelSize: 1})
 	assert.NoError(t, err)
@@ -134,8 +135,14 @@ func TestNewRedeemPreparedEvent(t *testing.T) {
 	assert.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	var retErr error
-	go func() { retErr = st.Start(ctx) }()
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				assert.Equal(t, r.(error), ErrUpdateInvalidRedeem)
+			}
+		}()
+		st.Start(ctx)
+	}()
 	defer cancel()
 
 	// Insert without a corresponding request redeem stored
@@ -179,5 +186,4 @@ func TestNewRedeemPreparedEvent(t *testing.T) {
 	time.Sleep(100 * time.Millisecond) // wait for the state to process the event
 	ch2 <- ev4                         // send the prepared event
 	time.Sleep(100 * time.Millisecond) // wait for the state to process the event
-	assert.Equal(t, retErr, ErrRedeemInvalid)
 }

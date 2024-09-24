@@ -2,12 +2,13 @@ package state
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
-func (stdb *StateDB) Insert(m *Mint) error {
+func (stdb *StateDB) InsertMint(m *Mint) error {
 	query := `INSERT INTO mint (btcTxId, receiver, amount, status) VALUES (?, ?, ?, ?)`
 	stmt, err := stdb.stmtCache.Prepare(query)
 	if err != nil {
@@ -24,8 +25,8 @@ func (stdb *StateDB) Insert(m *Mint) error {
 	return err
 }
 
-func (stdb *StateDB) GetRequested() ([]*Mint, error) {
-	query := `SELECT btcTxId, receiver, amount FROM mint WHERE status = ?`
+func (stdb *StateDB) GetRequestedMint() ([]*Mint, error) {
+	query := `SELECT btcTxId, receiver, amount, status FROM mint WHERE status = ?`
 	stmt, err := stdb.stmtCache.Prepare(query)
 	if err != nil {
 		return nil, err
@@ -40,7 +41,7 @@ func (stdb *StateDB) GetRequested() ([]*Mint, error) {
 	mints := []*Mint{}
 	for rows.Next() {
 		var s sqlMint
-		if err := rows.Scan(&s.BtcTxID, &s.Receiver, &s.Amount); err != nil {
+		if err := rows.Scan(&s.BtcTxID, &s.Receiver, &s.Amount, &s.Status); err != nil {
 			return nil, err
 		}
 
@@ -55,12 +56,12 @@ func (stdb *StateDB) GetRequested() ([]*Mint, error) {
 	return mints, nil
 }
 
-func (stdb *StateDB) Get(btcTxId ethcommon.Hash, status MintStatus) (*Mint, bool, error) {
+func (stdb *StateDB) GetMint(btcTxId ethcommon.Hash, status MintStatus) (*Mint, bool, error) {
 	var query string
 	if status == MintStatusRequested {
 		query = `SELECT btcTxId, receiver, amount FROM mint WHERE btcTxId = ? AND status = ?`
 	} else {
-		query = `SELECT btcTxId, mintTxHash, receiver, amount, outpoints FROM mint WHERE btcTxId = ? AND status = ?`
+		query = `SELECT btcTxId, mintTxHash, receiver, amount FROM mint WHERE btcTxId = ? AND status = ?`
 	}
 
 	stmt, err := stdb.stmtCache.Prepare(query)
@@ -76,7 +77,7 @@ func (stdb *StateDB) Get(btcTxId ethcommon.Hash, status MintStatus) (*Mint, bool
 	} else {
 		s.Status = string(MintStatusCompleted)
 		err = stmt.QueryRow(id, string(MintStatusCompleted)).Scan(
-			&s.BtcTxID, &s.MintTxHash, &s.Receiver, &s.Amount, &s.Outpoints)
+			&s.BtcTxID, &s.MintTxHash, &s.Receiver, &s.Amount)
 	}
 
 	if err != nil {
@@ -94,18 +95,18 @@ func (stdb *StateDB) Get(btcTxId ethcommon.Hash, status MintStatus) (*Mint, bool
 	return mint, true, nil
 }
 
-func (stdb *StateDB) Update(m *Mint) error {
-	_, ok, err := stdb.Get(m.BtcTxID, MintStatusRequested)
+func (stdb *StateDB) UpdateMint(m *Mint) error {
+	_, ok, err := stdb.GetMint(m.BtcTxID, MintStatusRequested)
 	if err != nil {
 		return err
 	}
 
 	if !ok {
 		msg := fmt.Sprintf("mint not found in statedb for btcTxId=%v", m.BtcTxID)
-		panic(msg)
+		return errors.New(msg)
 	}
 
-	query := `UPDATE mint SET mintTxHash = ?, outpoints = ?, status = ? WHERE btcTxId = ?`
+	query := `UPDATE mint SET mintTxHash = ?, status = ? WHERE btcTxId = ?`
 
 	stmt, err := stdb.stmtCache.Prepare(query)
 	if err != nil {
@@ -118,7 +119,7 @@ func (stdb *StateDB) Update(m *Mint) error {
 		return err
 	}
 
-	_, err = stmt.Exec(s.MintTxHash, s.Outpoints, string(MintStatusCompleted), s.BtcTxID)
+	_, err = stmt.Exec(s.MintTxHash, string(MintStatusCompleted), s.BtcTxID)
 
 	if err != nil {
 		return err

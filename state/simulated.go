@@ -1,6 +1,7 @@
 package state
 
 import (
+	"database/sql"
 	"math/big"
 
 	"github.com/TEENet-io/bridge-go/common"
@@ -26,4 +27,22 @@ func randRedeem(status RedeemStatus) *Redeem {
 		Receiver: "rand_btc_address",
 		Status:   status,
 	}
+}
+
+func randMint(status MintStatus) *Mint {
+	return &Mint{
+		BtcTxID:    common.RandBytes32(),
+		MintTxHash: common.RandBytes32(),
+		Receiver:   common.RandEthAddress(),
+		Amount:     big.NewInt(100),
+		Status:     status,
+	}
+}
+
+func getMemoryDB() *sql.DB {
+	db, err := sql.Open("sqlite3", ":memory:")
+	if err != nil {
+		panic(err)
+	}
+	return db
 }

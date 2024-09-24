@@ -20,7 +20,7 @@ var (
 	ErrGetEthFinalizedBlockNumber           = errors.New("failed to get eth finalized block number from statedb")
 	ErrStoredEthFinalizedBlockNumberInvalid = errors.New("stored eth finalized block number is invalid")
 
-	ErrRedeemInvalid          = errors.New("redeem is invalid")
+	ErrUpdateInvalidRedeem    = errors.New("redeem is invalid and cannot be updated")
 	ErrGetRedeem              = errors.New("failed to get redeem from statedb")
 	ErrCheckRedeemExistence   = errors.New("failed to check redeem existence")
 	ErrPreparedEventUnmatched = errors.New("redeem prepared event is unmatched with stored requested redeem")
@@ -28,6 +28,8 @@ var (
 	ErrPreparedEventInvalid   = errors.New("redeem prepared event is invalid")
 	ErrInsertRedeem           = errors.New("failed to insert redeem in statedb")
 	ErrRequestedEventInvalid  = errors.New("redeem requested event is invalid")
+
+	ErrUpdateMint = errors.New("failed to update mint in statedb")
 )
 
 type State struct {
@@ -61,6 +63,8 @@ func New(statedb *StateDB, cfg *Config) (*State, error) {
 		return nil, err
 	}
 
+	// TODO: init btc finalized block number
+
 	return st, nil
 }
 
@@ -72,52 +76,110 @@ func (st *State) Start(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
+		// TODO: case <-newBtcFinalizedBlockCh
 		case blkNum := <-st.newEthFinalizedBlockCh:
-			// Get the stored last finalized block number
-			lastFinalized, err := st.GetEthFinalizedBlockNumber()
-			if err != nil {
-				logger.Errorf("failed to get last finalized block number: err=%v", err)
-				return ErrGetEthFinalizedBlockNumber
+			handleNewBlockNumber := func() error {
+				// Get the stored last finalized block number
+				lastFinalized, err := st.GetEthFinalizedBlockNumber()
+				if err != nil {
+					logger.Errorf("failed to get last finalized block number: err=%v", err)
+					return ErrGetEthFinalizedBlockNumber
+				}
+
+				// Update the last finalized block number if the new one is larger
+				if lastFinalized.Cmp(blkNum) <= 0 {
+					if err := st.setFinalizedBlockNumber(blkNum); err != nil {
+						logger.Errorf("failed to set last finalized block number: err=%v", err)
+						return ErrSetEthFinalizedBlockNumber
+					}
+				}
+				return nil
 			}
 
-			// Update the last finalized block number if the new one is larger
-			if lastFinalized.Cmp(blkNum) <= 0 {
-				if err := st.setFinalizedBlockNumber(blkNum); err != nil {
-					logger.Errorf("failed to set last finalized block number: err=%v", err)
-					return ErrSetEthFinalizedBlockNumber
+			err := handleNewBlockNumber()
+			if err != nil {
+				switch err {
+				case ErrGetEthFinalizedBlockNumber:
+				case ErrSetEthFinalizedBlockNumber:
+				default:
+					panic(err)
 				}
+			}
+		// After receiving a new minted event, udpate statedb
+		case ev := <-st.newMintedEventCh:
+			handleEvent := func() error {
+				newLogger := logger.WithFields(
+					"mintTx", ev.MintTxHash.String(),
+					"btcTxId", ev.BtcTxId.String(),
+				)
+
+				mint := createMintFromMintedEvent(ev)
+
+				err := st.statedb.UpdateMint(mint)
+				if err != nil {
+					newLogger.Errorf("failed to update mint: err=%v", err)
+					return ErrUpdateMint
+				}
+				newLogger.Debug("update mint")
+				return nil
+			}
+
+			err := handleEvent()
+			if err != nil {
+				switch err {
+				case ErrUpdateMint:
+				default:
+					panic(err)
+				}
+				panic(err)
 			}
 		// After receiving a redeem request event
 		// 1. 	Check the existence of the redeem request tx hash
 		// 2.	Skip if found
 		// 3.	Insert a new redeem record in state db
 		case ev := <-st.newRedeemRequestedEvCh:
-			newLogger := logger.WithFields(
-				"reqTx", ev.RequestTxHash.String(),
-			)
+			handleEvent := func() error {
+				newLogger := logger.WithFields(
+					"reqTx", ev.RequestTxHash.String(),
+				)
 
-			// Check if the redeem already exists
-			ok, _, err := st.statedb.HasRedeem(ev.RequestTxHash)
+				// Check if the redeem already exists
+				ok, _, err := st.statedb.HasRedeem(ev.RequestTxHash)
+				if err != nil {
+					newLogger.Errorf("failed to check redeem existence: err=%v", err)
+					return ErrCheckRedeemExistence
+				}
+
+				if ok {
+					return nil
+				}
+
+				// Create a new redeem and save it to the database
+				redeem, err := createRedeemFromRequestedEvent(ev)
+				if err != nil {
+					newLogger.Errorf("failed to create redeem from requested event: err=%v, ev=%v", err, ev)
+					return ErrRequestedEventInvalid
+				}
+				if err := st.statedb.InsertAfterRequested(redeem); err != nil {
+					newLogger.Errorf("failed to insert redeem to db: err=%v", err)
+					return ErrInsertRedeem
+				}
+				newLogger.Debug("insert redeem after requested")
+
+				return nil
+			}
+
+			err := handleEvent()
 			if err != nil {
-				newLogger.Errorf("failed to check redeem existence: err=%v", err)
-				return ErrCheckRedeemExistence
+				switch err {
+				// statedb errors
+				case ErrCheckRedeemExistence, ErrInsertRedeem:
+				case ErrRequestedEventInvalid:
+				default:
+					panic(err)
+				}
+				panic(err)
 			}
-
-			if ok {
-				continue
-			}
-
-			// Create a new redeem and save it to the database
-			redeem, err := createRedeemFromRequestedEvent(ev)
-			if err != nil {
-				newLogger.Errorf("failed to create redeem from requested event: err=%v, ev=%v", err, ev)
-				return ErrRequestedEventInvalid
-			}
-			if err := st.statedb.InsertAfterRequested(redeem); err != nil {
-				newLogger.Errorf("failed to insert redeem to db: err=%v", err)
-				return ErrInsertRedeem
-			}
-			newLogger.Debug("insert redeem after requested")
 		// After receiving a redeem prepared event
 		// 1. 	Check the existence of the tx hash
 		// 2. 	If found, check its status
@@ -127,52 +189,69 @@ func (st *State) Start(ctx context.Context) error {
 		// NOTE that it is possible that a prepared event arrives earlier than
 		// its corresponding requested event
 		case ev := <-st.newRedeemPreparedEvCh:
-			newLogger := logger.WithFields(
-				"reqTx", ev.RequestTxHash.String(),
-				"prepTx", ev.PrepareTxHash.String(),
-			)
+			handleEvent := func() error {
+				newLogger := logger.WithFields(
+					"reqTx", ev.RequestTxHash.String(),
+					"prepTx", ev.PrepareTxHash.String(),
+				)
 
-			ok, status, err := st.statedb.HasRedeem(ev.RequestTxHash)
+				ok, status, err := st.statedb.HasRedeem(ev.RequestTxHash)
+				if err != nil {
+					newLogger.Errorf("error when checking existence: err=%v", err)
+					return ErrCheckRedeemExistence
+				}
+
+				var redeem *Redeem
+
+				if ok {
+					if status == RedeemStatusPrepared || status == RedeemStatusCompleted {
+						return nil
+					}
+
+					if status == RedeemStatusInvalid {
+						newLogger.Errorf("redeem is invalid and cannot be updated")
+						return ErrUpdateInvalidRedeem
+					}
+
+					redeem, ok, err = st.statedb.GetRedeem(ev.RequestTxHash, RedeemStatusRequested)
+					if err != nil || !ok {
+						newLogger.Errorf("failed to get stored redeem: err=%v", err)
+						return ErrGetRedeem
+					}
+
+					redeem, err = redeem.updateFromPreparedEvent(ev)
+					if err != nil {
+						logger.Errorf("failed to update redeem from prepared event: err=%v", err)
+						return ErrPreparedEventUnmatched
+					}
+				} else {
+					redeem, err = createRedeemFromPreparedEvent(ev)
+					if err != nil {
+						logger.Errorf("failed to create redeem from prepared event: err=%v, ev=%v", err, ev)
+						return ErrPreparedEventInvalid
+					}
+				}
+
+				if err = st.statedb.UpdateAfterPrepared(redeem); err != nil {
+					return ErrUpdateRedeem
+				}
+				newLogger.Debug("update redeem after prepared")
+
+				return nil
+			}
+
+			err := handleEvent()
 			if err != nil {
-				newLogger.Errorf("error when checking existence: err=%v", err)
-				return ErrCheckRedeemExistence
+				switch err {
+				// statedb errors
+				case ErrCheckRedeemExistence, ErrGetRedeem, ErrPreparedEventInvalid, ErrUpdateRedeem:
+				case ErrPreparedEventUnmatched:
+				case ErrUpdateInvalidRedeem:
+				default:
+					panic(err)
+				}
+				panic(err)
 			}
-
-			var redeem *Redeem
-
-			if ok {
-				if status == RedeemStatusPrepared || status == RedeemStatusCompleted {
-					continue
-				}
-
-				if status == RedeemStatusInvalid {
-					newLogger.Errorf("redeem is invalid")
-					return ErrRedeemInvalid
-				}
-
-				redeem, ok, err = st.statedb.GetRedeem(ev.RequestTxHash, RedeemStatusRequested)
-				if err != nil || !ok {
-					newLogger.Errorf("failed to get stored redeem: err=%v", err)
-					return ErrGetRedeem
-				}
-
-				redeem, err = redeem.updateFromPreparedEvent(ev)
-				if err != nil {
-					logger.Errorf("failed to update redeem from prepared event: err=%v", err)
-					return ErrPreparedEventUnmatched
-				}
-			} else {
-				redeem, err = createRedeemFromPreparedEvent(ev)
-				if err != nil {
-					logger.Errorf("failed to create redeem from prepared event: err=%v, ev=%v", err, ev)
-					return ErrPreparedEventInvalid
-				}
-			}
-
-			if err = st.statedb.UpdateAfterPrepared(redeem); err != nil {
-				return ErrUpdateRedeem
-			}
-			newLogger.Debug("update redeem after prepared")
 		}
 	}
 }
