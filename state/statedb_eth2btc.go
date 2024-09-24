@@ -1,32 +1,12 @@
-package eth2btcstate
+package state
 
 import (
 	"database/sql"
 
-	"github.com/TEENet-io/bridge-go/common"
-	"github.com/TEENet-io/bridge-go/database"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
-type StateDB struct {
-	stmtCache *database.StmtCache
-}
-
-func NewStateDB(db *sql.DB) (*StateDB, error) {
-	if _, err := db.Exec(redeemTable + kvTable); err != nil {
-		return nil, err
-	}
-
-	return &StateDB{
-		stmtCache: database.NewStmtCache(db),
-	}, nil
-}
-
-func (st *StateDB) Close() {
-	st.stmtCache.Clear()
-}
-
-func (st *StateDB) insertAfterRequested(redeem *Redeem) error {
+func (st *StateDB) InsertAfterRequested(redeem *Redeem) error {
 	// Insert after receiving a new redeem requested event. Only fields
 	// requestTxHash, requester, receiver, amount, and status are required.
 	query := `INSERT OR IGNORE INTO redeem (` + statusRequestedParamList + `) VALUES (?, ?, ?, ?, ?)`
@@ -54,11 +34,11 @@ func (st *StateDB) insertAfterRequested(redeem *Redeem) error {
 	return nil
 }
 
-func (st *StateDB) updateAfterPrepared(redeem *Redeem) error {
+func (st *StateDB) UpdateAfterPrepared(redeem *Redeem) error {
 	// Update after receiving a new redeem prepared event. Only fields
 	// prepareTxHash, outpoints, and status are required.
 	var query string
-	_, ok, err := st.Get(redeem.RequestTxHash, RedeemStatusRequested)
+	_, ok, err := st.GetRedeem(redeem.RequestTxHash, RedeemStatusRequested)
 	if err != nil {
 		return err
 	}
@@ -99,7 +79,7 @@ func (st *StateDB) updateAfterPrepared(redeem *Redeem) error {
 	return nil
 }
 
-func (st *StateDB) GetByStatus(status RedeemStatus) ([]*Redeem, error) {
+func (st *StateDB) GetRedeemByStatus(status RedeemStatus) ([]*Redeem, error) {
 	var query string
 	if status == RedeemStatusRequested || status == RedeemStatusInvalid {
 		query = `SELECT` + statusRequestedParamList + `FROM redeem WHERE status = ?`
@@ -172,7 +152,7 @@ func (st *StateDB) GetByStatus(status RedeemStatus) ([]*Redeem, error) {
 	return redeems, nil
 }
 
-func (st *StateDB) Get(requestTxHash ethcommon.Hash, status RedeemStatus) (*Redeem, bool, error) {
+func (st *StateDB) GetRedeem(requestTxHash ethcommon.Hash, status RedeemStatus) (*Redeem, bool, error) {
 	var query string
 	if status == RedeemStatusRequested || status == RedeemStatusInvalid {
 		query = `SELECT` + statusRequestedParamList + `FROM redeem WHERE requestTxHash = ? AND status = ?`
@@ -234,7 +214,7 @@ func (st *StateDB) Get(requestTxHash ethcommon.Hash, status RedeemStatus) (*Rede
 	return redeem, true, nil
 }
 
-func (st *StateDB) Has(requestTxHash ethcommon.Hash) (bool, RedeemStatus, error) {
+func (st *StateDB) HasRedeem(requestTxHash ethcommon.Hash) (bool, RedeemStatus, error) {
 	query := `SELECT status FROM redeem WHERE requestTxHash = ?`
 	stmt, err := st.stmtCache.Prepare(query)
 	if err != nil {
@@ -251,36 +231,4 @@ func (st *StateDB) Has(requestTxHash ethcommon.Hash) (bool, RedeemStatus, error)
 	}
 
 	return true, RedeemStatus(status), nil
-}
-
-func (st *StateDB) GetKeyedValue(key ethcommon.Hash) (ethcommon.Hash, error) {
-	query := `SELECT value FROM kv WHERE key = ?`
-	stmt, err := st.stmtCache.Prepare(query)
-	if err != nil {
-		return ethcommon.Hash{}, err
-	}
-
-	var value string
-	keyHex := key.String()[2:]
-	if err := stmt.QueryRow(keyHex).Scan(&value); err != nil {
-		return [32]byte{}, err
-	}
-
-	return common.HexStrToBytes32(value), nil
-}
-
-func (st *StateDB) setKeyedValue(key, value ethcommon.Hash) error {
-	query := `INSERT OR REPLACE INTO kv (key, value) VALUES (?, ?)`
-	stmt, err := st.stmtCache.Prepare(query)
-	if err != nil {
-		return err
-	}
-
-	keyHex := key.String()[2:]
-	valueHex := value.String()[2:]
-	if _, err := stmt.Exec(keyHex, valueHex); err != nil {
-		return err
-	}
-
-	return nil
 }

@@ -18,16 +18,15 @@ type Synchronizer struct {
 
 	etherman *etherman.Etherman
 
-	e2bSt Eth2BtcState
-	b2eSt Btc2EthState
+	st State
 
-	lastFinalizedBlockNumber *big.Int
+	ethFinalizedBlockNumber *big.Int
+	btcFinalizedBlockNumber *big.Int
 }
 
 func New(
 	etherman *etherman.Etherman,
-	e2bstate Eth2BtcState,
-	b2estate Btc2EthState,
+	st State,
 	cfg *Config,
 ) (*Synchronizer, error) {
 	chainID, err := etherman.Client().ChainID(context.Background())
@@ -40,19 +39,24 @@ func New(
 		return nil, ErrChainIDUnmatched(cfg.EthChainID, chainID)
 	}
 
-	// get the last finalized block number stored in state db
-	stored, err := e2bstate.GetFinalizedBlockNumber()
+	ethStored, err := st.GetEthFinalizedBlockNumber()
 	if err != nil {
 		logger.Error("failed to get eth finalized block number from database when initializing eth synchronizer")
 		return nil, err
 	}
 
+	btcStored, err := st.GetBtcFinalizedBlockNumber()
+	if err != nil {
+		logger.Error("failed to get btc finalized block number from database when initializing eth synchronizer")
+		return nil, err
+	}
+
 	return &Synchronizer{
-		etherman:                 etherman,
-		lastFinalizedBlockNumber: stored,
-		e2bSt:                    e2bstate,
-		b2eSt:                    b2estate,
-		cfg:                      cfg,
+		etherman:                etherman,
+		ethFinalizedBlockNumber: ethStored,
+		btcFinalizedBlockNumber: btcStored,
+		st:                      st,
+		cfg:                     cfg,
 	}, nil
 }
 
@@ -62,27 +66,32 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 		logger.Info("stopping Eth synchronization")
 	}()
 
+	checkEthTicker := time.NewTicker(s.cfg.FrequencyToCheckEthFinalizedBlock)
+	defer checkEthTicker.Stop()
+	checkBtcTicker := time.NewTicker(s.cfg.FrequencyToCheckBtcFinalizedBlock)
+	defer checkBtcTicker.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-time.After(s.cfg.FrequencyToCheckFinalizedBlock):
+		case <-checkBtcTicker.C:
 			newFinalized, err := s.etherman.GetLatestFinalizedBlockNumber()
 			if err != nil {
 				return err
 			}
 
 			// continue if new finalized block number is less than the last processed block number
-			if newFinalized.Cmp(s.lastFinalizedBlockNumber) != 1 {
+			if newFinalized.Cmp(s.ethFinalizedBlockNumber) != 1 {
 				continue
 			}
 
-			s.e2bSt.GetNewFinalizedBlockChannel() <- newFinalized
+			s.st.GetNewEthFinalizedBlockChannel() <- newFinalized
 
 			// For each block with height starting from lastFinalized + 1 to newFinalized,
 			// extract all the TWBTC minted, redeem request and redeem prepared events.
 			// Send all the events to the relevant states via channels.
-			num := new(big.Int).Add(s.lastFinalizedBlockNumber, big.NewInt(1))
+			num := new(big.Int).Add(s.ethFinalizedBlockNumber, big.NewInt(1))
 			for num.Cmp(newFinalized) != 1 {
 				minted, requested, prepared, err := s.etherman.GetEventLogs(num)
 				if err != nil {
@@ -91,7 +100,7 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 
 				for _, ev := range minted {
 					logger.Debugf("found event Minted: mintTx=0x%x, amount=%v, receiver=%s", ev.TxHash, ev.Amount, ev.Receiver)
-					s.b2eSt.GetNewMintedEventChannel() <- &MintedEvent{
+					s.st.GetNewMintedEventChannel() <- &MintedEvent{
 						MintedTxHash: ev.TxHash,
 						BtcTxId:      ev.BtcTxId,
 						Amount:       new(big.Int).Set(ev.Amount),
@@ -101,7 +110,7 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 
 				for _, ev := range requested {
 					logger.Debugf("found event RedeemRequested: reqTx=0x%x, amount=%v", ev.TxHash, ev.Amount)
-					s.e2bSt.GetNewRedeemRequestedEventChannel() <- &RedeemRequestedEvent{
+					s.st.GetNewRedeemRequestedEventChannel() <- &RedeemRequestedEvent{
 						RequestTxHash:   ev.TxHash,
 						Requester:       ev.Sender,
 						Amount:          new(big.Int).Set(ev.Amount),
@@ -118,7 +127,7 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 					for _, txid := range ev.OutpointTxIds {
 						outpointTxIds = append(outpointTxIds, txid)
 					}
-					s.e2bSt.GetNewRedeemPreparedEventChannel() <- &RedeemPreparedEvent{
+					s.st.GetNewRedeemPreparedEventChannel() <- &RedeemPreparedEvent{
 						PrepareTxHash: ev.TxHash,
 						RequestTxHash: ev.EthTxHash,
 						Requester:     ev.Requester,
@@ -132,7 +141,7 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 				num.Add(num, big.NewInt(1))
 			}
 
-			s.lastFinalizedBlockNumber = new(big.Int).Set(newFinalized)
+			s.ethFinalizedBlockNumber = new(big.Int).Set(newFinalized)
 		}
 	}
 }

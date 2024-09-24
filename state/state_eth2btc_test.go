@@ -1,7 +1,8 @@
-package eth2btcstate
+package state
 
 import (
 	"context"
+	"database/sql"
 	"math/big"
 	"testing"
 	"time"
@@ -13,27 +14,29 @@ import (
 
 func TestNewState(t *testing.T) {
 	sqlDB := getMemoryDB()
-	db, err := NewStateDB(sqlDB)
+	statedb, err := NewStateDB(sqlDB)
 	if err != nil {
 		t.Fatal(err)
 	}
+	_, err = statedb.GetKeyedValue(KeyEthFinalizedBlock)
+	assert.Equal(t, err, sql.ErrNoRows)
 	defer func() {
 		sqlDB.Close()
-		db.Close()
+		statedb.Close()
 	}()
 
-	st, err := New(db, &Config{ChannelSize: 1})
+	st, err := New(statedb, &Config{ChannelSize: 1})
 	assert.NoError(t, err)
-	finalized, err := st.GetFinalizedBlockNumber()
+	finalized, err := st.GetEthFinalizedBlockNumber()
 	assert.NoError(t, err)
 	assert.Equal(t, finalized, common.EthStartingBlock)
 
 	// return error when stored finalized block number less than the default starting block number
 	finalized = new(big.Int).Sub(common.EthStartingBlock, big.NewInt(1))
-	err = db.setKeyedValue(KeyLastFinalizedBlock, common.BigInt2Bytes32(finalized))
+	err = statedb.SetKeyedValue(KeyEthFinalizedBlock, common.BigInt2Bytes32(finalized))
 	assert.NoError(t, err)
-	_, err = New(db, &Config{ChannelSize: 1})
-	assert.Equal(t, err, ErrStoredFinalizedBlockNumberInvalid)
+	_, err = New(statedb, &Config{ChannelSize: 1})
+	assert.Equal(t, err, ErrStoredEthFinalizedBlockNumberInvalid)
 }
 
 func TestNewFinalizedBlockNumber(t *testing.T) {
@@ -47,7 +50,7 @@ func TestNewFinalizedBlockNumber(t *testing.T) {
 	st, err := New(statedb, &Config{ChannelSize: 1})
 	assert.NoError(t, err)
 
-	stored, err := st.GetFinalizedBlockNumber()
+	stored, err := st.GetEthFinalizedBlockNumber()
 	assert.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -57,17 +60,17 @@ func TestNewFinalizedBlockNumber(t *testing.T) {
 
 	// no change when the new finalized block number is equal or less than the stored one
 	minusOne := new(big.Int).Sub(stored, big.NewInt(1))
-	st.GetNewFinalizedBlockChannel() <- minusOne
+	st.GetNewEthFinalizedBlockChannel() <- minusOne
 	time.Sleep(100 * time.Millisecond)
-	curr, err := st.GetFinalizedBlockNumber()
+	curr, err := st.GetEthFinalizedBlockNumber()
 	assert.NoError(t, err)
 	assert.Equal(t, curr, stored)
 
 	// update when the new finalized block number is larger than the current one
 	plusOne := new(big.Int).Add(stored, big.NewInt(1))
-	st.GetNewFinalizedBlockChannel() <- plusOne
+	st.GetNewEthFinalizedBlockChannel() <- plusOne
 	time.Sleep(100 * time.Millisecond)
-	curr, err = st.GetFinalizedBlockNumber()
+	curr, err = st.GetEthFinalizedBlockNumber()
 	assert.NoError(t, err)
 	assert.Equal(t, curr, plusOne)
 }
@@ -105,7 +108,7 @@ func TestNewRedeemRequestedEvent(t *testing.T) {
 	ch <- ev
 	time.Sleep(100 * time.Millisecond)
 
-	actual, err := st.db.GetByStatus(RedeemStatusRequested)
+	actual, err := st.statedb.GetRedeemByStatus(RedeemStatusRequested)
 	assert.NoError(t, err)
 	assert.Len(t, actual, 1) // only one redeem should be saved
 	assert.Equal(t, expected, actual[0])
@@ -138,7 +141,7 @@ func TestNewRedeemPreparedEvent(t *testing.T) {
 	// Insert without a corresponding request redeem stored
 	ch2 <- ev1                         // send the prepared event
 	time.Sleep(100 * time.Millisecond) // wait for the state to process the event
-	actual, ok, err := st.db.Get(ev1.RequestTxHash, RedeemStatusPrepared)
+	actual, ok, err := st.statedb.GetRedeem(ev1.RequestTxHash, RedeemStatusPrepared)
 	assert.NoError(t, err)
 	assert.True(t, ok)
 	assert.Equal(t, expected, actual)
@@ -158,7 +161,7 @@ func TestNewRedeemPreparedEvent(t *testing.T) {
 	time.Sleep(100 * time.Millisecond) // wait for the state to process the event
 	expected, err = createRedeemFromPreparedEvent(ev2)
 	assert.NoError(t, err)
-	actual, ok, err = st.db.Get(ev2.RequestTxHash, RedeemStatusPrepared)
+	actual, ok, err = st.statedb.GetRedeem(ev2.RequestTxHash, RedeemStatusPrepared)
 	assert.NoError(t, err)
 	assert.True(t, ok)
 	assert.Equal(t, expected, actual)

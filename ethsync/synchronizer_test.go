@@ -29,45 +29,43 @@ func TestSync(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, chainID, big.NewInt(1337))
 
-	mockE2BState := NewMockEth2BtcState()
-	mockB2EState := NewMockBtc2EthState()
+	st := NewMockState()
 
 	cfg := &Config{
-		FrequencyToCheckFinalizedBlock: 100 * time.Millisecond,
-		BtcChainConfig:                 common.MainNetParams(),
-		EthChainID:                     chainID,
+		FrequencyToCheckEthFinalizedBlock: 500 * time.Millisecond,
+		FrequencyToCheckBtcFinalizedBlock: 500 * time.Millisecond,
+		BtcChainConfig:                    common.MainNetParams(),
+		EthChainID:                        chainID,
 	}
 
-	synchronizer, err := New(env.Etherman, mockE2BState, mockB2EState, cfg)
+	synchronizer, err := New(env.Etherman, st, cfg)
 	assert.NoError(t, err)
 
 	// No event should be sent since the finalized block number is too small
 	ctx1, cancel1 := context.WithCancel(context.Background())
-	go mockB2EState.Start(ctx1)
-	go mockE2BState.Start(ctx1)
+	go st.Start(ctx1)
 	go synchronizer.Sync(ctx1)
 	sendTxs(t, env)
 	time.Sleep(500 * time.Millisecond)
 	cancel1()
-	assert.Empty(t, mockB2EState.mintedEv)
-	assert.Empty(t, mockE2BState.requestedEv)
-	assert.Empty(t, mockE2BState.preparedEv)
+	assert.Empty(t, st.mintedEv)
+	assert.Empty(t, st.requestedEv)
+	assert.Empty(t, st.preparedEv)
 
 	// test when the finalized block number is valid
 	ctx2, cancel2 := context.WithCancel(context.Background())
 	blk, _ := env.Chain.Backend.Client().BlockByNumber(context.Background(), nil)
 	start := blk.Number()
 	assert.NoError(t, err)
-	for start.Cmp(synchronizer.lastFinalizedBlockNumber) != 1 {
+	for start.Cmp(synchronizer.ethFinalizedBlockNumber) != 1 {
 		env.Chain.Backend.Commit()
 		start.Add(start, big.NewInt(1))
 	}
 	blk, _ = env.Chain.Backend.Client().BlockByNumber(context.Background(), nil)
 	assert.Equal(t, blk.Number(),
-		synchronizer.lastFinalizedBlockNumber.Add(synchronizer.lastFinalizedBlockNumber, big.NewInt(1)))
+		synchronizer.ethFinalizedBlockNumber.Add(synchronizer.ethFinalizedBlockNumber, big.NewInt(1)))
 
-	go mockB2EState.Start(ctx2)
-	go mockE2BState.Start(ctx2)
+	go st.Start(ctx2)
 	go synchronizer.Sync(ctx2)
 
 	mintedEvs, reqeustedEvs, preparedEvs := sendTxs(t, env)
@@ -75,15 +73,15 @@ func TestSync(t *testing.T) {
 	cancel2()
 
 	blk, _ = env.Chain.Backend.Client().BlockByNumber(context.Background(), nil)
-	assert.Equal(t, blk.Number(), mockE2BState.lastFinalized)
-	assert.Equal(t, 2, len(mockE2BState.requestedEv))
-	assert.Equal(t, 1, len(mockE2BState.preparedEv))
-	assert.Equal(t, 1, len(mockB2EState.mintedEv))
+	assert.Equal(t, blk.Number(), st.lastEthFinalized)
+	assert.Equal(t, 2, len(st.requestedEv))
+	assert.Equal(t, 1, len(st.preparedEv))
+	assert.Equal(t, 1, len(st.mintedEv))
 
-	assert.Equal(t, mintedEvs[0].String(), mockB2EState.mintedEv[0].String())
-	assert.Equal(t, reqeustedEvs[0].String(), mockE2BState.requestedEv[0].String())
-	assert.Equal(t, reqeustedEvs[1].String(), mockE2BState.requestedEv[1].String())
-	assert.Equal(t, preparedEvs[0].String(), mockE2BState.preparedEv[0].String())
+	assert.Equal(t, mintedEvs[0].String(), st.mintedEv[0].String())
+	assert.Equal(t, reqeustedEvs[0].String(), st.requestedEv[0].String())
+	assert.Equal(t, reqeustedEvs[1].String(), st.requestedEv[1].String())
+	assert.Equal(t, preparedEvs[0].String(), st.preparedEv[0].String())
 }
 
 // sendTxs sends the following txs:
