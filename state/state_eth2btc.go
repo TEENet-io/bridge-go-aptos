@@ -1,7 +1,6 @@
 package state
 
 import (
-	"database/sql"
 	"math/big"
 
 	logger "github.com/0xPolygonHermez/zkevm-node/log"
@@ -9,19 +8,19 @@ import (
 )
 
 func (st *State) initEthFinalizedBlock() error {
-	storedBytes32, err := st.statedb.GetKeyedValue(KeyEthFinalizedBlock)
-	if err != nil && err != sql.ErrNoRows {
+	storedBytes32, ok, err := st.statedb.GetKeyedValue(KeyEthFinalizedBlock)
+	if err != nil {
 		return ErrGetEthFinalizedBlockNumber
 	}
 
-	if err == sql.ErrNoRows {
+	if !ok {
 		logger.Warnf("no stored last finalized block number found, using the default value %v", common.EthStartingBlock)
 		// save the default value
 		err := st.statedb.SetKeyedValue(KeyEthFinalizedBlock, common.BigInt2Bytes32(common.EthStartingBlock))
 		if err != nil {
 			return ErrSetEthFinalizedBlockNumber
 		}
-		st.cache.lastFinalized.Store(common.EthStartingBlock.Bytes())
+		st.cache.lastEthFinalized.Store(common.EthStartingBlock.Bytes())
 	} else {
 		stored := new(big.Int).SetBytes(storedBytes32[:])
 
@@ -30,7 +29,7 @@ func (st *State) initEthFinalizedBlock() error {
 			logger.Errorf("stored last finalized block number is invalid: %v", stored)
 			return ErrStoredEthFinalizedBlockNumberInvalid
 		}
-		st.cache.lastFinalized.Store(stored)
+		st.cache.lastEthFinalized.Store(stored)
 	}
 	return nil
 }

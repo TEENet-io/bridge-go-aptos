@@ -1,6 +1,7 @@
 package state
 
 import (
+	"log"
 	"testing"
 
 	"github.com/TEENet-io/bridge-go/common"
@@ -9,22 +10,78 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestInsertAfterRequested(t *testing.T) {
+func newTestStateDBEnv(t *testing.T) (*StateDB, func()) {
 	sqlDB := getMemoryDB()
-	db, err := NewStateDB(sqlDB)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
+	statedb, err := NewStateDB(sqlDB)
+	assert.NoError(t, err)
+	return statedb, func() {
+		statedb.Close()
 		sqlDB.Close()
-		db.Close()
-	}()
+	}
+}
+
+func TestGetRedeemWithNull(t *testing.T) {
+	db, close := newTestStateDBEnv(t)
+	defer close()
+
+	expected := randRedeem(RedeemStatusRequested)
+	err := db.InsertAfterRequested(expected)
+	assert.NoError(t, err)
+	actual, ok, err := db.GetRedeem(expected.RequestTxHash)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	assert.NoError(t, err)
+	assert.True(t, ok)
+	assert.Equal(t, expected.RequestTxHash, actual.RequestTxHash)
+	assert.Equal(t, expected.Requester, actual.Requester)
+	assert.Equal(t, expected.Receiver, actual.Receiver)
+	assert.Equal(t, expected.Amount, actual.Amount)
+	assert.Equal(t, expected.Status, actual.Status)
+	assert.Equal(t, ethcommon.Hash{}, actual.BtcTxId)
+	assert.Equal(t, ethcommon.Hash{}, actual.PrepareTxHash)
+	assert.Len(t, actual.Outpoints, 0)
+}
+
+func TestGetRedeemsByStatus(t *testing.T) {
+	db, close := newTestStateDBEnv(t)
+	defer close()
+
+	expected := []*Redeem{
+		randRedeem(RedeemStatusRequested),
+		randRedeem(RedeemStatusRequested),
+	}
+
+	for _, redeem := range expected {
+		err := db.InsertAfterRequested(redeem)
+		assert.NoError(t, err)
+	}
+
+	actual, err := db.GetRedeemsByStatus(RedeemStatusRequested)
+	assert.NoError(t, err)
+	assert.Len(t, actual, len(expected))
+	for i := range expected {
+		assert.Equal(t, expected[i].RequestTxHash, actual[i].RequestTxHash)
+		assert.Equal(t, expected[i].Requester, actual[i].Requester)
+		assert.Equal(t, expected[i].Receiver, actual[i].Receiver)
+		assert.Equal(t, expected[i].Amount, actual[i].Amount)
+		assert.Equal(t, expected[i].Status, actual[i].Status)
+		assert.Equal(t, ethcommon.Hash{}, actual[i].BtcTxId)
+		assert.Equal(t, ethcommon.Hash{}, actual[i].PrepareTxHash)
+		assert.Len(t, actual[i].Outpoints, 0)
+	}
+}
+
+func TestInsertAfterRequested(t *testing.T) {
+	db, close := newTestStateDBEnv(t)
+	defer close()
 
 	// Insert a redeem with status == requested
 	r0 := randRedeem(RedeemStatusRequested)
-	err = db.InsertAfterRequested(r0)
+	err := db.InsertAfterRequested(r0)
 	assert.NoError(t, err)
-	rs, err := db.GetRedeemByStatus(RedeemStatusRequested)
+	rs, err := db.GetRedeemsByStatus(RedeemStatusRequested)
 	assert.Equal(t, 1, len(rs))
 	r1 := rs[0]
 	assert.NoError(t, err)
@@ -43,7 +100,7 @@ func TestInsertAfterRequested(t *testing.T) {
 	r2.RequestTxHash = r0.RequestTxHash
 	err = db.InsertAfterRequested(r2)
 	assert.NoError(t, err)
-	rs, err = db.GetRedeemByStatus(RedeemStatusRequested)
+	rs, err = db.GetRedeemsByStatus(RedeemStatusRequested)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(rs))
 	assert.Equal(t, rs[0], r1)
@@ -52,7 +109,7 @@ func TestInsertAfterRequested(t *testing.T) {
 	r2.RequestTxHash = common.RandBytes32()
 	err = db.InsertAfterRequested(r2)
 	assert.NoError(t, err)
-	rs, err = db.GetRedeemByStatus(RedeemStatusRequested)
+	rs, err = db.GetRedeemsByStatus(RedeemStatusRequested)
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(rs))
 	assert.Equal(t, rs[0].RequestTxHash, r0.RequestTxHash)
@@ -75,7 +132,7 @@ func TestUpdateAfterPrepared(t *testing.T) {
 	r0.BtcTxId = [32]byte{}
 	err = db.UpdateAfterPrepared(r0)
 	assert.NoError(t, err)
-	actual, ok, err := db.GetRedeem(r0.RequestTxHash, RedeemStatusPrepared)
+	actual, ok, err := db.GetRedeem(r0.RequestTxHash)
 	assert.NoError(t, err)
 	assert.True(t, ok)
 	assert.Equal(t, r0, actual)
@@ -90,13 +147,13 @@ func TestUpdateAfterPrepared(t *testing.T) {
 	r1.Outpoints = []Outpoint{{TxId: common.RandBytes32(), Idx: 0}}
 	err = db.UpdateAfterPrepared(r1)
 	assert.NoError(t, err)
-	actual, ok, err = db.GetRedeem(r1.RequestTxHash, RedeemStatusPrepared)
+	actual, ok, err = db.GetRedeem(r1.RequestTxHash)
 	assert.NoError(t, err)
 	assert.True(t, ok)
 	assert.Equal(t, r1, actual)
 }
 
-func TestHas(t *testing.T) {
+func TestHasRedeem(t *testing.T) {
 	sqlDB := getMemoryDB()
 	db, err := NewStateDB(sqlDB)
 	if err != nil {

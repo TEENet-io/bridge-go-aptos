@@ -26,20 +26,23 @@ func (st *StateDB) Close() {
 	st.stmtCache.Clear()
 }
 
-func (st *StateDB) GetKeyedValue(key ethcommon.Hash) (ethcommon.Hash, error) {
+func (st *StateDB) GetKeyedValue(key ethcommon.Hash) (ethcommon.Hash, bool, error) {
 	query := `SELECT value FROM kv WHERE key = ?`
 	stmt, err := st.stmtCache.Prepare(query)
 	if err != nil {
-		return ethcommon.Hash{}, err
+		return ethcommon.Hash{}, false, err
 	}
 
 	var value string
 	keyHex := key.String()[2:]
 	if err := stmt.QueryRow(keyHex).Scan(&value); err != nil {
-		return [32]byte{}, err
+		if err == sql.ErrNoRows {
+			return ethcommon.Hash{}, false, nil
+		}
+		return ethcommon.Hash{}, false, err
 	}
 
-	return common.HexStrToBytes32(value), nil
+	return common.HexStrToBytes32(value), true, nil
 }
 
 func (st *StateDB) SetKeyedValue(key, value ethcommon.Hash) error {

@@ -23,7 +23,7 @@ type sqlRedeem struct {
 // Outpoints for non-emptyness since it is difficult to do the check
 // in db level.
 func (s *sqlRedeem) encode(r *Redeem) (*sqlRedeem, error) {
-	outpoints, err := encodeOutpoints(r.Outpoints)
+	outpoints, err := EncodeOutpoints(r.Outpoints)
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +47,7 @@ func (r *sqlRedeem) decode() (*Redeem, error) {
 	requester := ethcommon.HexToAddress("0x" + r.Requester)
 	amount := new(big.Int).SetUint64(r.Amount)
 
-	outpoints, err := decodeOutpoints(r.Outpoints)
+	outpoints, err := DecodeOutpoints(r.Outpoints)
 	if err != nil {
 		return nil, err
 	}

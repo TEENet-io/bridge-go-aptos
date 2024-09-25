@@ -6,7 +6,7 @@ import (
 	"errors"
 )
 
-func encodeOutpoints(outpoints []Outpoint) ([]byte, error) {
+func EncodeOutpoints(outpoints []Outpoint) ([]byte, error) {
 	if outpoints == nil {
 		return nil, nil
 	}
@@ -20,7 +20,7 @@ func encodeOutpoints(outpoints []Outpoint) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func decodeOutpoints(data []byte) ([]Outpoint, error) {
+func DecodeOutpoints(data []byte) ([]Outpoint, error) {
 	if data == nil {
 		return nil, nil
 	}
