@@ -71,15 +71,34 @@ func New(statedb *StateDB, cfg *Config) (*State, error) {
 }
 
 func (st *State) Start(ctx context.Context) error {
-	logger.Info("starting eth2btc state")
-	defer logger.Info("stopping eth2btc state")
+	logger.Info("starting state")
+	defer logger.Info("stopping state")
 
 	// TODO: error handling
+
+	errCh := make(chan error, 1)
 
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
+		case err := <-errCh:
+			switch err {
+			case ErrGetEthFinalizedBlockNumber:
+			case ErrSetEthFinalizedBlockNumber:
+			case ErrDBOpUpdateMint:
+			case ErrDBOpHasRedeem:
+			case ErrDBOpInsertRedeem:
+			case ErrRequestedEventInvalid:
+			case ErrDBOpGetRedeem:
+			case ErrDBOpUpdateRedeem:
+			case ErrPreparedEventInvalid:
+			case ErrPreparedEventUnmatched:
+			case ErrUpdateInvalidRedeem:
+			default:
+				logger.Fatal(err)
+			}
+			return err
 		// TODO: implement case <-st.newBtcFinalizedBlockCh:
 		case blkNum := <-st.newEthFinalizedBlockCh:
 			newLogger := logger.WithFields("newFinalized", blkNum.String())
@@ -102,15 +121,8 @@ func (st *State) Start(ctx context.Context) error {
 				return nil
 			}
 
-			err := handleNewBlockNumber()
-			if err != nil {
-				switch err {
-				case ErrGetEthFinalizedBlockNumber:
-				case ErrSetEthFinalizedBlockNumber:
-				default:
-					newLogger.Fatal(err)
-				}
-				return err
+			if err := handleNewBlockNumber(); err != nil {
+				errCh <- err
 			}
 		// After receiving a new minted event, udpate statedb
 		case ev := <-st.newMintedEventCh:
@@ -131,14 +143,8 @@ func (st *State) Start(ctx context.Context) error {
 				return nil
 			}
 
-			err := handleEvent()
-			if err != nil {
-				switch err {
-				case ErrDBOpUpdateMint:
-				default:
-					newLogger.Fatal(err)
-				}
-				return err
+			if err := handleEvent(); err != nil {
+				errCh <- err
 			}
 		// After receiving a redeem request event
 		// 1. 	Check the existence of the redeem request tx hash
@@ -176,17 +182,8 @@ func (st *State) Start(ctx context.Context) error {
 				return nil
 			}
 
-			err := handleEvent()
-			if err != nil {
-				switch err {
-				// statedb errors
-				case ErrDBOpHasRedeem:
-				case ErrDBOpInsertRedeem:
-				case ErrRequestedEventInvalid:
-				default:
-					newLogger.Fatal(err)
-				}
-				return err
+			if err := handleEvent(); err != nil {
+				errCh <- err
 			}
 		// After receiving a redeem prepared event
 		// 1. 	Check the existence of the tx hash
@@ -248,21 +245,8 @@ func (st *State) Start(ctx context.Context) error {
 				return nil
 			}
 
-			err := handleEvent()
-			if err != nil {
-				switch err {
-				// statedb errors
-				case ErrDBOpHasRedeem:
-				case ErrDBOpGetRedeem:
-				case ErrDBOpUpdateRedeem:
-					// other errors
-				case ErrPreparedEventInvalid:
-				case ErrPreparedEventUnmatched:
-				case ErrUpdateInvalidRedeem:
-				default:
-					newLogger.Fatal(err)
-				}
-				return err
+			if err := handleEvent(); err != nil {
+				errCh <- err
 			}
 		}
 	}
