@@ -3,7 +3,6 @@ package ethtxmanager
 import (
 	"database/sql"
 	"errors"
-	"fmt"
 
 	"github.com/TEENet-io/bridge-go/database"
 	ethcommon "github.com/ethereum/go-ethereum/common"
@@ -32,9 +31,8 @@ func (db *EthTxManagerDB) Close() {
 	db.stmtCache.Clear()
 }
 
-func (db *EthTxManagerDB) insertSignatureRequest(sr *SignatureRequest) error {
-	query := `INSERT OR IGNORE INTO signatureRequest (requestTxHash, signingHash, rx, s) VALUES (?, ?, ?, ?)`
-	stmt, err := db.stmtCache.Prepare(query)
+func (db *EthTxManagerDB) InsertSignatureRequest(sr *SignatureRequest) error {
+	stmt, err := db.stmtCache.Prepare(queryInsertSignatureRequest)
 	if err != nil {
 		return err
 	}
@@ -45,6 +43,7 @@ func (db *EthTxManagerDB) insertSignatureRequest(sr *SignatureRequest) error {
 	if _, err := stmt.Exec(
 		sqlSr.RequestTxHash,
 		sqlSr.SigningHash,
+		sqlSr.Outpoints,
 		sqlSr.Rx,
 		sqlSr.S,
 	); err != nil {
@@ -54,11 +53,23 @@ func (db *EthTxManagerDB) insertSignatureRequest(sr *SignatureRequest) error {
 	return nil
 }
 
+func (db *EthTxManagerDB) RemoveSignatureRequest(requestTxHash ethcommon.Hash) error {
+	stmt, err := db.stmtCache.Prepare(queryRemoveSignatureRequest)
+	if err != nil {
+		return err
+	}
+
+	if _, err := stmt.Exec(requestTxHash.String()[2:]); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (db *EthTxManagerDB) GetSignatureRequestByRequestTxHash(
 	requestTxHash ethcommon.Hash,
 ) (*SignatureRequest, bool, error) {
-	query := `SELECT * FROM signatureRequest WHERE requestTxHash = ?`
-	stmt, err := db.stmtCache.Prepare(query)
+	stmt, err := db.stmtCache.Prepare(queryGetSignatureRequestByRequestTxHash)
 	if err != nil {
 		return nil, false, err
 	}
@@ -69,6 +80,7 @@ func (db *EthTxManagerDB) GetSignatureRequestByRequestTxHash(
 	if err := stmt.QueryRow(txHashStr).Scan(
 		&sqlSr.RequestTxHash,
 		&sqlSr.SigningHash,
+		&sqlSr.Outpoints,
 		&sqlSr.Rx,
 		&sqlSr.S,
 	); err != nil {
@@ -78,12 +90,16 @@ func (db *EthTxManagerDB) GetSignatureRequestByRequestTxHash(
 		return nil, false, err
 	}
 
-	return sqlSr.decode(), true, nil
+	sr, err := sqlSr.decode()
+	if err != nil {
+		return nil, false, err
+	}
+
+	return sr, true, nil
 }
 
-func (db *EthTxManagerDB) insertMonitoredTx(mt *monitoredTx) error {
-	query := `INSERT OR IGNORE INTO monitoredTx (txHash, requestTxHash, sentAfter) VALUES (?, ?, ?)`
-	stmt, err := db.stmtCache.Prepare(query)
+func (db *EthTxManagerDB) InsertMonitoredTx(mt *monitoredTx) error {
+	stmt, err := db.stmtCache.Prepare(queryInsertMonitoredTx)
 	if err != nil {
 		return err
 	}
@@ -93,7 +109,7 @@ func (db *EthTxManagerDB) insertMonitoredTx(mt *monitoredTx) error {
 
 	if _, err := stmt.Exec(
 		sqlMt.TxHash,
-		sqlMt.RequestTxHash,
+		sqlMt.Id,
 		sqlMt.SentAfter,
 	); err != nil {
 		return err
@@ -102,9 +118,8 @@ func (db *EthTxManagerDB) insertMonitoredTx(mt *monitoredTx) error {
 	return nil
 }
 
-func (db *EthTxManagerDB) removeMonitoredTxAfterMined(txHash ethcommon.Hash) error {
-	query := `DELETE FROM monitoredTx WHERE txHash = ?`
-	stmt, err := db.stmtCache.Prepare(query)
+func (db *EthTxManagerDB) RemoveMonitoredTx(txHash ethcommon.Hash) error {
+	stmt, err := db.stmtCache.Prepare(queryRemoveMonitoredTx)
 	if err != nil {
 		return err
 	}
@@ -116,21 +131,20 @@ func (db *EthTxManagerDB) removeMonitoredTxAfterMined(txHash ethcommon.Hash) err
 	return nil
 }
 
-func (db *EthTxManagerDB) GetMonitoredTxByRequestTxHash(
-	RequestTxHash ethcommon.Hash,
+func (db *EthTxManagerDB) GetMonitoredTxById(
+	Id ethcommon.Hash,
 ) (*monitoredTx, bool, error) {
-	query := `SELECT * FROM monitoredTx WHERE requestTxHash = ?`
-	stmt, err := db.stmtCache.Prepare(query)
+	stmt, err := db.stmtCache.Prepare(queryGetMonitoredTxById)
 	if err != nil {
 		return nil, false, err
 	}
 
-	hashStr := RequestTxHash.String()[2:]
+	hashStr := Id.String()[2:]
 
 	var sqlMt sqlMonitoredTx
 	if err := stmt.QueryRow(hashStr).Scan(
 		&sqlMt.TxHash,
-		&sqlMt.RequestTxHash,
+		&sqlMt.Id,
 		&sqlMt.SentAfter,
 	); err != nil {
 		if err == sql.ErrNoRows {
@@ -142,9 +156,8 @@ func (db *EthTxManagerDB) GetMonitoredTxByRequestTxHash(
 	return sqlMt.decode(), true, nil
 }
 
-func (db *EthTxManagerDB) GetAllMonitoredTx() ([]*monitoredTx, error) {
-	query := `SELECT * FROM monitoredTx`
-	stmt, err := db.stmtCache.Prepare(query)
+func (db *EthTxManagerDB) GetMonitoredTxs() ([]*monitoredTx, error) {
+	stmt, err := db.stmtCache.Prepare(queryGetMonitoredTxs)
 	if err != nil {
 		return nil, err
 	}
@@ -152,7 +165,7 @@ func (db *EthTxManagerDB) GetAllMonitoredTx() ([]*monitoredTx, error) {
 	rows, err := stmt.Query()
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return []*monitoredTx{}, nil
+			return nil, nil // No rows found, return nil slice
 		}
 		return nil, err
 	}
@@ -163,17 +176,13 @@ func (db *EthTxManagerDB) GetAllMonitoredTx() ([]*monitoredTx, error) {
 		var sqlMt sqlMonitoredTx
 		if err := rows.Scan(
 			&sqlMt.TxHash,
-			&sqlMt.RequestTxHash,
+			&sqlMt.Id,
 			&sqlMt.SentAfter,
 		); err != nil {
 			return nil, err
 		}
 
 		mts = append(mts, sqlMt.decode())
-
-		if mts[len(mts)-1].TxHash == (ethcommon.Hash{}) {
-			fmt.Println("empty txHash")
-		}
 	}
 
 	return mts, nil

@@ -2,6 +2,7 @@ package ethtxmanager
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"time"
 
@@ -12,14 +13,16 @@ import (
 	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
+var (
+	ErrDBOpGetMonitoredTxs    = errors.New("failed to get monitored txs")
+	ErrDBOpGetRedeemsByStatus = errors.New("failed to get redeems by status")
+)
+
 type EthTxManager struct {
-	ctx      context.Context
-	cfg      *Config
-	etherman *etherman.Etherman
-
-	statedb *state.StateDB
-	mgrdb   *EthTxManagerDB
-
+	cfg           *Config
+	etherman      *etherman.Etherman
+	statedb       *state.StateDB
+	mgrdb         *EthTxManagerDB
 	schnorrWallet SchnorrThresholdWallet
 	btcWallet     BtcWallet
 
@@ -30,7 +33,6 @@ type EthTxManager struct {
 }
 
 func New(
-	ctx context.Context,
 	cfg *Config,
 	etherman *etherman.Etherman,
 	statedb *state.StateDB,
@@ -47,7 +49,6 @@ func New(
 	pubKey := common.BigInt2Bytes32(pk)
 
 	return &EthTxManager{
-		ctx:           ctx,
 		etherman:      etherman,
 		statedb:       statedb,
 		cfg:           cfg,
@@ -72,96 +73,106 @@ func (txmgr *EthTxManager) Start(ctx context.Context) error {
 	tickerToMint := time.NewTicker(txmgr.cfg.FrequencyToMint)
 	defer tickerToMint.Stop()
 
-	var wg sync.WaitGroup
-	defer wg.Wait()
+	errCh := make(chan error, 1)
 
 	for {
 		select {
-		case <-txmgr.ctx.Done():
-			return txmgr.ctx.Err()
+		case <-ctx.Done():
+			return ctx.Err()
+		case err := <-errCh:
+			switch err {
+			case context.Canceled:
+			case context.DeadlineExceeded:
+			// chain interaction errors
+			case ErrBridgeIsPrepared:
+			case ErrBridgeRedeemPrepare:
+			case ErrEthermanHeaderByNumber:
+			case ErrEthermanTransactionReceipt:
+			case ErrEthermanHeaderByHash:
+			// statedb errors
+			case ErrDBOpGetMonitoredTxByID:
+			case ErrDBOpGetSignatureRequestByRequestTxHash:
+			case ErrDBOpInsertMonitoredTx:
+			case ErrDBOpInsertSignatureRequest:
+			case ErrDBOpRemoveMonitoredTx:
+			case ErrDBOpGetRedeemsByStatus:
+			case ErrDBOpGetMonitoredTxs:
+			// wallet errors
+			case ErrBtcWalletRequest:
+			case ErrSchnorrWalletSign:
+			// statedb errors
+			default:
+				logger.Fatal(err)
+			}
+			return err
 		case <-tickerToMint.C:
+			// TODO: implement
 		case <-tickerToMonitor.C:
-			mtxs, err := txmgr.mgrdb.GetAllMonitoredTx()
+			mtxs, err := txmgr.mgrdb.GetMonitoredTxs()
 			if err != nil {
-				logger.Fatal("failed to get monitored tx by status: err=%v", err)
+				logger.Errorf("failed to get monitored tx by status: err=%v", err)
+				errCh <- ErrDBOpGetMonitoredTxs
 			}
 
 			if len(mtxs) == 0 {
 				continue
 			}
 
+			wg := sync.WaitGroup{}
+			wg.Add(len(mtxs))
 			for _, mtx := range mtxs {
-				wg.Add(1)
 				go func() {
-					defer func() {
-						if r := recover(); r != nil {
-							logger.Errorf("panic: %v", r)
-						}
-						wg.Done()
-					}()
-					err = txmgr.monitor(mtx, ctx)
-				}()
+					defer wg.Done()
+					err = txmgr.monitor(ctx, mtx)
 
-				if err != nil {
-					switch err {
-					// statedb errors
-					case ErrRemoveMonitoredTx:
-					// etherman errors
-					case ErrTransactionReceipt:
-					case ErrOnCanonicalChain:
-					case ErrHeaderByHash:
-					case ErrHeaderByNumber:
-					default:
-						logger.Fatal(err)
+					if err != nil {
+						errCh <- err
 					}
-				}
+				}()
 			}
+			wg.Wait()
 		case <-tickerToPrepare.C:
-			redeems, err := txmgr.statedb.GetRedeemByStatus(state.RedeemStatusRequested)
+			redeemsFromDB, err := txmgr.statedb.GetRedeemsByStatus(state.RedeemStatusRequested)
 			if err != nil {
 				logger.Errorf("failed to get redeems by status: err=%v", err)
-				return err
+				errCh <- ErrDBOpGetRedeemsByStatus
 			}
 
+			redeems := []*state.Redeem{}
+			for _, redeem := range redeemsFromDB {
+				// Check whether there is any pending tx that has tried to prepare the redeem
+				_, ok, err := txmgr.mgrdb.GetMonitoredTxById(redeem.RequestTxHash)
+				if err != nil {
+					logger.Errorf("failed to get monitored tx by request tx hash: err=%v", err)
+					errCh <- ErrDBOpGetMonitoredTxByID
+				}
+				if !ok {
+					redeems = append(redeems, redeem)
+				}
+			}
+
+			if len(redeems) == 0 {
+				continue
+			}
+
+			wg := sync.WaitGroup{}
+			wg.Add(len(redeems))
 			for _, redeem := range redeems {
 				// Check whether there is a routine currently being handling the redeem
 				if _, ok := txmgr.redeemLock.Load(redeem.RequestTxHash); ok {
 					continue
 				}
 
-				wg.Add(1)
 				go func() {
-					defer func() {
-						if r := recover(); r != nil {
-							txmgr.redeemLock.Delete(redeem.RequestTxHash)
-						}
-						wg.Done()
-					}()
+					defer wg.Done()
 					err = txmgr.prepareRedeem(ctx, redeem)
-				}()
 
-				if err != nil {
-					switch err {
-					// context errors
-					case context.Canceled:
-					case context.DeadlineExceeded:
-					// etherman errors
-					case ErrIsPrepared:
-					case ErrRedeemPrepare:
-					case ErrHeaderByNumber:
-					// statedb errors
-					case ErrGetMonitoredTxByRequestTxHash:
-					case ErrGetSignatureRequestByRequestTxHash:
-					case ErrInsertMonitoredTx:
-					case ErrInsertSignatureRequest:
-					// wallet errors
-					case ErrBtcWalletRequest:
-					case ErrSchnorrWalletSign:
-					default:
-						logger.Fatal(err)
+					if err != nil {
+						errCh <- err
 					}
-				}
+				}()
 			}
+			wg.Wait()
 		}
 	}
 }
