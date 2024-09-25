@@ -39,7 +39,7 @@ func (st *StateDB) UpdateAfterPrepared(redeem *Redeem) error {
 	// Update after receiving a new redeem prepared event. Only fields
 	// prepareTxHash, outpoints, and status are required.
 	var query string
-	_, ok, err := st.GetRedeem(redeem.RequestTxHash, RedeemStatusRequested)
+	_, ok, err := st.GetRedeem(redeem.RequestTxHash)
 	if err != nil {
 		return err
 	}
@@ -81,15 +81,9 @@ func (st *StateDB) UpdateAfterPrepared(redeem *Redeem) error {
 	return nil
 }
 
-func (st *StateDB) GetRedeemByStatus(status RedeemStatus) ([]*Redeem, error) {
-	var query string
-	if status == RedeemStatusRequested || status == RedeemStatusInvalid {
-		query = `SELECT` + statusRequestedParamList + `FROM redeem WHERE status = ?`
-	} else if status == RedeemStatusPrepared {
-		query = `SELECT` + statusPreparedParamList + `FROM redeem WHERE status = ?`
-	} else {
-		query = `SELECT * FROM redeem WHERE status = ?`
-	}
+func (st *StateDB) GetRedeemsByStatus(status RedeemStatus) ([]*Redeem, error) {
+	query := `SELECT * FROM redeem WHERE status = ?`
+
 	stmt, err := st.stmtCache.Prepare(query)
 	if err != nil {
 		return []*Redeem{}, err
@@ -104,44 +98,32 @@ func (st *StateDB) GetRedeemByStatus(status RedeemStatus) ([]*Redeem, error) {
 	}
 	defer rows.Close()
 
-	var redeems []*Redeem
+	var (
+		prepareTxHash, btcTxId sql.NullString
+		redeems                []*Redeem
+	)
+
 	for rows.Next() {
 		var r sqlRedeem
-		if status == RedeemStatusRequested || status == RedeemStatusInvalid {
-			if err := rows.Scan(
-				&r.RequestTxHash,
-				&r.Requester,
-				&r.Receiver,
-				&r.Amount,
-				&r.Status,
-			); err != nil {
-				return nil, err
-			}
-		} else if status == RedeemStatusPrepared {
-			if err := rows.Scan(
-				&r.RequestTxHash,
-				&r.PrepareTxHash,
-				&r.Requester,
-				&r.Receiver,
-				&r.Amount,
-				&r.Outpoints,
-				&r.Status,
-			); err != nil {
-				return nil, err
-			}
-		} else {
-			if err := rows.Scan(
-				&r.RequestTxHash,
-				&r.PrepareTxHash,
-				&r.BtcTxId,
-				&r.Requester,
-				&r.Receiver,
-				&r.Amount,
-				&r.Outpoints,
-				&r.Status,
-			); err != nil {
-				return nil, err
-			}
+		if err := rows.Scan(
+			&r.RequestTxHash,
+			&prepareTxHash,
+			&btcTxId,
+			&r.Requester,
+			&r.Receiver,
+			&r.Amount,
+			&r.Outpoints,
+			&r.Status,
+		); err != nil {
+			return nil, err
+		}
+
+		if prepareTxHash.Valid {
+			r.PrepareTxHash = prepareTxHash.String
+		}
+
+		if btcTxId.Valid {
+			r.BtcTxId = btcTxId.String
 		}
 
 		redeem, err := r.decode()
@@ -154,58 +136,42 @@ func (st *StateDB) GetRedeemByStatus(status RedeemStatus) ([]*Redeem, error) {
 	return redeems, nil
 }
 
-func (st *StateDB) GetRedeem(requestTxHash ethcommon.Hash, status RedeemStatus) (*Redeem, bool, error) {
-	var query string
-	if status == RedeemStatusRequested || status == RedeemStatusInvalid {
-		query = `SELECT` + statusRequestedParamList + `FROM redeem WHERE requestTxHash = ? AND status = ?`
-	} else if status == RedeemStatusPrepared {
-		query = `SELECT` + statusPreparedParamList + `FROM redeem WHERE requestTxHash = ? AND status = ?`
-	} else {
-		query = `SELECT * FROM redeem WHERE requestTxHash = ? AND status = ?`
-	}
+func (st *StateDB) GetRedeem(requestTxHash ethcommon.Hash) (*Redeem, bool, error) {
+	query := `SELECT * FROM redeem WHERE requestTxHash = ?;`
+
 	stmt, err := st.stmtCache.Prepare(query)
 	if err != nil {
 		return nil, false, err
 	}
 
-	row := stmt.QueryRow(requestTxHash.String()[2:], string(status))
-	var r sqlRedeem
-	if status == RedeemStatusRequested || status == RedeemStatusInvalid {
-		err = row.Scan(
-			&r.RequestTxHash,
-			&r.Requester,
-			&r.Receiver,
-			&r.Amount,
-			&r.Status,
-		)
-	} else if status == RedeemStatusPrepared {
-		err = row.Scan(
-			&r.RequestTxHash,
-			&r.PrepareTxHash,
-			&r.Requester,
-			&r.Receiver,
-			&r.Amount,
-			&r.Outpoints,
-			&r.Status,
-		)
-	} else {
-		err = row.Scan(
-			&r.RequestTxHash,
-			&r.PrepareTxHash,
-			&r.BtcTxId,
-			&r.Requester,
-			&r.Receiver,
-			&r.Amount,
-			&r.Outpoints,
-			&r.Status,
-		)
-	}
+	var (
+		r                      sqlRedeem
+		prepareTxHash, btcTxId sql.NullString
+	)
 
-	if err != nil {
+	row := stmt.QueryRow(requestTxHash.String()[2:])
+	if err := row.Scan(
+		&r.RequestTxHash,
+		&prepareTxHash,
+		&btcTxId,
+		&r.Requester,
+		&r.Receiver,
+		&r.Amount,
+		&r.Outpoints,
+		&r.Status,
+	); err != nil {
 		if err == sql.ErrNoRows { // no redeem found
 			return nil, false, nil
 		}
 		return nil, false, err
+	}
+
+	if prepareTxHash.Valid {
+		r.PrepareTxHash = prepareTxHash.String
+	}
+
+	if btcTxId.Valid {
+		r.BtcTxId = btcTxId.String
 	}
 
 	redeem, err := r.decode()

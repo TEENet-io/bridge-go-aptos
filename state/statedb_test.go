@@ -27,14 +27,16 @@ func TestKV(t *testing.T) {
 	assert.NoError(t, err)
 
 	// get
-	v, err := db.GetKeyedValue(key)
+	v, ok, err := db.GetKeyedValue(key)
 	assert.NoError(t, err)
+	assert.True(t, ok)
 	assert.Equal(t, []byte("value1"), ethcommon.TrimLeftZeroes(v[:]))
 
 	val.SetBytes([]byte("value2"))
 	err = db.SetKeyedValue(key, val)
 	assert.NoError(t, err)
-	v, err = db.GetKeyedValue(key)
+	v, ok, err = db.GetKeyedValue(key)
 	assert.NoError(t, err)
+	assert.True(t, ok)
 	assert.Equal(t, []byte("value2"), ethcommon.TrimLeftZeroes(v[:]))
 }

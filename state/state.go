@@ -19,17 +19,18 @@ var (
 	ErrSetEthFinalizedBlockNumber           = errors.New("failed to set eth finalized block number in statedb")
 	ErrGetEthFinalizedBlockNumber           = errors.New("failed to get eth finalized block number from statedb")
 	ErrStoredEthFinalizedBlockNumberInvalid = errors.New("stored eth finalized block number is invalid")
+	ErrKeyValueNotFound                     = errors.New("key value not found")
 
 	ErrUpdateInvalidRedeem    = errors.New("redeem is invalid and cannot be updated")
-	ErrGetRedeem              = errors.New("failed to get redeem from statedb")
-	ErrCheckRedeemExistence   = errors.New("failed to check redeem existence")
 	ErrPreparedEventUnmatched = errors.New("redeem prepared event is unmatched with stored requested redeem")
-	ErrUpdateRedeem           = errors.New("failed to update redeem in statedb")
 	ErrPreparedEventInvalid   = errors.New("redeem prepared event is invalid")
-	ErrInsertRedeem           = errors.New("failed to insert redeem in statedb")
 	ErrRequestedEventInvalid  = errors.New("redeem requested event is invalid")
 
-	ErrUpdateMint = errors.New("failed to update mint in statedb")
+	ErrDBOpUpdateRedeem = errors.New("failed to update redeem in statedb")
+	ErrDBOpGetRedeem    = errors.New("failed to get redeem from statedb")
+	ErrDBOpHasRedeem    = errors.New("failed to check redeem existence")
+	ErrDBOpInsertRedeem = errors.New("failed to insert redeem in statedb")
+	ErrDBOpUpdateMint   = errors.New("failed to update mint in statedb")
 )
 
 type State struct {
@@ -43,7 +44,8 @@ type State struct {
 	newRedeemPreparedEvCh  chan *ethsync.RedeemPreparedEvent
 
 	cache struct {
-		lastFinalized atomic.Value // uint64
+		lastEthFinalized atomic.Value // uint64
+		lastBtcFinalized atomic.Value // uint64
 	}
 }
 
@@ -72,11 +74,13 @@ func (st *State) Start(ctx context.Context) error {
 	logger.Info("starting eth2btc state")
 	defer logger.Info("stopping eth2btc state")
 
+	// TODO: error handling
+
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		// TODO: case <-newBtcFinalizedBlockCh
+		// TODO: implement case <-st.newBtcFinalizedBlockCh:
 		case blkNum := <-st.newEthFinalizedBlockCh:
 			newLogger := logger.WithFields("newFinalized", blkNum.String())
 
@@ -90,7 +94,7 @@ func (st *State) Start(ctx context.Context) error {
 
 				// Update the last finalized block number if the new one is larger
 				if lastFinalized.Cmp(blkNum) <= 0 {
-					if err := st.setFinalizedBlockNumber(blkNum); err != nil {
+					if err := st.setEthFinalizedBlockNumber(blkNum); err != nil {
 						newLogger.Errorf("failed to set last finalized block number: err=%v", err)
 						return ErrSetEthFinalizedBlockNumber
 					}
@@ -106,6 +110,7 @@ func (st *State) Start(ctx context.Context) error {
 				default:
 					newLogger.Fatal(err)
 				}
+				return err
 			}
 		// After receiving a new minted event, udpate statedb
 		case ev := <-st.newMintedEventCh:
@@ -120,7 +125,7 @@ func (st *State) Start(ctx context.Context) error {
 				err := st.statedb.UpdateMint(mint)
 				if err != nil {
 					newLogger.Errorf("failed to update mint: err=%v", err)
-					return ErrUpdateMint
+					return ErrDBOpUpdateMint
 				}
 				newLogger.Debug("update mint")
 				return nil
@@ -129,10 +134,11 @@ func (st *State) Start(ctx context.Context) error {
 			err := handleEvent()
 			if err != nil {
 				switch err {
-				case ErrUpdateMint:
+				case ErrDBOpUpdateMint:
 				default:
 					newLogger.Fatal(err)
 				}
+				return err
 			}
 		// After receiving a redeem request event
 		// 1. 	Check the existence of the redeem request tx hash
@@ -148,7 +154,7 @@ func (st *State) Start(ctx context.Context) error {
 				ok, _, err := st.statedb.HasRedeem(ev.RequestTxHash)
 				if err != nil {
 					newLogger.Errorf("failed to check redeem existence: err=%v", err)
-					return ErrCheckRedeemExistence
+					return ErrDBOpHasRedeem
 				}
 
 				if ok {
@@ -163,7 +169,7 @@ func (st *State) Start(ctx context.Context) error {
 				}
 				if err := st.statedb.InsertAfterRequested(redeem); err != nil {
 					newLogger.Errorf("failed to insert redeem to db: err=%v", err)
-					return ErrInsertRedeem
+					return ErrDBOpInsertRedeem
 				}
 				newLogger.Debug("insert redeem after requested")
 
@@ -174,11 +180,13 @@ func (st *State) Start(ctx context.Context) error {
 			if err != nil {
 				switch err {
 				// statedb errors
-				case ErrCheckRedeemExistence, ErrInsertRedeem:
+				case ErrDBOpHasRedeem:
+				case ErrDBOpInsertRedeem:
 				case ErrRequestedEventInvalid:
 				default:
 					newLogger.Fatal(err)
 				}
+				return err
 			}
 		// After receiving a redeem prepared event
 		// 1. 	Check the existence of the tx hash
@@ -198,7 +206,7 @@ func (st *State) Start(ctx context.Context) error {
 				ok, status, err := st.statedb.HasRedeem(ev.RequestTxHash)
 				if err != nil {
 					newLogger.Errorf("error when checking existence: err=%v", err)
-					return ErrCheckRedeemExistence
+					return ErrDBOpHasRedeem
 				}
 
 				var redeem *Redeem
@@ -213,10 +221,10 @@ func (st *State) Start(ctx context.Context) error {
 						return ErrUpdateInvalidRedeem
 					}
 
-					redeem, ok, err = st.statedb.GetRedeem(ev.RequestTxHash, RedeemStatusRequested)
+					redeem, ok, err = st.statedb.GetRedeem(ev.RequestTxHash)
 					if err != nil || !ok {
 						newLogger.Errorf("failed to get stored redeem: err=%v", err)
-						return ErrGetRedeem
+						return ErrDBOpGetRedeem
 					}
 
 					redeem, err = redeem.updateFromPreparedEvent(ev)
@@ -233,7 +241,7 @@ func (st *State) Start(ctx context.Context) error {
 				}
 
 				if err = st.statedb.UpdateAfterPrepared(redeem); err != nil {
-					return ErrUpdateRedeem
+					return ErrDBOpUpdateRedeem
 				}
 				newLogger.Debug("update redeem after prepared")
 
@@ -244,38 +252,42 @@ func (st *State) Start(ctx context.Context) error {
 			if err != nil {
 				switch err {
 				// statedb errors
-				case ErrCheckRedeemExistence:
-				case ErrGetRedeem:
+				case ErrDBOpHasRedeem:
+				case ErrDBOpGetRedeem:
+				case ErrDBOpUpdateRedeem:
+					// other errors
 				case ErrPreparedEventInvalid:
-				case ErrUpdateRedeem:
-				// other errors
 				case ErrPreparedEventUnmatched:
 				case ErrUpdateInvalidRedeem:
 				default:
 					newLogger.Fatal(err)
 				}
+				return err
 			}
 		}
 	}
 }
 
 func (st *State) GetEthFinalizedBlockNumber() (*big.Int, error) {
-	if v := st.cache.lastFinalized.Load(); v != nil {
+	if v := st.cache.lastEthFinalized.Load(); v != nil {
 		return new(big.Int).SetBytes(v.([]byte)), nil
 	}
 
-	b, err := st.statedb.GetKeyedValue(KeyEthFinalizedBlock)
+	b, ok, err := st.statedb.GetKeyedValue(KeyEthFinalizedBlock)
 	if err != nil {
 		return nil, err
 	}
-	st.cache.lastFinalized.Store(b.Big().Bytes())
+	if !ok {
+		return nil, ErrKeyValueNotFound
+	}
+	st.cache.lastEthFinalized.Store(b.Big().Bytes())
 
 	return b.Big(), nil
 }
 
 func (st *State) GetBtcFinalizedBlockNumber() (*big.Int, error) {
 	//TODO: implement this
-	return nil, nil
+	return big.NewInt(1), nil
 }
 
 func (st *State) GetNewEthFinalizedBlockChannel() chan<- *big.Int {
@@ -298,11 +310,11 @@ func (st *State) GetNewMintedEventChannel() chan<- *ethsync.MintedEvent {
 	return st.newMintedEventCh
 }
 
-func (st *State) setFinalizedBlockNumber(fbNum *big.Int) error {
+func (st *State) setEthFinalizedBlockNumber(fbNum *big.Int) error {
 	if err := st.statedb.SetKeyedValue(KeyEthFinalizedBlock, common.BigInt2Bytes32(fbNum)); err != nil {
 		return err
 	}
-	st.cache.lastFinalized.Store(fbNum.Bytes())
+	st.cache.lastEthFinalized.Store(fbNum.Bytes())
 
 	return nil
 }
