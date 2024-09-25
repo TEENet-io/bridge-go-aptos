@@ -12,16 +12,16 @@ import (
 )
 
 var (
-	ErrIsPrepared                         = errors.New("failed to call bridge.IsPrepared")
-	ErrGetMonitoredTxByRequestTxHash      = errors.New("failed to get monitored tx by request tx hash")
-	ErrGetSignatureRequestByRequestTxHash = errors.New("failed to get signature request by request tx hash")
-	ErrBtcWalletRequest                   = errors.New("failed to request spendable outpoints from btc wallet")
-	ErrSchnorrWalletSign                  = errors.New("failed to request signature from schnorr wallet")
-	ErrInsertSignatureRequest             = errors.New("failed to insert signature request in db")
-	ErrRedeemPrepare                      = errors.New("failed to call bridge.RedeemPrepare")
-	ErrInsertMonitoredTx                  = errors.New("failed to insert monitored tx in db")
-	ErrEmptyOutpointsReturned             = errors.New("empty outpoints returned")
-	ErrInvalidSchnorrSignature            = errors.New("invalid schnorr signature")
+	ErrBridgeIsPrepared                       = errors.New("failed to call bridge.IsPrepared")
+	ErrDBOpGetMonitoredTxByID                 = errors.New("failed to get monitored tx by id")
+	ErrDBOpGetSignatureRequestByRequestTxHash = errors.New("failed to get signature request by request tx hash")
+	ErrBtcWalletRequest                       = errors.New("failed to request spendable outpoints from btc wallet")
+	ErrSchnorrWalletSign                      = errors.New("failed to request signature from schnorr wallet")
+	ErrDBOpInsertSignatureRequest             = errors.New("failed to insert signature request in db")
+	ErrBridgeRedeemPrepare                    = errors.New("failed to call bridge.RedeemPrepare")
+	ErrDBOpInsertMonitoredTx                  = errors.New("failed to insert monitored tx in db")
+	ErrEmptyOutpointsReturned                 = errors.New("empty outpoints returned")
+	ErrInvalidSchnorrSignature                = errors.New("invalid schnorr signature")
 )
 
 func (txmgr *EthTxManager) prepareRedeem(ctx context.Context, redeem *state.Redeem) error {
@@ -37,33 +37,32 @@ func (txmgr *EthTxManager) prepareRedeem(ctx context.Context, redeem *state.Rede
 	ok, err := txmgr.etherman.IsPrepared(redeem.RequestTxHash)
 	if err != nil {
 		newLogger.Errorf("Etherman: failed to check if prepared: err=%v", err)
-		return ErrIsPrepared
+		return ErrBridgeIsPrepared
 	}
 	if ok {
-		return nil
-	}
-
-	// Check whether there is any pending tx that is preparing the redeem
-	_, ok, err = txmgr.mgrdb.GetMonitoredTxByRequestTxHash(redeem.RequestTxHash)
-	if err != nil {
-		newLogger.Errorf("failed to get monitored tx by request tx hash: err=%v", err)
-		return ErrGetMonitoredTxByRequestTxHash
-	}
-	if ok {
+		newLogger.Debug("redeem already prepared, skip preparing redeem")
 		return nil
 	}
 
 	// It is possible that the request for signature is successful but the
 	// redeem prepare tx is failed. In this case, we should resend a tx
 	// right away to prepare the redeem.
-	_, ok, err = txmgr.mgrdb.GetSignatureRequestByRequestTxHash(redeem.RequestTxHash)
+	sr, ok, err := txmgr.mgrdb.GetSignatureRequestByRequestTxHash(redeem.RequestTxHash)
 	if err != nil {
 		newLogger.Error("failed to get signature request by request tx hash")
-		return ErrGetSignatureRequestByRequestTxHash
+		return ErrDBOpGetSignatureRequestByRequestTxHash
 	}
 	if ok {
 		newLogger.Debug("signature request already exists, resend a tx for preparing redeem")
-		return txmgr.handleRequestedSignature(createPrepareParams(redeem), newLogger)
+
+		// Set outpoints
+		redeem.Outpoints = append([]state.Outpoint{}, sr.Outpoints...)
+		params := createPrepareParams(redeem)
+		// Set signature
+		params.Rx = common.BigIntClone(sr.Rx)
+		params.S = common.BigIntClone(sr.S)
+
+		return txmgr.handleTx(params, newLogger)
 	}
 
 	// request spendable outpoints from btc wallet
@@ -110,16 +109,20 @@ func (txmgr *EthTxManager) prepareRedeem(ctx context.Context, redeem *state.Rede
 	}
 	newLogger.Debug("schnorr signature received")
 
-	err = txmgr.mgrdb.insertSignatureRequest(req)
+	// set outpoints before saving
+	req.Outpoints = append([]state.Outpoint{}, outpoints...)
+
+	// insert the signature request in db
+	err = txmgr.mgrdb.InsertSignatureRequest(req)
 	if err != nil {
 		newLogger.Errorf("failed to insert signature request in db: err=%v", err)
-		return ErrInsertSignatureRequest
+		return ErrDBOpInsertSignatureRequest
 	}
 	newLogger.Debug("inserted signature request in db")
 
 	params.Rx = common.BigIntClone(req.Rx)
 	params.S = common.BigIntClone(req.S)
-	return txmgr.handleRequestedSignature(params, newLogger)
+	return txmgr.handleTx(params, newLogger)
 }
 
 func (txmgr *EthTxManager) waitforOutpoints(
@@ -163,7 +166,7 @@ func (txmgr *EthTxManager) waitForSignature(
 	}
 }
 
-func (txmgr *EthTxManager) handleRequestedSignature(
+func (txmgr *EthTxManager) handleTx(
 	params *etherman.PrepareParams,
 	logger *logger.Logger,
 ) error {
@@ -171,7 +174,7 @@ func (txmgr *EthTxManager) handleRequestedSignature(
 	latest, err := txmgr.etherman.Client().HeaderByNumber(context.Background(), nil)
 	if err != nil {
 		logger.Errorf("failed to get latest block: err=%v", err)
-		return ErrHeaderByNumber
+		return ErrEthermanHeaderByNumber
 	}
 	logger.Debugf("got latest block: num=%d", latest.Number)
 
@@ -179,23 +182,23 @@ func (txmgr *EthTxManager) handleRequestedSignature(
 	tx, err := txmgr.etherman.RedeemPrepare(params)
 	if err != nil {
 		logger.Errorf("failed to prepare redeem, err=%v", err)
-		return ErrRedeemPrepare
+		return ErrBridgeRedeemPrepare
 	}
 
-	logger1 := logger.WithFields("prepareTx", tx.Hash().String())
-	logger1.Debug("tx sent to prepare redeem")
+	newLogger := logger.WithFields("prepareTx", tx.Hash().String())
+	newLogger.Debug("tx sent to prepare redeem")
 
 	mt := &monitoredTx{
-		TxHash:        tx.Hash(),
-		RequestTxHash: params.RequestTxHash,
-		SentAfter:     latest.Hash(),
+		TxHash:    tx.Hash(),
+		Id:        params.RequestTxHash,
+		SentAfter: latest.Hash(),
 	}
-	err = txmgr.mgrdb.insertMonitoredTx(mt)
+	err = txmgr.mgrdb.InsertMonitoredTx(mt)
 	if err != nil {
-		logger1.Errorf("failed to insert monitored tx in db, err=%v", err)
-		return ErrInsertMonitoredTx
+		newLogger.Errorf("failed to insert monitored tx in db, err=%v", err)
+		return ErrDBOpInsertMonitoredTx
 	}
-	logger1.Debugf("inserted monitored tx: sentAfter=0x%x", mt.SentAfter)
+	newLogger.Debugf("inserted monitored tx: sentAfter=0x%x", mt.SentAfter)
 
 	return nil
 }
