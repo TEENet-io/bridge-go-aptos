@@ -66,16 +66,18 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 		logger.Info("stopping Eth synchronization")
 	}()
 
-	checkEthTicker := time.NewTicker(s.cfg.FrequencyToCheckEthFinalizedBlock)
-	defer checkEthTicker.Stop()
-	checkBtcTicker := time.NewTicker(s.cfg.FrequencyToCheckBtcFinalizedBlock)
-	defer checkBtcTicker.Stop()
+	ethTicker := time.NewTicker(s.cfg.FrequencyToCheckEthFinalizedBlock)
+	defer ethTicker.Stop()
+	btcTicker := time.NewTicker(s.cfg.FrequencyToCheckBtcFinalizedBlock)
+	defer btcTicker.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-checkBtcTicker.C:
+		case <-btcTicker.C:
+			// TODO: implement
+		case <-ethTicker.C:
 			newFinalized, err := s.etherman.GetLatestFinalizedBlockNumber()
 			if err != nil {
 				return err
