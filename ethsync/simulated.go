@@ -6,11 +6,7 @@ import (
 	"github.com/TEENet-io/bridge-go/common"
 )
 
-type SimSync struct {
-	*Synchronizer
-}
-
-func (s *SimSync) RandRedeemRequestedEvent(amount int, valid bool) *RedeemRequestedEvent {
+func RandRedeemRequestedEvent(amount int, valid bool) *RedeemRequestedEvent {
 	if valid {
 		return &RedeemRequestedEvent{
 			RequestTxHash:   common.RandBytes32(),
@@ -30,7 +26,7 @@ func (s *SimSync) RandRedeemRequestedEvent(amount int, valid bool) *RedeemReques
 	}
 }
 
-func (s *SimSync) RandRedeemPreparedEvent(amount int, outpointNum int) *RedeemPreparedEvent {
+func RandRedeemPreparedEvent(amount int, outpointNum int) *RedeemPreparedEvent {
 	ev := &RedeemPreparedEvent{
 		RequestTxHash: common.RandBytes32(),
 		PrepareTxHash: common.RandBytes32(),
