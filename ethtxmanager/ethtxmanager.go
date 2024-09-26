@@ -70,8 +70,8 @@ func (txmgr *EthTxManager) Start(ctx context.Context) error {
 	tickerToMonitor := time.NewTicker(txmgr.cfg.FrequencyToMonitorPendingTxs)
 	defer tickerToMonitor.Stop()
 
-	tickerToMint := time.NewTicker(txmgr.cfg.FrequencyToMint)
-	defer tickerToMint.Stop()
+	tickerToMintPendingTxs := time.NewTicker(txmgr.cfg.FrequencyToMint)
+	defer tickerToMintPendingTxs.Stop()
 
 	errCh := make(chan error, 1)
 
@@ -105,10 +105,12 @@ func (txmgr *EthTxManager) Start(ctx context.Context) error {
 				logger.Fatal(err)
 			}
 			return err
-		case <-tickerToMint.C:
-			// TODO: implement
-		case <-tickerToMonitor.C:
-			mtxs, err := txmgr.mgrdb.GetMonitoredTxs()
+		//////////////////////////////////////////
+		// TODO: handle of case of chain reorg
+		// case <-reorgCh: // chain reorg detected by synchronizer
+		//////////////////////////////////////////
+		case <-tickerToMintPendingTxs.C:
+			mtxs, err := txmgr.mgrdb.GetMonitoredTxsByStatus(Pending)
 			if err != nil {
 				logger.Errorf("failed to get monitored tx by status: err=%v", err)
 				errCh <- ErrDBOpGetMonitoredTxs
@@ -123,7 +125,7 @@ func (txmgr *EthTxManager) Start(ctx context.Context) error {
 			for _, mtx := range mtxs {
 				go func() {
 					defer wg.Done()
-					err = txmgr.monitor(ctx, mtx)
+					err = txmgr.monitorPendingTxs(ctx, mtx)
 
 					if err != nil {
 						errCh <- err
@@ -141,13 +143,28 @@ func (txmgr *EthTxManager) Start(ctx context.Context) error {
 			redeems := []*state.Redeem{}
 			for _, redeem := range redeemsFromDB {
 				// Check whether there is any pending tx that has tried to prepare the redeem
-				_, ok, err := txmgr.mgrdb.GetMonitoredTxById(redeem.RequestTxHash)
+				mts, err := txmgr.mgrdb.GetMonitoredTxsById(redeem.RequestTxHash)
 				if err != nil {
 					logger.Errorf("failed to get monitored tx by request tx hash: err=%v", err)
 					errCh <- ErrDBOpGetMonitoredTxByID
 				}
-				if !ok {
+				if len(mts) == 0 {
+					// Add the redeem to the list of redeems to be prepared
+					// if there is no pending tx that has tried to prepare the redeem
 					redeems = append(redeems, redeem)
+				} else {
+					// Add the redeem to the list of redeems to be prepared
+					// if all the txs that have tried to prepare the redeem have timed out
+					isTimeout := true
+					for _, mt := range mts {
+						if mt.Status != Timeout {
+							isTimeout = false
+							break
+						}
+					}
+					if isTimeout {
+						redeems = append(redeems, redeem)
+					}
 				}
 			}
 
