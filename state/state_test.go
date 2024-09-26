@@ -241,4 +241,27 @@ func TestNewRedeemPreparedEvent(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, ok)
 	assert.Equal(t, expected, actual)
+
+	cancel()
+}
+
+func TestNewMintedEvent(t *testing.T) {
+	st, ctx, cancel, close := newTestStateEnv(t)
+	defer cancel()
+	defer close()
+
+	ch := st.GetNewMintedEventChannel()
+
+	ev := ethsync.RandMintedEvent(100)
+	expected := createMintFromMintedEvent(ev)
+
+	go func() { st.Start(ctx) }()
+
+	ch <- ev
+	time.Sleep(100 * time.Millisecond)
+
+	actual, ok, err := st.statedb.GetMint(ev.BtcTxId)
+	assert.NoError(t, err)
+	assert.True(t, ok)
+	assert.Equal(t, expected, actual)
 }
