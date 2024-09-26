@@ -3,52 +3,79 @@ package state
 import (
 	"testing"
 
-	ethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/TEENet-io/bridge-go/common"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestStateDBOps(t *testing.T) {
+func newTestStateDB(t *testing.T) (*StateDB, func()) {
 	sqlDB := getMemoryDB()
-	defer sqlDB.Close()
 	stdb, err := NewStateDB(sqlDB)
 	assert.NoError(t, err)
-	defer stdb.Close()
 
-	mints, err := stdb.GetRequestedMint()
+	close := func() {
+		stdb.Close()
+		sqlDB.Close()
+	}
+
+	return stdb, close
+}
+func TestInsertMint(t *testing.T) {
+	statedb, close := newTestStateDB(t)
+	defer close()
+
+	mint := RandMint(false)
+	err := statedb.InsertMint(mint)
 	assert.NoError(t, err)
-	assert.Len(t, mints, 0)
-
-	expected := RandMint(MintStatusRequested)
-
-	err = stdb.InsertMint(expected)
-	assert.NoError(t, err)
-
-	mints, err = stdb.GetRequestedMint()
-	assert.NoError(t, err)
-	assert.Len(t, mints, 1)
-	assert.Equal(t, expected.BtcTxID, mints[0].BtcTxID)
-	assert.Equal(t, expected.Receiver, mints[0].Receiver)
-	assert.Equal(t, expected.Amount, mints[0].Amount)
-	assert.Equal(t, MintStatusRequested, mints[0].Status)
-	assert.Equal(t, ethcommon.Hash{}, mints[0].MintTxHash)
-
-	_, ok, err := stdb.GetMint(expected.BtcTxID, MintStatusCompleted)
-	assert.NoError(t, err)
-	assert.False(t, ok)
-	m, ok, err := stdb.GetMint(expected.BtcTxID, MintStatusRequested)
+	chk, ok, err := statedb.GetMint(mint.BtcTxId)
 	assert.NoError(t, err)
 	assert.True(t, ok)
-	assert.Equal(t, mints[0].String(), m.String())
+	assert.Equal(t, mint, chk)
+}
 
-	mint1 := RandMint(MintStatusRequested)
-	err = stdb.UpdateMint(mint1)
-	assert.Error(t, err)
+func TestGetUnMinted(t *testing.T) {
+	statedb, close := newTestStateDB(t)
+	defer close()
 
-	expected.Status = MintStatusCompleted
-	err = stdb.UpdateMint(expected)
+	unminted := RandMint(false)
+	err := statedb.InsertMint(unminted)
 	assert.NoError(t, err)
-	m, ok, err = stdb.GetMint(expected.BtcTxID, MintStatusCompleted)
+
+	minted := RandMint(true)
+	err = statedb.InsertMint(minted)
+	assert.NoError(t, err)
+
+	chk, err := statedb.GetUnMinted()
+	assert.NoError(t, err)
+	assert.Len(t, chk, 1)
+	assert.Equal(t, unminted, chk[0])
+}
+
+func TestUpdateMint(t *testing.T) {
+	statedb, close := newTestStateDB(t)
+	defer close()
+
+	unminted := RandMint(false)
+	err := statedb.InsertMint(unminted)
+	assert.NoError(t, err)
+
+	minted := &Mint{
+		BtcTxId:    unminted.BtcTxId,
+		MintTxHash: common.RandBytes32(),
+		Receiver:   unminted.Receiver,
+		Amount:     common.BigIntClone(unminted.Amount),
+	}
+	err = statedb.UpdateMint(minted)
+	assert.NoError(t, err)
+	chk, ok, err := statedb.GetMint(minted.BtcTxId)
 	assert.NoError(t, err)
 	assert.True(t, ok)
-	assert.Equal(t, expected.String(), m.String())
+	assert.Equal(t, minted, chk)
+
+	mint := RandMint(true)
+	err = statedb.UpdateMint(mint)
+	assert.NoError(t, err)
+	chk, ok, err = statedb.GetMint(mint.BtcTxId)
+	assert.NoError(t, err)
+	assert.True(t, ok)
+	assert.Equal(t, mint, chk)
 }

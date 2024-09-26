@@ -9,20 +9,12 @@ import (
 	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
-type MintStatus string
-
-const (
-	MintStatusRequested MintStatus = "requested"
-	MintStatusCompleted MintStatus = "completed"
-)
-
 // Mint represents the process of minting TWBTC
 type Mint struct {
-	BtcTxID    ethcommon.Hash
+	BtcTxId    ethcommon.Hash
 	MintTxHash ethcommon.Hash
 	Receiver   ethcommon.Address
 	Amount     *big.Int
-	Status     MintStatus
 }
 
 func (m *Mint) String() string {
@@ -31,39 +23,35 @@ func (m *Mint) String() string {
 
 func createMintFromMintedEvent(ev *ethsync.MintedEvent) *Mint {
 	return &Mint{
-		BtcTxID:    ev.BtcTxId,
+		BtcTxId:    ev.BtcTxId,
 		MintTxHash: ev.MintTxHash,
 		Receiver:   ev.Receiver,
 		Amount:     ev.Amount,
-		Status:     MintStatusRequested,
 	}
 }
 
 type sqlMint struct {
-	BtcTxID    string
+	BtcTxId    string
 	MintTxHash string
 	Receiver   string
 	Amount     uint64
-	Status     string
 }
 
 func (s *sqlMint) encode(m *Mint) (*sqlMint, error) {
 	s = &sqlMint{}
-	s.BtcTxID = m.BtcTxID.String()[2:]
+	s.BtcTxId = m.BtcTxId.String()[2:]
 	s.MintTxHash = m.MintTxHash.String()[2:]
 	s.Receiver = m.Receiver.String()[2:]
 	s.Amount = m.Amount.Uint64()
-	s.Status = string(m.Status)
 
 	return s, nil
 }
 
 func (s *sqlMint) decode() (*Mint, error) {
 	return &Mint{
-		BtcTxID:    common.HexStrToBytes32("0x" + s.BtcTxID),
+		BtcTxId:    common.HexStrToBytes32("0x" + s.BtcTxId),
 		MintTxHash: common.HexStrToBytes32("0x" + s.MintTxHash),
 		Receiver:   ethcommon.HexToAddress("0x" + s.Receiver),
 		Amount:     new(big.Int).SetUint64(s.Amount),
-		Status:     MintStatus(s.Status),
 	}, nil
 }
