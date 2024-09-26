@@ -9,50 +9,12 @@ import (
 )
 
 type SignatureRequest struct {
-	RequestTxHash ethcommon.Hash
-	SigningHash   ethcommon.Hash
-	Outpoints     []state.Outpoint
-	Rx            *big.Int
-	S             *big.Int
+	Id          ethcommon.Hash
+	SigningHash ethcommon.Hash
+	Outpoints   []state.Outpoint
+	Rx          *big.Int
+	S           *big.Int
 }
-
-// type sqlSignatureRequest struct {
-// 	RequestTxHash string
-// 	SigningHash   string
-// 	Outpoints     []byte
-// 	Rx            string
-// 	S             string
-// }
-
-// func (s *sqlSignatureRequest) encode(sr *SignatureRequest) (*sqlSignatureRequest, error) {
-// 	s.RequestTxHash = sr.RequestTxHash.String()[2:]
-// 	s.SigningHash = sr.SigningHash.String()[2:]
-// 	s.Rx = common.BigIntToHexStr(sr.Rx)[2:]
-// 	s.S = common.BigIntToHexStr(sr.S)[2:]
-
-// 	outpoints, err := state.EncodeOutpoints(sr.Outpoints)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	s.Outpoints = append([]byte{}, outpoints...)
-
-// 	return s, nil
-// }
-
-// func (s *sqlSignatureRequest) decode() (*SignatureRequest, error) {
-// 	outpoints, err := state.DecodeOutpoints(s.Outpoints)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	return &SignatureRequest{
-// 		RequestTxHash: common.HexStrToBytes32(s.RequestTxHash),
-// 		SigningHash:   common.HexStrToBytes32(s.SigningHash),
-// 		Outpoints:     append([]state.Outpoint{}, outpoints...),
-// 		Rx:            common.HexStrToBigInt(s.Rx),
-// 		S:             common.HexStrToBigInt(s.S),
-// 	}, nil
-// }
 
 type MonitoredTxStatus string
 
