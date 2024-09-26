@@ -17,6 +17,14 @@ type MintParams struct {
 	S        *big.Int
 }
 
+func (params *MintParams) SigningHash() ethcommon.Hash {
+	return crypto.Keccak256Hash(common.EncodePacked(
+		params.BtcTxId,
+		params.Amount,
+		params.Receiver,
+	))
+}
+
 type RequestParams struct {
 	Amount   *big.Int
 	Receiver string
