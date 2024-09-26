@@ -16,6 +16,7 @@ import (
 var (
 	ErrDBOpGetMonitoredTxs    = errors.New("failed to get monitored txs")
 	ErrDBOpGetRedeemsByStatus = errors.New("failed to get redeems by status")
+	ErrDBOpGetUnMinted        = errors.New("failed to get unminted")
 )
 
 type EthTxManager struct {
@@ -30,6 +31,7 @@ type EthTxManager struct {
 	pubKey ethcommon.Hash
 
 	redeemLock sync.Map
+	mintLock   sync.Map
 }
 
 func New(
@@ -70,8 +72,8 @@ func (txmgr *EthTxManager) Start(ctx context.Context) error {
 	tickerToMonitor := time.NewTicker(txmgr.cfg.FrequencyToMonitorPendingTxs)
 	defer tickerToMonitor.Stop()
 
-	tickerToMintPendingTxs := time.NewTicker(txmgr.cfg.FrequencyToMint)
-	defer tickerToMintPendingTxs.Stop()
+	tickerToMint := time.NewTicker(txmgr.cfg.FrequencyToMint)
+	defer tickerToMint.Stop()
 
 	errCh := make(chan error, 1)
 
@@ -86,6 +88,7 @@ func (txmgr *EthTxManager) Start(ctx context.Context) error {
 			// chain interaction errors
 			case ErrBridgeIsPrepared:
 			case ErrBridgeRedeemPrepare:
+			case ErrBridgeIsMinted:
 			case ErrEthermanHeaderByNumber:
 			case ErrEthermanTransactionReceipt:
 			case ErrEthermanHeaderByHash:
@@ -97,6 +100,7 @@ func (txmgr *EthTxManager) Start(ctx context.Context) error {
 			case ErrDBOpRemoveMonitoredTx:
 			case ErrDBOpGetRedeemsByStatus:
 			case ErrDBOpGetMonitoredTxs:
+			case ErrDBOpGetUnMinted:
 			// wallet errors
 			case ErrBtcWalletRequest:
 			case ErrSchnorrWalletSign:
@@ -109,7 +113,7 @@ func (txmgr *EthTxManager) Start(ctx context.Context) error {
 		// TODO: handle of case of chain reorg
 		// case <-reorgCh: // chain reorg detected by synchronizer
 		//////////////////////////////////////////
-		case <-tickerToMintPendingTxs.C:
+		case <-tickerToMonitor.C:
 			mtxs, err := txmgr.mgrdb.GetMonitoredTxsByStatus(Pending)
 			if err != nil {
 				logger.Errorf("failed to get monitored tx by status: err=%v", err)
@@ -125,9 +129,7 @@ func (txmgr *EthTxManager) Start(ctx context.Context) error {
 			for _, mtx := range mtxs {
 				go func() {
 					defer wg.Done()
-					err = txmgr.monitorPendingTxs(ctx, mtx)
-
-					if err != nil {
+					if err := txmgr.monitorPendingTxs(ctx, mtx); err != nil {
 						errCh <- err
 					}
 				}()
@@ -182,9 +184,62 @@ func (txmgr *EthTxManager) Start(ctx context.Context) error {
 
 				go func() {
 					defer wg.Done()
-					err = txmgr.prepareRedeem(ctx, redeem)
+					if err := txmgr.prepareRedeem(ctx, redeem); err != nil {
+						errCh <- err
+					}
+				}()
+			}
+			wg.Wait()
+		case <-tickerToMint.C:
+			mintReqs, err := txmgr.statedb.GetUnMinted()
+			if err != nil {
+				logger.Errorf("failed to get unminted: err=%v", err)
+				errCh <- ErrDBOpGetUnMinted
+			}
 
-					if err != nil {
+			if len(mintReqs) == 0 {
+				continue
+			}
+
+			// same rules as for check redeems applied here
+			toMints := []*state.Mint{}
+			for _, req := range mintReqs {
+				// Check whether there is a routine currently being handling the mint
+				monitoredMints, err := txmgr.mgrdb.GetMonitoredTxsById(req.BtcTxId)
+				if err != nil {
+					logger.Errorf("failed to get monitored tx by id: err=%v", err)
+					errCh <- ErrDBOpGetMonitoredTxByID
+				}
+				if len(monitoredMints) == 0 {
+					toMints = append(toMints, req)
+				} else {
+					isTimeout := true
+					for _, mt := range monitoredMints {
+						if mt.Status != Timeout {
+							isTimeout = false
+							break
+						}
+					}
+					if isTimeout {
+						toMints = append(toMints, req)
+					}
+				}
+			}
+
+			if len(toMints) == 0 {
+				continue
+			}
+
+			wg := sync.WaitGroup{}
+			wg.Add(len(toMints))
+			for _, toMint := range toMints {
+				if _, ok := txmgr.mintLock.Load(toMint.BtcTxId); ok {
+					continue
+				}
+
+				go func() {
+					defer wg.Done()
+					if err := txmgr.mint(ctx, toMint); err != nil {
 						errCh <- err
 					}
 				}()
