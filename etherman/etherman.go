@@ -184,7 +184,7 @@ func (etherman *Etherman) Mint(params *MintParams) (*types.Transaction, error) {
 	}
 	etherman.auth.Nonce = new(big.Int).SetUint64(nonce)
 
-	tx, err := contract.Mint(
+	return contract.Mint(
 		etherman.auth,
 		params.BtcTxId,
 		params.Receiver,
@@ -192,11 +192,6 @@ func (etherman *Etherman) Mint(params *MintParams) (*types.Transaction, error) {
 		params.Rx,
 		params.S,
 	)
-	if err != nil {
-		return nil, err
-	}
-
-	return tx, nil
 }
 
 func (etherman *Etherman) RedeemRequest(auth *bind.TransactOpts, params *RequestParams) (*types.Transaction, error) {
@@ -205,12 +200,7 @@ func (etherman *Etherman) RedeemRequest(auth *bind.TransactOpts, params *Request
 		return nil, err
 	}
 
-	tx, err := contract.RedeemRequest(auth, params.Amount, string(params.Receiver))
-	if err != nil {
-		return nil, err
-	}
-
-	return tx, nil
+	return contract.RedeemRequest(auth, params.Amount, string(params.Receiver))
 }
 
 func (etherman *Etherman) RedeemPrepare(params *PrepareParams) (*types.Transaction, error) {
@@ -233,7 +223,7 @@ func (etherman *Etherman) RedeemPrepare(params *PrepareParams) (*types.Transacti
 	}
 	etherman.auth.Nonce = new(big.Int).SetUint64(nonce)
 
-	tx, err := contract.RedeemPrepare(
+	return contract.RedeemPrepare(
 		etherman.auth,
 		params.RequestTxHash,
 		params.Requester,
@@ -244,11 +234,6 @@ func (etherman *Etherman) RedeemPrepare(params *PrepareParams) (*types.Transacti
 		params.Rx,
 		params.S,
 	)
-	if err != nil {
-		return nil, err
-	}
-
-	return tx, nil
 }
 
 func (etherman *Etherman) TWBTCAddress() (ethcommon.Address, error) {
@@ -279,18 +264,13 @@ func (etherman *Etherman) TWBTCBalanceOf(addr ethcommon.Address) (*big.Int, erro
 	return balance, nil
 }
 
-func (etherman *Etherman) TWBTCApprove(auth *bind.TransactOpts, amount *big.Int) (ethcommon.Hash, error) {
+func (etherman *Etherman) TWBTCApprove(auth *bind.TransactOpts, amount *big.Int) (*types.Transaction, error) {
 	contract, err := etherman.getTWBTCContract()
 	if err != nil {
-		return ethcommon.Hash{}, err
+		return nil, err
 	}
 
-	tx, err := contract.Approve(auth, etherman.cfg.BridgeContractAddress, amount)
-	if err != nil {
-		return ethcommon.Hash{}, err
-	}
-
-	return tx.Hash(), nil
+	return contract.Approve(auth, etherman.cfg.BridgeContractAddress, amount)
 }
 
 func (etherman *Etherman) TWBTCAllowance(owner ethcommon.Address) (*big.Int, error) {
