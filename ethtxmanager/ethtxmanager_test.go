@@ -312,13 +312,13 @@ func TestMainRoutine(t *testing.T) {
 	// 2. mint twbtc tokens
 	_, params := env.sim.Mint(1, 100)
 	env.statedb.InsertMint(&state.Mint{
-		BtcTxID:  params.BtcTxId,
+		BtcTxId:  params.BtcTxId,
 		Receiver: params.Receiver,
 		Amount:   common.BigIntClone(params.Amount),
 	})
 	_, params = env.sim.Mint(2, 200)
 	env.statedb.InsertMint(&state.Mint{
-		BtcTxID:  params.BtcTxId,
+		BtcTxId:  params.BtcTxId,
 		Receiver: params.Receiver,
 		Amount:   common.BigIntClone(params.Amount),
 	})
