@@ -45,10 +45,10 @@ func (w *MockSchnorrThresholdWallet) Sign(
 	}
 
 	ch <- &SignatureRequest{
-		RequestTxHash: request.RequestTxHash,
-		SigningHash:   request.SigningHash,
-		Rx:            rx,
-		S:             s,
+		Id:          request.Id,
+		SigningHash: request.SigningHash,
+		Rx:          rx,
+		S:           s,
 	}
 
 	return nil
