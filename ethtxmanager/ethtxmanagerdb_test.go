@@ -2,93 +2,145 @@ package ethtxmanager
 
 import (
 	"database/sql"
-	"math/big"
 	"testing"
 
 	"github.com/TEENet-io/bridge-go/common"
-	"github.com/TEENet-io/bridge-go/state"
 	"github.com/stretchr/testify/assert"
 
 	_ "github.com/mattn/go-sqlite3"
 )
 
-func TestSigReqOps(t *testing.T) {
+func newMgr(t *testing.T) (etm *EthTxManagerDB, close func()) {
 	db, err := sql.Open("sqlite3", ":memory:")
 	assert.NoError(t, err)
-	defer db.Close()
 
-	etm, err := NewEthTxManagerDB(db)
+	etm, err = NewEthTxManagerDB(db)
 	assert.NoError(t, err)
-	defer etm.Close()
 
-	sr := &SignatureRequest{
-		RequestTxHash: common.RandBytes32(),
-		SigningHash:   common.RandBytes32(),
-		Outpoints: []state.Outpoint{
-			{
-				TxId: common.RandBytes32(),
-				Idx:  0,
-			},
-			{
-				TxId: common.RandBytes32(),
-				Idx:  1,
-			}},
-		Rx: big.NewInt(100),
-		S:  big.NewInt(200),
+	close = func() {
+		etm.Close()
+		db.Close()
 	}
 
-	err = etm.InsertSignatureRequest(sr)
-	assert.NoError(t, err)
-
-	sr2, ok, err := etm.GetSignatureRequestByRequestTxHash(sr.RequestTxHash)
-	assert.NoError(t, err)
-	assert.True(t, ok)
-	assert.Equal(t, sr, sr2)
-
-	err = etm.RemoveSignatureRequest(sr.RequestTxHash)
-	assert.NoError(t, err)
-
-	_, ok, err = etm.GetSignatureRequestByRequestTxHash(sr.RequestTxHash)
-	assert.NoError(t, err)
-	assert.False(t, ok)
+	return etm, close
 }
 
-func TestMonitoredTxOps(t *testing.T) {
-	db, err := sql.Open("sqlite3", ":memory:")
-	assert.NoError(t, err)
-	defer db.Close()
+func TestInsertPendingMonitoredTx(t *testing.T) {
+	etm, close := newMgr(t)
+	defer close()
 
-	etm, err := NewEthTxManagerDB(db)
-	assert.NoError(t, err)
-	defer etm.Close()
+	mt := RandMonitoredTx(Pending, 1)
+	mt.MinedAt = common.RandBytes32()
 
-	mt := &monitoredTx{
-		TxHash:    common.RandBytes32(),
-		Id:        common.RandBytes32(),
-		SentAfter: common.RandBytes32(),
+	err := etm.InsertPendingMonitoredTx(mt)
+	assert.NoError(t, err)
+
+	chk, err := etm.GetMonitoredTxsById(mt.Id)
+	assert.NoError(t, err)
+	assert.Len(t, chk, 1)
+
+	assert.Equal(t, mt.TxHash, chk[0].TxHash)
+	assert.Equal(t, mt.Id, chk[0].Id)
+	assert.Equal(t, mt.SentAfter, chk[0].SentAfter)
+
+	assert.Equal(t, common.EmptyHash, chk[0].MinedAt)
+	assert.Equal(t, Pending, chk[0].Status)
+}
+
+func TestGetMonitoredTxsByStatus(t *testing.T) {
+	etm, close := newMgr(t)
+	defer close()
+
+	mts := []*MonitoredTx{
+		RandMonitoredTx(Pending, 1),
+		RandMonitoredTx(Pending, 2),
+		RandMonitoredTx(Success, 3),
+		RandMonitoredTx(Reverted, 4),
 	}
 
-	mts, err := etm.GetMonitoredTxs()
-	assert.NoError(t, err)
-	assert.Len(t, mts, 0)
+	for i, mt := range mts {
+		err := etm.InsertPendingMonitoredTx(mt)
+		assert.NoError(t, err)
 
-	err = etm.InsertMonitoredTx(mt)
+		if i > 1 {
+			err := etm.UpdateMonitoredTxAfterMined(mt.TxHash, mt.MinedAt, mt.Status)
+			assert.NoError(t, err)
+		}
+	}
+
+	chk, err := etm.GetMonitoredTxsByStatus(Reorg)
+	assert.NoError(t, err)
+	assert.Len(t, chk, 0)
+
+	chk, err = etm.GetMonitoredTxsByStatus(Pending)
+	assert.NoError(t, err)
+	assert.Len(t, chk, 2)
+	assert.Equal(t, mts[0], chk[0])
+	assert.Equal(t, mts[1], chk[1])
+
+	chk, err = etm.GetMonitoredTxsByStatus(Success)
+	assert.NoError(t, err)
+	assert.Len(t, chk, 1)
+	assert.Equal(t, mts[2], chk[0])
+}
+
+func TestUpdateMonitoredTxStatus(t *testing.T) {
+	etm, close := newMgr(t)
+	defer close()
+
+	mt := RandMonitoredTx(Pending, 1)
+	err := etm.InsertPendingMonitoredTx(mt)
 	assert.NoError(t, err)
 
-	mt1, ok, err := etm.GetMonitoredTxById(mt.Id)
-	assert.NoError(t, err)
-	assert.True(t, ok)
-	assert.Equal(t, mt, mt1)
+	err = etm.UpdateMonitoredTxStatus(mt.TxHash, "Invalid_Status")
+	assert.Error(t, err)
 
-	mts, err = etm.GetMonitoredTxs()
-	assert.NoError(t, err)
-	assert.Len(t, mts, 1)
-	assert.Equal(t, mt, mts[0])
-
-	err = etm.RemoveMonitoredTx(mt.TxHash)
+	err = etm.UpdateMonitoredTxStatus(mt.TxHash, Success)
 	assert.NoError(t, err)
 
-	_, ok, err = etm.GetMonitoredTxById(mt.Id)
+	chk, err := etm.GetMonitoredTxsById(mt.Id)
 	assert.NoError(t, err)
-	assert.False(t, ok)
+	mt.Status = Success
+	assert.Equal(t, mt, chk[0])
+}
+
+func TestUpdateMonitoredTxAfterMined(t *testing.T) {
+	etm, close := newMgr(t)
+	defer close()
+
+	mt := RandMonitoredTx(Pending, 1)
+	err := etm.InsertPendingMonitoredTx(mt)
+	assert.NoError(t, err)
+
+	minedAt := common.RandBytes32()
+	mt.MinedAt = minedAt
+	mt.Status = Success
+	err = etm.UpdateMonitoredTxAfterMined(mt.TxHash, minedAt, Success)
+	assert.NoError(t, err)
+
+	chk, err := etm.GetMonitoredTxsById(mt.Id)
+	assert.NoError(t, err)
+	assert.Len(t, chk, 1)
+	assert.Equal(t, mt, chk[0])
+}
+
+func TestGetMonitoredTxsById(t *testing.T) {
+	etm, close := newMgr(t)
+	defer close()
+
+	mts := []*MonitoredTx{
+		RandMonitoredTx(Pending, 1),
+		RandMonitoredTx(Timeout, 2),
+	}
+	mts[1].Id = mts[0].Id
+	for _, mt := range mts {
+		err := etm.InsertMonitoredTx(mt)
+		assert.NoError(t, err)
+	}
+
+	chk, err := etm.GetMonitoredTxsById(mts[0].Id)
+	assert.NoError(t, err)
+	assert.Len(t, chk, 2)
+	assert.Equal(t, mts[0], chk[0])
+	assert.Equal(t, mts[1], chk[1])
 }
