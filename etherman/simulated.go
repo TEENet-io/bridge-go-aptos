@@ -282,12 +282,12 @@ func (env *SimEtherman) Approve(requester int, amount int) ethcommon.Hash {
 		logger.Fatal("insufficient balance")
 	}
 
-	txHash, err := env.Etherman.TWBTCApprove(env.Chain.Accounts[requester], big.NewInt(int64(amount)))
+	tx, err := env.Etherman.TWBTCApprove(env.Chain.Accounts[requester], big.NewInt(int64(amount)))
 	if err != nil {
 		logger.Fatal(err)
 	}
 
-	return txHash
+	return tx.Hash()
 }
 
 func (env *SimEtherman) Request(auth *bind.TransactOpts, requester int, amount int, btcAddrIdx int) (ethcommon.Hash, *RequestParams) {
