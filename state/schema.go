@@ -35,8 +35,6 @@ var (
 		mintTxHash CHAR(64) UNIQUE,
 		receiver CHAR(40) NOT NULL,
 		amount BIGINT UNSIGNED NOT NULL,
-		status VARCHAR(10) NOT NULL,
-		CONSTRAINT chk_status CHECK (status IN ('requested', 'completed')),
 		CONSTRAINT chk_amount CHECK (amount > 0),
 		CONSTRAINT chk_btcTxId CHECK (btcTxId != '` + strZeroBytes32 + `'),
 		CONSTRAINT chk_receiver CHECK (receiver != '` + strZeroBytes20 + `')

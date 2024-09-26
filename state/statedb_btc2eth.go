@@ -2,14 +2,13 @@ package state
 
 import (
 	"database/sql"
-	"errors"
-	"fmt"
 
+	"github.com/TEENet-io/bridge-go/common"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 func (stdb *StateDB) InsertMint(m *Mint) error {
-	query := `INSERT INTO mint (btcTxId, receiver, amount, status) VALUES (?, ?, ?, ?)`
+	query := `INSERT INTO mint (BtcTxId, mintTxHash, receiver, amount) VALUES (?, ?, ?, ?)`
 	stmt, err := stdb.stmtCache.Prepare(query)
 	if err != nil {
 		return err
@@ -21,18 +20,26 @@ func (stdb *StateDB) InsertMint(m *Mint) error {
 		return err
 	}
 
-	_, err = stmt.Exec(s.BtcTxID, s.Receiver, s.Amount, string(MintStatusRequested))
+	var mintTxHash sql.NullString
+	if m.MintTxHash != common.EmptyHash {
+		mintTxHash.String = m.MintTxHash.String()[2:]
+		mintTxHash.Valid = true
+	} else {
+		mintTxHash.Valid = false
+	}
+
+	_, err = stmt.Exec(s.BtcTxId, mintTxHash, s.Receiver, s.Amount)
 	return err
 }
 
-func (stdb *StateDB) GetRequestedMint() ([]*Mint, error) {
-	query := `SELECT btcTxId, receiver, amount, status FROM mint WHERE status = ?`
+func (stdb *StateDB) GetUnMinted() ([]*Mint, error) {
+	query := `SELECT BtcTxId, receiver, amount FROM mint WHERE mintTxHash IS NULL`
 	stmt, err := stdb.stmtCache.Prepare(query)
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := stmt.Query(string(MintStatusRequested))
+	rows, err := stmt.Query()
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +48,7 @@ func (stdb *StateDB) GetRequestedMint() ([]*Mint, error) {
 	mints := []*Mint{}
 	for rows.Next() {
 		var s sqlMint
-		if err := rows.Scan(&s.BtcTxID, &s.Receiver, &s.Amount, &s.Status); err != nil {
+		if err := rows.Scan(&s.BtcTxId, &s.Receiver, &s.Amount); err != nil {
 			return nil, err
 		}
 
@@ -56,35 +63,28 @@ func (stdb *StateDB) GetRequestedMint() ([]*Mint, error) {
 	return mints, nil
 }
 
-func (stdb *StateDB) GetMint(btcTxId ethcommon.Hash, status MintStatus) (*Mint, bool, error) {
-	var query string
-	if status == MintStatusRequested {
-		query = `SELECT btcTxId, receiver, amount FROM mint WHERE btcTxId = ? AND status = ?`
-	} else {
-		query = `SELECT btcTxId, mintTxHash, receiver, amount FROM mint WHERE btcTxId = ? AND status = ?`
-	}
-
+func (stdb *StateDB) GetMint(BtcTxId ethcommon.Hash) (*Mint, bool, error) {
+	query := `SELECT BtcTxId, mintTxHash, receiver, amount FROM mint WHERE BtcTxId = ?`
 	stmt, err := stdb.stmtCache.Prepare(query)
 	if err != nil {
 		return nil, false, err
 	}
 
-	var s sqlMint
-	id := btcTxId.String()[2:]
-	if status == MintStatusRequested {
-		s.Status = string(MintStatusRequested)
-		err = stmt.QueryRow(id, string(MintStatusRequested)).Scan(&s.BtcTxID, &s.Receiver, &s.Amount)
-	} else {
-		s.Status = string(MintStatusCompleted)
-		err = stmt.QueryRow(id, string(MintStatusCompleted)).Scan(
-			&s.BtcTxID, &s.MintTxHash, &s.Receiver, &s.Amount)
-	}
+	var (
+		s          sqlMint
+		mintTxHash sql.NullString
+	)
 
-	if err != nil {
+	id := BtcTxId.String()[2:]
+	if err := stmt.QueryRow(id).Scan(&s.BtcTxId, &mintTxHash, &s.Receiver, &s.Amount); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, false, nil
 		}
 		return nil, false, err
+	}
+
+	if mintTxHash.Valid {
+		s.MintTxHash = mintTxHash.String
 	}
 
 	mint, err := s.decode()
@@ -95,18 +95,18 @@ func (stdb *StateDB) GetMint(btcTxId ethcommon.Hash, status MintStatus) (*Mint, 
 	return mint, true, nil
 }
 
+// UpdateMint updates the mint with the given BtcTxId
+// If the mint does not exist, it inserts a new row
 func (stdb *StateDB) UpdateMint(m *Mint) error {
-	_, ok, err := stdb.GetMint(m.BtcTxID, MintStatusRequested)
+	_, ok, err := stdb.GetMint(m.BtcTxId)
 	if err != nil {
 		return err
 	}
-
 	if !ok {
-		msg := fmt.Sprintf("mint not found in statedb for btcTxId=%v", m.BtcTxID)
-		return errors.New(msg)
+		return stdb.InsertMint(m)
 	}
 
-	query := `UPDATE mint SET mintTxHash = ?, status = ? WHERE btcTxId = ?`
+	query := `UPDATE mint SET mintTxHash = ? WHERE BtcTxId = ?`
 
 	stmt, err := stdb.stmtCache.Prepare(query)
 	if err != nil {
@@ -119,7 +119,7 @@ func (stdb *StateDB) UpdateMint(m *Mint) error {
 		return err
 	}
 
-	_, err = stmt.Exec(s.MintTxHash, string(MintStatusCompleted), s.BtcTxID)
+	_, err = stmt.Exec(s.MintTxHash, s.BtcTxId)
 
 	if err != nil {
 		return err
