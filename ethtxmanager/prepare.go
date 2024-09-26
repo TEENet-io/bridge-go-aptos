@@ -71,8 +71,8 @@ func (txmgr *EthTxManager) prepareRedeem(ctx context.Context, redeem *state.Rede
 	chForSignature := make(chan *SignatureRequest, 1)
 	err = txmgr.schnorrWallet.Sign(
 		&SignatureRequest{
-			RequestTxHash: redeem.RequestTxHash,
-			SigningHash:   signingHash,
+			Id:          redeem.RequestTxHash,
+			SigningHash: signingHash,
 		},
 		chForSignature,
 	)
@@ -92,7 +92,7 @@ func (txmgr *EthTxManager) prepareRedeem(ctx context.Context, redeem *state.Rede
 	req.Outpoints = append([]state.Outpoint{}, outpoints...)
 	params.Rx = common.BigIntClone(req.Rx)
 	params.S = common.BigIntClone(req.S)
-	return txmgr.handleTx(params, req, newLogger)
+	return txmgr.handleRedeemPrepareTx(params, req, newLogger)
 }
 
 func (txmgr *EthTxManager) waitforOutpoints(
@@ -136,7 +136,7 @@ func (txmgr *EthTxManager) waitForSignature(
 	}
 }
 
-func (txmgr *EthTxManager) handleTx(
+func (txmgr *EthTxManager) handleRedeemPrepareTx(
 	params *etherman.PrepareParams,
 	req *SignatureRequest,
 	logger *logger.Logger,
