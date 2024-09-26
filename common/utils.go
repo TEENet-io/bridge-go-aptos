@@ -61,6 +61,20 @@ func RandBytes32() [32]byte {
 	return b
 }
 
+func RandBytes(n int) []byte {
+	b := make([]byte, n)
+	_, err := rand.Read(b)
+	if err != nil {
+		return nil
+	}
+	return b
+}
+
+func RandBigInt() *big.Int {
+	b := RandBytes(32)
+	return new(big.Int).SetBytes(b)
+}
+
 // Shorten shortens a hex string so that both sides have n characters and
 // the rest is replaced with "..."
 func Shorten(hexStr string, n int) string {
