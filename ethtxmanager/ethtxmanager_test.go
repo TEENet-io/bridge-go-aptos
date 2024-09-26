@@ -3,7 +3,6 @@ package ethtxmanager
 import (
 	"context"
 	"database/sql"
-	"math/big"
 	"os"
 	"sync"
 	"testing"
@@ -32,7 +31,7 @@ const (
 	timtoutOnWaitingForOutpoints  = 1 * time.Second
 	timeoutOnMonitoringPendingTxs = 10
 
-	blockInterval = 100 * time.Millisecond
+	// blockInterval = 100 * time.Millisecond
 )
 
 type testEnv struct {
@@ -143,12 +142,12 @@ func TestIsPrepared(t *testing.T) {
 	cancel()
 
 	// no new tx created for monitoring
-	mtxs, err := env.mgrdb.GetMonitoredTxs()
+	mtxs, err := env.mgrdb.GetMonitoredTxsById(redeem.RequestTxHash)
 	assert.NoError(t, err)
 	assert.Len(t, mtxs, 0)
 }
 
-func TestOnExistingMonitoringTx(t *testing.T) {
+func TestMonitorOnCheckBeforePrepare(t *testing.T) {
 	common.Debug = true
 	file := randFile()
 	defer func() {
@@ -159,149 +158,71 @@ func TestOnExistingMonitoringTx(t *testing.T) {
 	env := newTestEnv(t, file)
 	defer env.close()
 
-	// insert a requested redeem to trigger preparing prodecure
-	redeem := &state.Redeem{
-		RequestTxHash: common.RandBytes32(),
-		Requester:     common.RandEthAddress(),
-		Receiver:      "btc_adress",
-		Amount:        big.NewInt(100),
-		Status:        state.RedeemStatusRequested,
-	}
+	redeem := state.RandRedeem(state.RedeemStatusRequested)
 	err := env.statedb.InsertAfterRequested(redeem)
 	assert.NoError(t, err)
 
-	// insert a monitoring tx with its id = redeem.RequestTxHash
-	mt := &monitoredTx{
-		TxHash:    common.RandBytes32(),
-		Id:        redeem.RequestTxHash,
-		SentAfter: common.RandBytes32(),
-	}
+	// prepare a redeem when no associated monitored tx in the table
+	// expected to find a new monitored tx added to the table
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() { err = env.mgr.Start(ctx) }()
+	time.Sleep(frequencyToPrepareRedeem * 2)
+	cancel()
+	mts, err := env.mgrdb.GetMonitoredTxsById(redeem.RequestTxHash)
+	assert.NoError(t, err)
+	assert.Len(t, mts, 1)
+	assert.Equal(t, redeem.RequestTxHash, mts[0].Id)
+	err = env.mgrdb.DeleteMonitoredTxByTxHash(mts[0].TxHash)
+	assert.NoError(t, err)
+
+	// prepare a redeem when there are associated monitored tx in the table.
+	// Not all the tx are with status Timeout, so no new monitored tx should be added
+	mt1 := RandMonitoredTx(Pending, 1)
+	mt1.Id = redeem.RequestTxHash
+	mt2 := RandMonitoredTx(Timeout, 1)
+	mt2.Id = redeem.RequestTxHash
+	err = env.mgrdb.InsertMonitoredTx(mt1)
+	assert.NoError(t, err)
+	err = env.mgrdb.InsertMonitoredTx(mt2)
+	assert.NoError(t, err)
+	ctx, cancel = context.WithCancel(context.Background())
+	go func() { err = env.mgr.Start(ctx) }()
+	time.Sleep(frequencyToPrepareRedeem * 2)
+	cancel()
+	mts, err = env.mgrdb.GetMonitoredTxsById(redeem.RequestTxHash)
+	assert.NoError(t, err)
+	assert.Len(t, mts, 2)
+	err = env.mgrdb.DeleteMonitoredTxByTxHash(mt1.TxHash)
+	assert.NoError(t, err)
+	err = env.mgrdb.DeleteMonitoredTxByTxHash(mt2.TxHash)
+	assert.NoError(t, err)
+
+	// prepare a redeem when there is an associated monitored tx in the table.
+	// The status of the tx is Timeout, so a new monitored tx should be added
+	mt := RandMonitoredTx(Timeout, 1)
+	mt.Id = redeem.RequestTxHash
 	err = env.mgrdb.InsertMonitoredTx(mt)
 	assert.NoError(t, err)
-
-	ctx, cancel := context.WithCancel(context.Background())
-
-	go func() { err = env.mgr.Start(ctx) }()
-
-	time.Sleep(frequencyToPrepareRedeem * 2)
-	cancel()
-
-	// no new tx created for monitoring
-	mtxs, err := env.mgrdb.GetMonitoredTxs()
-	assert.NoError(t, err)
-	assert.Len(t, mtxs, 1)
-	assert.Equal(t, mt, mtxs[0])
-}
-
-func TestOnExistingSignatureRequest(t *testing.T) {
-	common.Debug = true
-	file := randFile()
-	defer func() {
-		common.Debug = false
-		os.Remove(file)
-	}()
-
-	env := newTestEnv(t, file)
-	defer env.close()
-	commit := env.sim.Chain.Backend.Commit
-
-	// mint and approve on chain
-	env.sim.Mint(1, 100)
-	commit()
-	env.sim.Approve(1, 100)
-	commit()
-	tx, reqParams := env.sim.Request(env.sim.GetAuth(1), 1, 100, 1)
-	commit()
-
-	// generate prepare params
-	prepParams := &etherman.PrepareParams{
-		RequestTxHash: tx,
-		Requester:     env.sim.GetAuth(1).From,
-		Receiver:      reqParams.Receiver,
-		Amount:        common.BigIntClone(reqParams.Amount),
-		OutpointTxIds: []ethcommon.Hash{common.RandBytes32()},
-		OutpointIdxs:  []uint16{0},
-	}
-
-	// insert the requested redeem to the state db
-	redeem := &state.Redeem{
-		RequestTxHash: prepParams.RequestTxHash,
-		Requester:     prepParams.Requester,
-		Receiver:      prepParams.Receiver,
-		Amount:        common.BigIntClone(prepParams.Amount),
-		Status:        state.RedeemStatusRequested,
-	}
-	err := env.statedb.InsertAfterRequested(redeem)
-	assert.NoError(t, err)
-
-	// generate signature request
-	sr := &SignatureRequest{
-		RequestTxHash: prepParams.RequestTxHash,
-		SigningHash:   prepParams.SigningHash(),
-		Outpoints: []state.Outpoint{
-			{
-				TxId: prepParams.OutpointTxIds[0],
-				Idx:  prepParams.OutpointIdxs[0],
-			},
-		},
-	}
-	rx, s, err := env.sim.Sign(sr.SigningHash[:])
-	assert.NoError(t, err)
-	sr.Rx = rx
-	sr.S = s
-
-	// insert the signature request to the db
-	err = env.mgrdb.InsertSignatureRequest(sr)
-	assert.NoError(t, err)
-
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel = context.WithCancel(context.Background())
 	go func() { err = env.mgr.Start(ctx) }()
 	time.Sleep(frequencyToPrepareRedeem * 2)
 	cancel()
-
-	// new tx created for monitoring
-	mtxs, err := env.mgrdb.GetMonitoredTxs()
+	mts, err = env.mgrdb.GetMonitoredTxsById(redeem.RequestTxHash)
 	assert.NoError(t, err)
-	assert.Len(t, mtxs, 1)
-	assert.Equal(t, sr.RequestTxHash, mtxs[0].Id)
+	assert.Len(t, mts, 2)
+	for _, m := range mts {
+		if m.Status == Timeout {
+			assert.Equal(t, mt, m)
+		} else {
+			assert.Equal(t, redeem.RequestTxHash, m.Id)
+		}
+	}
 }
 
 func TestMonintorOnMined(t *testing.T) {
-	common.Debug = true
-	file := randFile()
-	defer func() {
-		common.Debug = false
-		os.Remove(file)
-	}()
-
-	env := newTestEnv(t, file)
-	defer env.close()
-	commit := env.sim.Chain.Backend.Commit
-
-	blk, _ := env.sim.Chain.Backend.Client().BlockByNumber(context.Background(), nil)
-	sentAfter := blk.Hash()
-
-	tx, params := env.sim.Prepare(1, 100, 1, 1)
-	commit()
-
-	// insert a monitoring tx
-	mt := &monitoredTx{
-		TxHash:    tx,
-		Id:        params.RequestTxHash,
-		SentAfter: sentAfter,
-	}
-	err := env.mgrdb.InsertMonitoredTx(mt)
-	assert.NoError(t, err)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	go func() { err = env.mgr.Start(ctx) }()
-	time.Sleep(frequencyToMonitorPendingTxs * 2)
-	cancel()
-
-	// monitored tx removed
-	_, ok, err := env.mgrdb.GetMonitoredTxById(mt.Id)
-	assert.NoError(t, err)
-	assert.False(t, ok)
+	// TODO: cannot test this function on simulated backend
+	// since it does not allow mine reverted a tx
+	// To be tested on other chain
 }
 
 func TestMonitorOnTimeout(t *testing.T) {
@@ -318,16 +239,13 @@ func TestMonitorOnTimeout(t *testing.T) {
 
 	blk, _ := env.sim.Chain.Backend.Client().BlockByNumber(context.Background(), nil)
 
-	mt := &monitoredTx{
-		TxHash:    common.RandBytes32(),
-		Id:        common.RandBytes32(),
-		SentAfter: blk.Hash(),
-	}
+	mt := RandMonitoredTx(Pending, 1)
+	mt.SentAfter = blk.Hash()
+
 	err := env.mgrdb.InsertMonitoredTx(mt)
 	assert.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
-
 	go func() { err = env.mgr.Start(ctx) }()
 
 	// generate [timeout + 1] blocks to trigger timeout
@@ -338,10 +256,10 @@ func TestMonitorOnTimeout(t *testing.T) {
 	time.Sleep(frequencyToMonitorPendingTxs * 2)
 	cancel()
 
-	// monitored tx removed
-	_, ok, err := env.mgrdb.GetMonitoredTxById(mt.Id)
+	// status set as Timeout
+	mts, err := env.mgrdb.GetMonitoredTxsById(mt.Id)
 	assert.NoError(t, err)
-	assert.False(t, ok)
+	assert.Equal(t, Timeout, mts[0].Status)
 }
 
 // Main routine test procedures:
@@ -352,14 +270,11 @@ func TestMonitorOnTimeout(t *testing.T) {
 //     [tx1]: from [1] with valid btc address
 //     [tx2]: from [1] with invalid btc address
 //     [tx3]: from [2] with valid btc address
-//  5. Check for signature request
+//  5. Check for monitored tx -- Here we do not commit a new block for the sent txs
 //     have row for [tx1, tx3]
-//     no row for [tx2]
-//  6. Check for monitored tx -- Here we do not commit a new block for the sent txs
-//     have row for [tx1, tx3]
-//  7. commit a new block
-//  8. Check monitor pending txs
-//     no rows after observing the txs are mined
+//  6. commit a new block
+//  7. Check monitor pending txs
+//     status == success for [tx1, tx3]
 func TestMainRoutine(t *testing.T) {
 	common.Debug = true
 	file := randFile()
@@ -426,58 +341,41 @@ func TestMainRoutine(t *testing.T) {
 	// give time to process requested redeem
 	time.Sleep(1 * time.Second)
 
-	// 5. check for saved signature request
-	// tx1
-	sr1, ok, err := env.mgrdb.GetSignatureRequestByRequestTxHash(tx1)
+	// 5. check for monitored tx
+	mts, err := env.mgrdb.GetMonitoredTxsById(tx1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.True(t, ok)
-	assert.True(t, common.Verify(env.sim.Sk.PubKey().X().Bytes(), sr1.SigningHash[:], sr1.Rx, sr1.S))
-	// tx2
-	_, ok, err = env.mgrdb.GetSignatureRequestByRequestTxHash(tx2)
+	assert.Len(t, mts, 1)
+	mts, err = env.mgrdb.GetMonitoredTxsById(tx2)
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.False(t, ok)
-	// tx3
-	_, ok, err = env.mgrdb.GetSignatureRequestByRequestTxHash(tx3)
+	assert.Len(t, mts, 0)
+	mts, err = env.mgrdb.GetMonitoredTxsById(tx3)
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.True(t, ok)
+	assert.Len(t, mts, 1)
 
-	// 6. check for monitored tx
-	// tx1
-	_, ok, err = env.mgrdb.GetMonitoredTxById(tx1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.True(t, ok)
-	// tx2
-	_, ok, err = env.mgrdb.GetMonitoredTxById(tx2)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.False(t, ok)
-	// tx3
-	_, ok, err = env.mgrdb.GetMonitoredTxById(tx3)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assert.True(t, ok)
-
-	// 7. commit a new block to allow the txs to be mined
+	// 6. commit a new block to allow the txs to be mined
 	commit()
 	printCurrBlockNumber(env, "prepared")
 	time.Sleep(1 * time.Second)
 
-	// 8. check monitor pending txs
-	mtxs, err := env.mgrdb.GetMonitoredTxs()
+	// 7. check monitor pending txs
+	mts, err = env.mgrdb.GetMonitoredTxsById(tx1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Len(t, mtxs, 0)
+	assert.Len(t, mts, 1)
+	assert.Equal(t, Success, mts[0].Status)
+	mts, err = env.mgrdb.GetMonitoredTxsById(tx3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Len(t, mts, 1)
+	assert.Equal(t, Success, mts[0].Status)
 
 	cancel()
 	wg.Wait()
