@@ -18,7 +18,7 @@ func TestStateDBOps(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, mints, 0)
 
-	expected := randMint(MintStatusRequested)
+	expected := RandMint(MintStatusRequested)
 
 	err = stdb.InsertMint(expected)
 	assert.NoError(t, err)
@@ -40,7 +40,7 @@ func TestStateDBOps(t *testing.T) {
 	assert.True(t, ok)
 	assert.Equal(t, mints[0].String(), m.String())
 
-	mint1 := randMint(MintStatusRequested)
+	mint1 := RandMint(MintStatusRequested)
 	err = stdb.UpdateMint(mint1)
 	assert.Error(t, err)
 

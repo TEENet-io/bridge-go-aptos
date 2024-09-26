@@ -12,7 +12,7 @@ import (
 )
 
 func TestJSON(t *testing.T) {
-	redeem := randRedeem(RedeemStatusCompleted)
+	redeem := RandRedeem(RedeemStatusCompleted)
 	jOutpoints := []JSONOutpoint{}
 	for _, outpoint := range redeem.Outpoints {
 		jOutpoints = append(jOutpoints, JSONOutpoint{
@@ -44,7 +44,7 @@ func TestJSON(t *testing.T) {
 }
 
 func TestClone(t *testing.T) {
-	redeem := randRedeem(RedeemStatusCompleted)
+	redeem := RandRedeem(RedeemStatusCompleted)
 
 	clone := redeem.Clone()
 	assert.Equal(t, redeem, clone)
@@ -99,7 +99,7 @@ func TestSetFromRequestEvent(t *testing.T) {
 }
 
 func TestUpdateFromPreparedEvent(t *testing.T) {
-	redeem := randRedeem(RedeemStatusRequested)
+	redeem := RandRedeem(RedeemStatusRequested)
 	prepEv := &ethsync.RedeemPreparedEvent{
 		RequestTxHash: redeem.RequestTxHash,
 	}
