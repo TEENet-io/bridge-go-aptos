@@ -45,6 +45,7 @@ func RandRedeemPreparedEvent(amount int, outpointNum int) *RedeemPreparedEvent {
 
 func RandMintedEvent(amount int) *MintedEvent {
 	return &MintedEvent{
+		BtcTxId:    common.RandBytes32(),
 		MintTxHash: common.RandBytes32(),
 		Receiver:   common.RandEthAddress(),
 		Amount:     big.NewInt(int64(amount)),
