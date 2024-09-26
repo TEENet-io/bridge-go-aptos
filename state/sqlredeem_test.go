@@ -8,7 +8,7 @@ import (
 )
 
 func Test(t *testing.T) {
-	r0 := randRedeem(RedeemStatusRequested)
+	r0 := RandRedeem(RedeemStatusRequested)
 	r1 := &sqlRedeem{}
 	var err error
 

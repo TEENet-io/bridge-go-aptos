@@ -8,7 +8,7 @@ import (
 	"github.com/TEENet-io/bridge-go/common"
 )
 
-func randRedeem(status RedeemStatus) *Redeem {
+func RandRedeem(status RedeemStatus) *Redeem {
 	return &Redeem{
 		RequestTxHash: common.RandBytes32(),
 		PrepareTxHash: common.RandBytes32(),
@@ -30,7 +30,7 @@ func randRedeem(status RedeemStatus) *Redeem {
 	}
 }
 
-func randMint(status MintStatus) *Mint {
+func RandMint(status MintStatus) *Mint {
 	return &Mint{
 		BtcTxID:    common.RandBytes32(),
 		MintTxHash: common.RandBytes32(),

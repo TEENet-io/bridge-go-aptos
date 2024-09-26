@@ -24,7 +24,7 @@ func TestGetRedeemWithNull(t *testing.T) {
 	db, close := newTestStateDBEnv(t)
 	defer close()
 
-	expected := randRedeem(RedeemStatusRequested)
+	expected := RandRedeem(RedeemStatusRequested)
 	err := db.InsertAfterRequested(expected)
 	assert.NoError(t, err)
 	actual, ok, err := db.GetRedeem(expected.RequestTxHash)
@@ -49,8 +49,8 @@ func TestGetRedeemsByStatus(t *testing.T) {
 	defer close()
 
 	expected := []*Redeem{
-		randRedeem(RedeemStatusRequested),
-		randRedeem(RedeemStatusRequested),
+		RandRedeem(RedeemStatusRequested),
+		RandRedeem(RedeemStatusRequested),
 	}
 
 	for _, redeem := range expected {
@@ -78,7 +78,7 @@ func TestInsertAfterRequested(t *testing.T) {
 	defer close()
 
 	// Insert a redeem with status == requested
-	r0 := randRedeem(RedeemStatusRequested)
+	r0 := RandRedeem(RedeemStatusRequested)
 	err := db.InsertAfterRequested(r0)
 	assert.NoError(t, err)
 	rs, err := db.GetRedeemsByStatus(RedeemStatusRequested)
@@ -95,7 +95,7 @@ func TestInsertAfterRequested(t *testing.T) {
 	assert.Nil(t, r1.Outpoints)
 
 	// Cannot insert two redeems with the same request tx hash
-	r2 := randRedeem(RedeemStatusRequested)
+	r2 := RandRedeem(RedeemStatusRequested)
 	r2.Outpoints = nil
 	r2.RequestTxHash = r0.RequestTxHash
 	err = db.InsertAfterRequested(r2)
@@ -128,7 +128,7 @@ func TestUpdateAfterPrepared(t *testing.T) {
 	}()
 
 	// Check errors
-	r0 := randRedeem(RedeemStatusPrepared)
+	r0 := RandRedeem(RedeemStatusPrepared)
 	r0.BtcTxId = [32]byte{}
 	err = db.UpdateAfterPrepared(r0)
 	assert.NoError(t, err)
@@ -138,7 +138,7 @@ func TestUpdateAfterPrepared(t *testing.T) {
 	assert.Equal(t, r0, actual)
 
 	// Update with previous redeem request stored
-	r1 := randRedeem(RedeemStatusRequested)
+	r1 := RandRedeem(RedeemStatusRequested)
 	r1.Outpoints = nil
 	r1.BtcTxId = [32]byte{}
 	err = db.InsertAfterRequested(r1)
@@ -164,7 +164,7 @@ func TestHasRedeem(t *testing.T) {
 		db.Close()
 	}()
 
-	r := randRedeem(RedeemStatusRequested)
+	r := RandRedeem(RedeemStatusRequested)
 
 	ok, _, err := db.HasRedeem(r.RequestTxHash)
 	assert.NoError(t, err)
