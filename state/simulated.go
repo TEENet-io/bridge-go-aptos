@@ -6,6 +6,7 @@ import (
 
 	logger "github.com/0xPolygonHermez/zkevm-node/log"
 	"github.com/TEENet-io/bridge-go/common"
+	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 func RandRedeem(status RedeemStatus) *Redeem {
@@ -30,13 +31,17 @@ func RandRedeem(status RedeemStatus) *Redeem {
 	}
 }
 
-func RandMint(status MintStatus) *Mint {
+func RandMint(isMinted bool) *Mint {
+	var txHash ethcommon.Hash
+	if isMinted {
+		txHash = common.RandBytes32()
+	}
+
 	return &Mint{
-		BtcTxID:    common.RandBytes32(),
-		MintTxHash: common.RandBytes32(),
+		BtcTxId:    common.RandBytes32(),
+		MintTxHash: txHash,
 		Receiver:   common.RandEthAddress(),
 		Amount:     big.NewInt(100),
-		Status:     status,
 	}
 }
 
