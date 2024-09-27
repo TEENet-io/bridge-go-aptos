@@ -4,6 +4,7 @@ import (
 	"math/big"
 
 	"github.com/TEENet-io/bridge-go/state"
+	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 type SchnorrThresholdWallet interface {
@@ -19,7 +20,7 @@ type BtcWallet interface {
 	// outpoints with a timeout. It should also monitor the RedeemPrepared
 	// events emitted from the bridge for permanent locking.
 	Request(
-		requestRedeemTxHash [32]byte,
+		Id ethcommon.Hash,
 		amount *big.Int,
 		ch chan<- []state.Outpoint,
 	) error

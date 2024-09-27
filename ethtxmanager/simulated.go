@@ -6,13 +6,14 @@ import (
 	"github.com/TEENet-io/bridge-go/common"
 	"github.com/TEENet-io/bridge-go/etherman"
 	"github.com/TEENet-io/bridge-go/state"
+	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 type MockBtcWallet struct {
 }
 
 func (w *MockBtcWallet) Request(
-	requestRedeemTxHash [32]byte,
+	Id ethcommon.Hash,
 	amount *big.Int,
 	ch chan<- []state.Outpoint,
 ) error {
