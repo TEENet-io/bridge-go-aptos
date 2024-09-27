@@ -50,9 +50,16 @@ func (s *sqlSpendable) decode() (*Spendable, error) {
 type RequestStatus string
 
 const (
-	Locked  RequestStatus = "locked"
-	Timeout RequestStatus = "timeout"
-	Spent   RequestStatus = "spent"
+	// status set after outpoints found and returned to the requester
+	Locked RequestStatus = "locked"
+	// tx associated with the request failed. At this point, all outpoints are
+	// still locked and not available for spending
+	Failed RequestStatus = "failed"
+	// status set after all outpoints are unlocked due to the failure of the tx
+	// associated with the request
+	Unlock RequestStatus = "unlock"
+	//
+	Spent RequestStatus = "spent"
 )
 
 type Request struct {

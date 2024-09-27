@@ -14,7 +14,8 @@ import (
 )
 
 var (
-	ErrNotFound = errors.New("no spendables found")
+	ErrNotFound                = errors.New("no spendables found")
+	ErrDBOpGetRequestsByStatus = errors.New("failed to get requests by status")
 )
 
 type BtcWallet struct {
@@ -56,12 +57,25 @@ func (w *BtcWallet) Start(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case err := <-errCh:
+			switch err {
+			case ErrDBOpGetRequestsByStatus:
+			default:
+				logger.Fatalf("unexpected error: %v", err)
+			}
 			return err
 		case <-w.newSpendableCh:
 			// TODO: handle new spendable sent by btc sychronizer
 		case <-ticker.C:
 			// TODO: check requests and lock corresponding spendables if they fail
+			reqs, err := w.db.GetRequestsByStatus(Locked)
+			if err != nil {
+				logger.Errorf("failed to get requests: %v", err)
+				errCh <- ErrDBOpGetRequestsByStatus
+			}
 
+			if len(reqs) == 0 {
+				continue
+			}
 		}
 	}
 }
