@@ -47,7 +47,7 @@ func TestInsertRequest(t *testing.T) {
 				Idx:  1,
 			},
 		},
-		Status: Timeout,
+		Status: Failed,
 	}
 	err := btcWalletDB.InsertRequest(req)
 	assert.NoError(t, err)
@@ -78,13 +78,13 @@ func TestUpdateRequestStatus(t *testing.T) {
 	err := db.InsertRequest(req)
 	assert.NoError(t, err)
 
-	err = db.UpdateRequestStatus(req.Id, Timeout)
+	err = db.UpdateRequestStatus(req.Id, Failed)
 	assert.NoError(t, err)
 
 	chk, ok, err := db.GetRequestById(req.Id)
 	assert.NoError(t, err)
 	assert.True(t, ok)
-	assert.Equal(t, Timeout, chk.Status)
+	assert.Equal(t, Failed, chk.Status)
 }
 
 func TestGetRequestsByStatus(t *testing.T) {
@@ -110,7 +110,7 @@ func TestGetRequestsByStatus(t *testing.T) {
 					Idx:  1,
 				},
 			},
-			Status: Timeout,
+			Status: Failed,
 		},
 	}
 	for _, req := range reqs {
