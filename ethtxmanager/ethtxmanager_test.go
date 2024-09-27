@@ -3,6 +3,7 @@ package ethtxmanager
 import (
 	"context"
 	"database/sql"
+	"math/big"
 	"os"
 	"sync"
 	"testing"
@@ -25,7 +26,7 @@ const (
 
 	// eth tx manager config
 	frequencyToPrepareRedeem      = 500 * time.Millisecond
-	frequencyToMint               = 200 * time.Millisecond
+	frequencyToMint               = 500 * time.Millisecond
 	frequencyToMonitorPendingTxs  = 500 * time.Millisecond
 	timeoutOnWaitingForSignature  = 1 * time.Second
 	timtoutOnWaitingForOutpoints  = 1 * time.Second
@@ -107,6 +108,110 @@ func randFile() string {
 	return ethcommon.Hash(common.RandBytes32()).String() + ".db"
 }
 
+func TestOnIsMinted(t *testing.T) {
+	common.Debug = true
+	file := randFile()
+	defer func() {
+		common.Debug = false
+		os.Remove(file)
+	}()
+
+	env := newTestEnv(t, file)
+	defer env.close()
+	commit := env.sim.Chain.Backend.Commit
+
+	// mint the btcTxId on chain
+	_, params := env.sim.Mint(1, 100)
+	commit()
+
+	mint := &state.Mint{
+		BtcTxId:  params.BtcTxId,
+		Receiver: params.Receiver,
+		Amount:   common.BigIntClone(params.Amount),
+	}
+	err := env.statedb.InsertMint(mint)
+	assert.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() { err = env.mgr.Start(ctx) }()
+	time.Sleep(frequencyToMint * 2)
+	cancel()
+	mts, err := env.mgrdb.GetMonitoredTxsById(mint.BtcTxId)
+	assert.NoError(t, err)
+	assert.Len(t, mts, 0)
+}
+
+// TestOnCheckBeforeMint tests the checks before entering the mint process
+func TestOnCheckBeforeMint(t *testing.T) {
+	common.Debug = true
+	file := randFile()
+	defer func() {
+		common.Debug = false
+		os.Remove(file)
+	}()
+
+	env := newTestEnv(t, file)
+	defer env.close()
+
+	unMinted := state.RandMint(false)
+	err := env.statedb.InsertMint(unMinted)
+	assert.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() { err = env.mgr.Start(ctx) }()
+	time.Sleep(frequencyToMint * 2)
+	cancel()
+	mts, err := env.mgrdb.GetMonitoredTxsById(unMinted.BtcTxId)
+	assert.NoError(t, err)
+	assert.Len(t, mts, 1)
+	assert.Equal(t, common.EmptyHash, mts[0].MinedAt)
+	env.mgrdb.DeleteMonitoredTxByTxHash(mts[0].TxHash)
+
+	// prepare a redeem when there are associated monitored tx in the table.
+	// Not all the tx are with status Timeout, so no new monitored tx should be added
+	mt1 := RandMonitoredTx(Pending, 1)
+	mt1.Id = unMinted.BtcTxId
+	mt2 := RandMonitoredTx(Timeout, 1)
+	mt2.Id = unMinted.BtcTxId
+	err = env.mgrdb.InsertMonitoredTx(mt1)
+	assert.NoError(t, err)
+	err = env.mgrdb.InsertMonitoredTx(mt2)
+	assert.NoError(t, err)
+	ctx, cancel = context.WithCancel(context.Background())
+	go func() { err = env.mgr.Start(ctx) }()
+	time.Sleep(frequencyToPrepareRedeem * 2)
+	cancel()
+	mts, err = env.mgrdb.GetMonitoredTxsById(unMinted.BtcTxId)
+	assert.NoError(t, err)
+	assert.Len(t, mts, 2)
+	err = env.mgrdb.DeleteMonitoredTxByTxHash(mt1.TxHash)
+	assert.NoError(t, err)
+	err = env.mgrdb.DeleteMonitoredTxByTxHash(mt2.TxHash)
+	assert.NoError(t, err)
+
+	// prepare a redeem when there is an associated monitored tx in the table.
+	// The status of the tx is Timeout, so a new monitored tx should be added
+	mt := RandMonitoredTx(Timeout, 1)
+	mt.Id = unMinted.BtcTxId
+	err = env.mgrdb.InsertMonitoredTx(mt)
+	assert.NoError(t, err)
+	ctx, cancel = context.WithCancel(context.Background())
+	go func() { err = env.mgr.Start(ctx) }()
+	time.Sleep(frequencyToPrepareRedeem * 2)
+	cancel()
+	mts, err = env.mgrdb.GetMonitoredTxsById(unMinted.BtcTxId)
+	assert.NoError(t, err)
+	assert.Len(t, mts, 2)
+	for _, m := range mts {
+		if m.Status == Timeout {
+			assert.Equal(t, mt, m)
+		} else {
+			assert.Equal(t, unMinted.BtcTxId, m.Id)
+		}
+	}
+}
+
+// TestIsPrepared tests the case where the redeem is already prepared on chain
 func TestIsPrepared(t *testing.T) {
 	common.Debug = true
 	file := randFile()
@@ -147,7 +252,8 @@ func TestIsPrepared(t *testing.T) {
 	assert.Len(t, mtxs, 0)
 }
 
-func TestMonitorOnCheckBeforePrepare(t *testing.T) {
+// TestOnCheckBeforePrepare tests the checks before entering the prepare process
+func TestOnCheckBeforePrepare(t *testing.T) {
 	common.Debug = true
 	file := randFile()
 	defer func() {
@@ -219,12 +325,6 @@ func TestMonitorOnCheckBeforePrepare(t *testing.T) {
 	}
 }
 
-func TestMonintorOnMined(t *testing.T) {
-	// TODO: cannot test this function on simulated backend
-	// since it does not allow mine reverted a tx
-	// To be tested on other chain
-}
-
 func TestMonitorOnTimeout(t *testing.T) {
 	common.Debug = true
 	file := randFile()
@@ -265,6 +365,8 @@ func TestMonitorOnTimeout(t *testing.T) {
 // Main routine test procedures:
 //  1. Start main routines of eth2btc state, eth tx manager, eth synchronizer, and mock wallet
 //  2. Mint twbtc tokens for account [1] and [2]
+//     a. create two mint requests for [1] and [2]
+//     b. insert the mint requests to the state db
 //  3. Approve twbtc tokens for the two users
 //  4. Request redeem
 //     [tx1]: from [1] with valid btc address
@@ -310,20 +412,24 @@ func TestMainRoutine(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	// 2. mint twbtc tokens
-	_, params := env.sim.Mint(1, 100)
-	env.statedb.InsertMint(&state.Mint{
-		BtcTxId:  params.BtcTxId,
-		Receiver: params.Receiver,
-		Amount:   common.BigIntClone(params.Amount),
-	})
-	_, params = env.sim.Mint(2, 200)
-	env.statedb.InsertMint(&state.Mint{
-		BtcTxId:  params.BtcTxId,
-		Receiver: params.Receiver,
-		Amount:   common.BigIntClone(params.Amount),
-	})
+	mints := []*state.Mint{
+		{
+			BtcTxId:  common.RandBytes32(),
+			Receiver: env.sim.GetAuth(1).From,
+			Amount:   big.NewInt(100),
+		},
+		{
+			BtcTxId:  common.RandBytes32(),
+			Receiver: env.sim.GetAuth(2).From,
+			Amount:   big.NewInt(200),
+		},
+	}
+	for _, mint := range mints {
+		err := env.statedb.InsertMint(mint)
+		assert.NoError(t, err)
+	}
+	time.Sleep(1 * time.Second)
 	commit()
-	printCurrBlockNumber(env, "minted")
 
 	// 3. approve twbtc tokens
 	env.sim.Approve(1, 90)
