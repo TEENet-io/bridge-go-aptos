@@ -63,25 +63,12 @@ func RandMonitoredTx(status MonitoredTxStatus, outpointNum int) *MonitoredTx {
 	}
 
 	mt := &MonitoredTx{
-		TxHash:      common.RandBytes32(),
-		Id:          common.RandBytes32(),
-		SigningHash: common.RandBytes32(),
-		SentAfter:   common.RandBytes32(),
-		MinedAt:     minedAt,
-		Status:      status,
+		TxHash:    common.RandBytes32(),
+		Id:        common.RandBytes32(),
+		SentAfter: common.RandBytes32(),
+		MinedAt:   minedAt,
+		Status:    status,
 	}
-
-	for i := 0; i < outpointNum; i++ {
-		mt.Outpoints = append(mt.Outpoints, state.Outpoint{
-			TxId: common.RandBytes32(),
-			Idx:  uint16(i),
-		})
-	}
-
-	rx := common.RandBytes32()
-	mt.Rx = new(big.Int).SetBytes(rx[:])
-	s := common.RandBytes32()
-	mt.S = new(big.Int).SetBytes(s[:])
 
 	return mt
 }

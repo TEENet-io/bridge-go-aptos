@@ -40,17 +40,11 @@ func (db *EthTxManagerDB) InsertPendingMonitoredTx(mt *MonitoredTx) error {
 	}
 
 	sqlMt := &sqlMonitoredTx{}
-	if _, err := sqlMt.encode(mt); err != nil {
-		return err
-	}
+	sqlMt.encode(mt)
 
 	if _, err := stmt.Exec(
 		sqlMt.TxHash,
 		sqlMt.Id,
-		sqlMt.SigningHash,
-		sqlMt.Outpoints,
-		sqlMt.Rx,
-		sqlMt.S,
 		sqlMt.SentAfter,
 		string(Pending),
 	); err != nil {
@@ -67,9 +61,7 @@ func (db *EthTxManagerDB) InsertMonitoredTx(mt *MonitoredTx) error {
 	}
 
 	sqlMt := &sqlMonitoredTx{}
-	if _, err := sqlMt.encode(mt); err != nil {
-		return err
-	}
+	sqlMt.encode(mt)
 
 	var minedAt sql.NullString
 	if mt.MinedAt != common.EmptyHash {
@@ -82,10 +74,6 @@ func (db *EthTxManagerDB) InsertMonitoredTx(mt *MonitoredTx) error {
 	if _, err := stmt.Exec(
 		sqlMt.TxHash,
 		sqlMt.Id,
-		sqlMt.SigningHash,
-		sqlMt.Outpoints,
-		sqlMt.Rx,
-		sqlMt.S,
 		sqlMt.SentAfter,
 		minedAt,
 		sqlMt.Status,
@@ -112,10 +100,6 @@ func (db *EthTxManagerDB) GetMonitoredTxByTxHash(txHash ethcommon.Hash) (*Monito
 	if err := stmt.QueryRow(hashStr).Scan(
 		&sqlMt.TxHash,
 		&sqlMt.Id,
-		&sqlMt.SigningHash,
-		&sqlMt.Outpoints,
-		&sqlMt.Rx,
-		&sqlMt.S,
 		&sqlMt.SentAfter,
 		&mintedAt,
 		&sqlMt.Status,
@@ -129,11 +113,7 @@ func (db *EthTxManagerDB) GetMonitoredTxByTxHash(txHash ethcommon.Hash) (*Monito
 		sqlMt.MinedAt = mintedAt.String
 	}
 
-	if mt, err := sqlMt.decode(); err != nil {
-		return nil, false, err
-	} else {
-		return mt, true, nil
-	}
+	return sqlMt.decode(), true, nil
 }
 
 func (db *EthTxManagerDB) GetMonitoredTxsById(Id ethcommon.Hash) ([]*MonitoredTx, error) {
@@ -161,10 +141,6 @@ func (db *EthTxManagerDB) GetMonitoredTxsById(Id ethcommon.Hash) ([]*MonitoredTx
 		if err := rows.Scan(
 			&sqlMt.TxHash,
 			&sqlMt.Id,
-			&sqlMt.SigningHash,
-			&sqlMt.Outpoints,
-			&sqlMt.Rx,
-			&sqlMt.S,
 			&sqlMt.SentAfter,
 			&mintedAt,
 			&sqlMt.Status,
@@ -176,11 +152,7 @@ func (db *EthTxManagerDB) GetMonitoredTxsById(Id ethcommon.Hash) ([]*MonitoredTx
 			sqlMt.MinedAt = mintedAt.String
 		}
 
-		mt, err := sqlMt.decode()
-		if err != nil {
-			return nil, err
-		}
-		mts = append(mts, mt)
+		mts = append(mts, sqlMt.decode())
 	}
 
 	return mts, nil
@@ -211,10 +183,6 @@ func (db *EthTxManagerDB) GetMonitoredTxsByStatus(status MonitoredTxStatus) ([]*
 		if err := rows.Scan(
 			&sqlMt.TxHash,
 			&sqlMt.Id,
-			&sqlMt.SigningHash,
-			&sqlMt.Outpoints,
-			&sqlMt.Rx,
-			&sqlMt.S,
 			&sqlMt.SentAfter,
 			&mintedAt,
 			&sqlMt.Status,
@@ -226,11 +194,7 @@ func (db *EthTxManagerDB) GetMonitoredTxsByStatus(status MonitoredTxStatus) ([]*
 			sqlMt.MinedAt = mintedAt.String
 		}
 
-		mt, err := sqlMt.decode()
-		if err != nil {
-			return nil, err
-		}
-		mts = append(mts, mt)
+		mts = append(mts, sqlMt.decode())
 	}
 
 	return mts, nil
