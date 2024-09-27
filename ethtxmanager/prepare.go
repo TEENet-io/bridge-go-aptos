@@ -88,11 +88,9 @@ func (txmgr *EthTxManager) prepareRedeem(ctx context.Context, redeem *state.Rede
 	}
 	newLogger.Debug("schnorr signature received")
 
-	// set outpoints before saving
-	req.Outpoints = append([]state.Outpoint{}, outpoints...)
 	params.Rx = common.BigIntClone(req.Rx)
 	params.S = common.BigIntClone(req.S)
-	return txmgr.handleRedeemPrepareTx(params, req, newLogger)
+	return txmgr.handleRedeemPrepareTx(params, newLogger)
 }
 
 func (txmgr *EthTxManager) waitforOutpoints(
@@ -138,7 +136,6 @@ func (txmgr *EthTxManager) waitForSignature(
 
 func (txmgr *EthTxManager) handleRedeemPrepareTx(
 	params *etherman.PrepareParams,
-	req *SignatureRequest,
 	logger *logger.Logger,
 ) error {
 	// Get the latest block
@@ -160,13 +157,9 @@ func (txmgr *EthTxManager) handleRedeemPrepareTx(
 	newLogger.Debug("tx sent to prepare redeem")
 
 	mt := &MonitoredTx{
-		TxHash:      tx.Hash(),
-		Id:          params.RequestTxHash,
-		SigningHash: req.SigningHash,
-		Outpoints:   append([]state.Outpoint{}, req.Outpoints...),
-		Rx:          common.BigIntClone(req.Rx),
-		S:           common.BigIntClone(req.S),
-		SentAfter:   latest.Hash(),
+		TxHash:    tx.Hash(),
+		Id:        params.RequestTxHash,
+		SentAfter: latest.Hash(),
 	}
 	err = txmgr.mgrdb.InsertPendingMonitoredTx(mt)
 	if err != nil {

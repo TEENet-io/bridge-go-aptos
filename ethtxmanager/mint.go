@@ -34,24 +34,6 @@ func (txmgr *EthTxManager) mint(ctx context.Context, mint *state.Mint) error {
 		return nil
 	}
 
-	// request spendable outpoints from btc wallet
-	chForOutpoints := make(chan []state.Outpoint, 1)
-	err = txmgr.btcWallet.Request(
-		mint.BtcTxId,
-		mint.Amount,
-		chForOutpoints,
-	)
-	if err != nil {
-		newLogger.Errorf("failed to request spendable outpoints with err=%v", err)
-		return ErrBtcWalletRequest
-	}
-
-	outpoints, err := txmgr.waitforOutpoints(ctx, chForOutpoints)
-	if err != nil {
-		return err
-	}
-	newLogger.Debug("outpoints received")
-
 	// Compute the signing hash
 	params := &etherman.MintParams{
 		BtcTxId:  mint.BtcTxId,
@@ -82,7 +64,6 @@ func (txmgr *EthTxManager) mint(ctx context.Context, mint *state.Mint) error {
 	newLogger.Debug("schnorr signature received")
 
 	// set outpoints before saving
-	req.Outpoints = append([]state.Outpoint{}, outpoints...)
 	params.Rx = common.BigIntClone(req.Rx)
 	params.S = common.BigIntClone(req.S)
 
@@ -113,13 +94,9 @@ func (txmgr *EthTxManager) handleMintTx(
 
 	// Save the monitored tx
 	mt := &MonitoredTx{
-		TxHash:      tx.Hash(),
-		Id:          params.BtcTxId,
-		SigningHash: req.SigningHash,
-		Outpoints:   append([]state.Outpoint{}, req.Outpoints...),
-		Rx:          common.BigIntClone(req.Rx),
-		S:           common.BigIntClone(req.S),
-		SentAfter:   latest.Hash(),
+		TxHash:    tx.Hash(),
+		Id:        params.BtcTxId,
+		SentAfter: latest.Hash(),
 	}
 	err = txmgr.mgrdb.InsertPendingMonitoredTx(mt)
 	if err != nil {
