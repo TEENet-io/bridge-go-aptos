@@ -70,8 +70,8 @@ func RandBytes(n int) []byte {
 	return b
 }
 
-func RandBigInt() *big.Int {
-	b := RandBytes(32)
+func RandBigInt(byteNum int) *big.Int {
+	b := RandBytes(byteNum)
 	return new(big.Int).SetBytes(b)
 }
 
