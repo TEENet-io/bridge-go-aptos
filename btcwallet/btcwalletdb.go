@@ -13,7 +13,7 @@ type BtcWalletDB struct {
 }
 
 func NewBtcWalletDB(db *sql.DB) (*BtcWalletDB, error) {
-	if _, err := db.Exec(spendableTable + sortedSpendable); err != nil {
+	if _, err := db.Exec(spendableTable + sortedSpendable + requestTable); err != nil {
 		return nil, err
 	}
 
@@ -26,8 +26,8 @@ func (db *BtcWalletDB) Close() {
 	db.stmtcache.Clear()
 }
 
-func (db *BtcWalletDB) Insert(spendable *Spendable) error {
-	stmt, err := db.stmtcache.Prepare(queryInsert)
+func (db *BtcWalletDB) InsertSpendable(spendable *Spendable) error {
+	stmt, err := db.stmtcache.Prepare(queryInsertSpendable)
 	if err != nil {
 		return err
 	}
@@ -50,8 +50,8 @@ func (db *BtcWalletDB) Insert(spendable *Spendable) error {
 	return nil
 }
 
-func (db *BtcWalletDB) GetById(btcTxId ethcommon.Hash) (*Spendable, bool, error) {
-	stmt, err := db.stmtcache.Prepare(queryGetById)
+func (db *BtcWalletDB) GetSpendableById(btcTxId ethcommon.Hash) (*Spendable, bool, error) {
+	stmt, err := db.stmtcache.Prepare(queryGetSpendableById)
 	if err != nil {
 		return nil, false, err
 	}
@@ -78,8 +78,8 @@ func (db *BtcWalletDB) GetById(btcTxId ethcommon.Hash) (*Spendable, bool, error)
 	return spendable, true, nil
 }
 
-func (db *BtcWalletDB) SetLock(btcTxId ethcommon.Hash, lock bool) error {
-	stmt, err := db.stmtcache.Prepare(querySetLock)
+func (db *BtcWalletDB) SetLockOnSpendable(btcTxId ethcommon.Hash, lock bool) error {
+	stmt, err := db.stmtcache.Prepare(querySetLockOnSpendable)
 	if err != nil {
 		return err
 	}
@@ -94,8 +94,8 @@ func (db *BtcWalletDB) SetLock(btcTxId ethcommon.Hash, lock bool) error {
 	return nil
 }
 
-func (db *BtcWalletDB) Delete(btcTxId ethcommon.Hash) error {
-	stmt, err := db.stmtcache.Prepare(queryDelete)
+func (db *BtcWalletDB) DeleteSpendable(btcTxId ethcommon.Hash) error {
+	stmt, err := db.stmtcache.Prepare(queryDeleteSpendable)
 	if err != nil {
 		return err
 	}
@@ -107,8 +107,8 @@ func (db *BtcWalletDB) Delete(btcTxId ethcommon.Hash) error {
 	return nil
 }
 
-func (db *BtcWalletDB) GetSpendables(amount *big.Int) ([]*Spendable, bool, error) {
-	stmt, err := db.stmtcache.Prepare(queryGetSorted)
+func (db *BtcWalletDB) RequestSpendablesByAmount(amount *big.Int) ([]*Spendable, bool, error) {
+	stmt, err := db.stmtcache.Prepare(queryGetSortedSpendables)
 	if err != nil {
 		return nil, false, err
 	}
@@ -154,4 +154,118 @@ func (db *BtcWalletDB) GetSpendables(amount *big.Int) ([]*Spendable, bool, error
 		return nil, false, nil
 	}
 	return spendables, true, nil
+}
+
+func (db *BtcWalletDB) InsertRequest(req *Request) error {
+	stmt, err := db.stmtcache.Prepare(queryInsertRequest)
+	if err != nil {
+		return err
+	}
+
+	var sqlRequest sqlRequest
+	if _, err := sqlRequest.encode(req); err != nil {
+		return err
+	}
+
+	if _, err := stmt.Exec(
+		sqlRequest.Id,
+		sqlRequest.Outpoints,
+		sqlRequest.Status,
+	); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (db *BtcWalletDB) GetRequestById(id ethcommon.Hash) (*Request, bool, error) {
+	stmt, err := db.stmtcache.Prepare(queryGetRequestById)
+	if err != nil {
+		return nil, false, err
+	}
+
+	var sqlRequest sqlRequest
+	if err := stmt.QueryRow(id.String()[2:]).Scan(
+		&sqlRequest.Id,
+		&sqlRequest.Outpoints,
+		&sqlRequest.CreatedAt,
+		&sqlRequest.Status,
+	); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
+
+	req, err := sqlRequest.decode()
+	if err != nil {
+		return nil, false, err
+	}
+
+	return req, true, nil
+}
+
+func (db *BtcWalletDB) DeleteRequest(id ethcommon.Hash) error {
+	stmt, err := db.stmtcache.Prepare(queryDeleteRequest)
+	if err != nil {
+		return err
+	}
+
+	if _, err := stmt.Exec(id.String()[2:]); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (db *BtcWalletDB) UpdateRequestStatus(id ethcommon.Hash, status RequestStatus) error {
+	stmt, err := db.stmtcache.Prepare(queryUpdateRequestStatus)
+	if err != nil {
+		return err
+	}
+
+	if _, err := stmt.Exec(
+		status,
+		id.String()[2:],
+	); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (db *BtcWalletDB) GetRequestsByStatus(status RequestStatus) ([]*Request, error) {
+	stmt, err := db.stmtcache.Prepare(queryGetRequestsByStatus)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := stmt.Query(string(status))
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	requests := []*Request{}
+	for rows.Next() {
+		var sqlRequest sqlRequest
+		if err := rows.Scan(
+			&sqlRequest.Id,
+			&sqlRequest.Outpoints,
+			&sqlRequest.CreatedAt,
+			&sqlRequest.Status,
+		); err != nil {
+			return nil, err
+		}
+
+		req, err := sqlRequest.decode()
+		if err != nil {
+			return nil, err
+		}
+		requests = append(requests, req)
+	}
+
+	return requests, nil
 }
