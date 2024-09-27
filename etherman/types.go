@@ -20,8 +20,8 @@ type MintParams struct {
 func (params *MintParams) SigningHash() ethcommon.Hash {
 	return crypto.Keccak256Hash(common.EncodePacked(
 		params.BtcTxId,
-		params.Amount,
 		params.Receiver,
+		params.Amount,
 	))
 }
 
