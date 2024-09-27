@@ -2,7 +2,9 @@ package btcwallet
 
 import (
 	"math/big"
+	"time"
 
+	"github.com/TEENet-io/bridge-go/state"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
@@ -42,5 +44,55 @@ func (s *sqlSpendable) decode() (*Spendable, error) {
 		Amount:      amount,
 		BlockNumber: blockNumber,
 		Lock:        s.Lock,
+	}, nil
+}
+
+type RequestStatus string
+
+const (
+	Locked  RequestStatus = "locked"
+	Timeout RequestStatus = "timeout"
+	Spent   RequestStatus = "spent"
+)
+
+type Request struct {
+	Id        ethcommon.Hash
+	Outpoints []state.Outpoint
+	CreatedAt time.Time
+	Status    RequestStatus
+}
+
+type sqlRequest struct {
+	Id        string
+	Outpoints []byte
+	CreatedAt time.Time
+	Status    string
+}
+
+func (r *sqlRequest) encode(req *Request) (*sqlRequest, error) {
+	outpoints, err := state.EncodeOutpoints(req.Outpoints)
+	if err != nil {
+		return nil, err
+	}
+
+	r.Id = req.Id.String()[2:]
+	r.Outpoints = outpoints
+	// r.CreatedAt = req.CreatedAt.Unix()
+	r.Status = string(req.Status)
+	return r, nil
+}
+
+func (r *sqlRequest) decode() (*Request, error) {
+	id := ethcommon.HexToHash("0x" + r.Id)
+	outpoints, err := state.DecodeOutpoints(r.Outpoints)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Request{
+		Id:        id,
+		Outpoints: outpoints,
+		CreatedAt: r.CreatedAt,
+		Status:    RequestStatus(r.Status),
 	}, nil
 }
