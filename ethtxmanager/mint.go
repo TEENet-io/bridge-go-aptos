@@ -67,12 +67,11 @@ func (txmgr *EthTxManager) mint(ctx context.Context, mint *state.Mint) error {
 	params.Rx = common.BigIntClone(req.Rx)
 	params.S = common.BigIntClone(req.S)
 
-	return txmgr.handleMintTx(params, req, newLogger)
+	return txmgr.handleMintTx(params, newLogger)
 }
 
 func (txmgr *EthTxManager) handleMintTx(
 	params *etherman.MintParams,
-	req *SignatureRequest,
 	logger *logger.Logger,
 ) error {
 	// Get the latest block
