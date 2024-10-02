@@ -1,4 +1,4 @@
-package rpc
+package btcman
 
 import (
 	"os"
@@ -6,8 +6,8 @@ import (
 
 	"github.com/btcsuite/btcd/chaincfg"
 
-	"teenet.io/bridge-go/btc/data"
-	"teenet.io/bridge-go/btc/wallet"
+	"github.com/TEENet-io/bridge-go/btcman/assembler"
+	"github.com/TEENet-io/bridge-go/btcman/utxo"
 )
 
 var server string
@@ -40,11 +40,11 @@ func TestListUtxosLegacy(t *testing.T) {
 	defer r.Close()
 
 	priv_key_str := "cQthTMaKUU9f6br1hMXdGFXHwGaAfFFerNkn632BpGE6KXhTMmGY"
-	b_wallet, err := wallet.NewBasicWallet(priv_key_str, &chaincfg.RegressionNetParams)
+	b_wallet, err := assembler.NewBasicSigner(priv_key_str, &chaincfg.RegressionNetParams)
 	if err != nil {
 		t.Fatal("Cannot create BasicWallet")
 	}
-	wallet, err := wallet.NewLegacyWallet(*b_wallet)
+	wallet, err := assembler.NewLegacySigner(*b_wallet)
 	if err != nil {
 		t.Fatal("Cannot create Legacy Wallet")
 	}
@@ -59,7 +59,7 @@ func TestListUtxosLegacy(t *testing.T) {
 	}
 }
 
-func TestLegacyWalletTransfer(t *testing.T) {
+func TestLegacySignerTransfer(t *testing.T) {
 	// Legacy wallet transfers some bitcoins out to an address
 	// Set up rpc client
 	if !setup() {
@@ -73,11 +73,11 @@ func TestLegacyWalletTransfer(t *testing.T) {
 	defer r.Close()
 	// Create a legacy wallet
 	priv_key_str := "cNSHjGk52rQ6iya8jdNT9VJ8dvvQ8kPAq5pcFHsYBYdDqahWuneH"
-	b_wallet, err := wallet.NewBasicWallet(priv_key_str, &chaincfg.RegressionNetParams)
+	b_wallet, err := assembler.NewBasicSigner(priv_key_str, &chaincfg.RegressionNetParams)
 	if err != nil {
 		t.Fatalf("Cannot create wallet from private key %s", priv_key_str)
 	}
-	wallet, err := wallet.NewLegacyWallet(*b_wallet)
+	wallet, err := assembler.NewLegacySigner(*b_wallet)
 	if err != nil {
 		t.Fatalf("Cannot create legacy wallet")
 	}
@@ -105,7 +105,7 @@ func TestLegacyWalletTransfer(t *testing.T) {
 	var fee_amount = int64(0.1 * 1e8)
 
 	// Select barely enough UTXO(s) to spend
-	selected_utxos, err := data.SelectUtxo(utxos, dst_amount, fee_amount)
+	selected_utxos, err := utxo.SelectUtxo(utxos, dst_amount, fee_amount)
 	if err != nil {
 		t.Fatalf("cannot select enough utxos: %v", err)
 	}
@@ -113,7 +113,7 @@ func TestLegacyWalletTransfer(t *testing.T) {
 	t.Logf("utxo selected: %d", len(selected_utxos))
 
 	// Make up the Tx to be sent
-	tx, err := wallet.MakeTransferTx(dst_addr, dst_amount, change_addr, fee_amount, selected_utxos)
+	tx, err := wallet.MakeTransferOutTx(dst_addr, dst_amount, change_addr, fee_amount, selected_utxos)
 	if err != nil {
 		t.Fatalf("cannot create transfer Tx %v", err)
 	}
@@ -130,7 +130,7 @@ func TestLegacyWalletTransfer(t *testing.T) {
 	t.Logf("Transaction sent, txHash is %s", txHash.String())
 }
 
-func TestLegacyWalletMakeBridgeDeposit(t *testing.T) {
+func TestLegacySignerMakeBridgeDeposit(t *testing.T) {
 	// Legacy wallet make a deposit on our bridge
 	// Set up rpc client
 	if !setup() {
@@ -145,11 +145,11 @@ func TestLegacyWalletMakeBridgeDeposit(t *testing.T) {
 
 	// Create a legacy wallet
 	priv_key_str := "cNSHjGk52rQ6iya8jdNT9VJ8dvvQ8kPAq5pcFHsYBYdDqahWuneH"
-	b_wallet, err := wallet.NewBasicWallet(priv_key_str, &chaincfg.RegressionNetParams)
+	b_wallet, err := assembler.NewBasicSigner(priv_key_str, &chaincfg.RegressionNetParams)
 	if err != nil {
 		t.Fatalf("Cannot create wallet from private key %s", priv_key_str)
 	}
-	wallet, err := wallet.NewLegacyWallet(*b_wallet)
+	wallet, err := assembler.NewLegacySigner(*b_wallet)
 	if err != nil {
 		t.Fatalf("Cannot create legacy wallet")
 	}
@@ -177,7 +177,7 @@ func TestLegacyWalletMakeBridgeDeposit(t *testing.T) {
 	var fee_amount = int64(0.1 * 1e8)
 
 	// Select barely enough UTXO(s) to spend
-	selected_utxos, err := data.SelectUtxo(utxos, btc_bridge_amount, fee_amount)
+	selected_utxos, err := utxo.SelectUtxo(utxos, btc_bridge_amount, fee_amount)
 	if err != nil {
 		t.Fatalf("cannot select enough utxos: %v", err)
 	}
