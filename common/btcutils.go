@@ -21,6 +21,7 @@ func MainNetParams() *chaincfg.Params {
 	return &chaincfg.MainNetParams
 }
 
+// btcec.PrivateKey == btcutil.WIF.PrivKey (same type)
 func Sign(sk *btcec.PrivateKey, msg []byte) (*big.Int, *big.Int, error) {
 	sig, err := schnorr.Sign(sk, msg[:])
 	if err != nil {

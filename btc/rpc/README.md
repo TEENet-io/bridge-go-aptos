@@ -1,1 +1,0 @@
-RPC related functions. send/receive/monitor.

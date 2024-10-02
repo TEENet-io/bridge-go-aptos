@@ -1,0 +1,1 @@
+Defition of `UTXO` type and related operations on it.
