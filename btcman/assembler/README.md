@@ -1,4 +1,4 @@
-Assembler represents a single entity that can assemble the Tx.
+Assembler represents a single entity that assembles the Tx.
 
 It requires assembler able to do the following two jobs in *SEQUENCE*:
 
@@ -15,8 +15,9 @@ This **requires** the assembler to produce some valid signatures to unlock UTXOs
 
 This however, depends on different implentations of legacy signer, segwit signer and m-to-n schnorr signer.
 
+### Files
 ```bash
 interfaces.go # Defines lock and unlock
-legacy.go # A legacy signer (single private key) implementation
-schnorr.go # A m-to-n schnorr signers' group implementation (aggregated), not implemented yet.
+locker_impl.go # Implements the lock interface
+legacy.go # A legacy assembler (single private key) implements unlock interface + useful functions
 ```
