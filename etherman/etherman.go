@@ -347,6 +347,20 @@ func (etherman *Etherman) IsMinted(btcTxId [32]byte) (bool, error) {
 	return ok, nil
 }
 
+func (etherman *Etherman) IsUsed(btcTxId [32]byte) (bool, error) {
+	contract, err := etherman.getBridgeContract()
+	if err != nil {
+		return false, err
+	}
+
+	ok, err := contract.IsUsed(nil, btcTxId)
+	if err != nil {
+		return false, err
+	}
+
+	return ok, nil
+}
+
 func (etherman *Etherman) getAuthNonce() (uint64, error) {
 	nonce, err := etherman.ethClient.PendingNonceAt(context.Background(), etherman.auth.From)
 	if err != nil {
