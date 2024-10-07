@@ -7,17 +7,21 @@ import (
 )
 
 const (
-	TIMEOUT_DELAY    int64 = 1800 // half an hour
-	INIT_WINDOW_SIZE int   = 10   // initial window size of UTXO scan
+	TIMEOUT_DELAY int64 = 1800 // half an hour
 )
 
+// TreasureVault is a vault that stores UTXOs
+// that is related to a btcAddress
 type TreasureVault struct {
-	backend  VaultUTXOStorage
-	updateMu sync.Mutex
+	BtcAddress string
+	backend    VaultUTXOStorage
+	updateMu   sync.Mutex
 }
 
-func NewTreasureVault(backend VaultUTXOStorage) *TreasureVault {
-	return &TreasureVault{backend: backend}
+// NewTreasureVault contains one btc address as identifier.
+// And uses any backend that implements VaultUTXOStorage.
+func NewTreasureVault(btcAddress string, backend VaultUTXOStorage) *TreasureVault {
+	return &TreasureVault{BtcAddress: btcAddress, backend: backend}
 }
 
 // AddUTXO adds a new UTXO to the treasure vault
