@@ -449,19 +449,13 @@ func TestMainRoutine(t *testing.T) {
 
 	// 5. check for monitored tx
 	mts, err := env.mgrdb.GetMonitoredTxsById(tx1)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	assert.Len(t, mts, 1)
 	mts, err = env.mgrdb.GetMonitoredTxsById(tx2)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	assert.Len(t, mts, 0)
 	mts, err = env.mgrdb.GetMonitoredTxsById(tx3)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	assert.Len(t, mts, 1)
 
 	// 6. commit a new block to allow the txs to be mined
@@ -471,15 +465,11 @@ func TestMainRoutine(t *testing.T) {
 
 	// 7. check monitor pending txs
 	mts, err = env.mgrdb.GetMonitoredTxsById(tx1)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	assert.Len(t, mts, 1)
 	assert.Equal(t, Success, mts[0].Status)
 	mts, err = env.mgrdb.GetMonitoredTxsById(tx3)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 	assert.Len(t, mts, 1)
 	assert.Equal(t, Success, mts[0].Status)
 
