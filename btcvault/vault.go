@@ -2,6 +2,7 @@ package btcvault
 
 import (
 	"fmt"
+	"sync"
 	"time"
 )
 
@@ -11,7 +12,8 @@ const (
 )
 
 type TreasureVault struct {
-	backend VaultUTXOStorage
+	backend  VaultUTXOStorage
+	updateMu sync.Mutex
 }
 
 func NewTreasureVault(backend VaultUTXOStorage) *TreasureVault {
@@ -48,6 +50,10 @@ func (tv *TreasureVault) AddUTXO(blockNumber int32, blockHash string, txID strin
 // ChooseAndLock selects UTXOs that sum to at least the target amount and locks them
 // In bitcoin world, ususally you need to specify the target amount big enough to inlucude the fee.
 func (tv *TreasureVault) ChooseAndLock(targetAmount int64) ([]VaultUTXO, error) {
+	// protection against concurrent updates
+	tv.updateMu.Lock()
+	defer tv.updateMu.Unlock()
+
 	utxos, err := tv.backend.QueryEnoughUTXOs(targetAmount)
 	if err != nil {
 		return nil, err
