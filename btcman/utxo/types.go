@@ -22,9 +22,9 @@ const (
 // Represents the unspent transaction output (UTXO)
 // in our program
 type UTXO struct {
-	TxID      string           // Identifier, human readable
-	TxHash    *chainhash.Hash  // Identifier, used for tx search
-	Vout      uint32           // exact index of the Tx's outputs to be spent
+	TxID      string           // Tx Identifier, human readable hex string
+	TxHash    *chainhash.Hash  // Tx Identifier, used for tx search in bitcoin nodes
+	Vout      uint32           // at which index of the Tx's outputs is the UTXO
 	Amount    int64            // in satoshi
 	PkScriptT PubKeyScriptType // Type of the locking script
 	PkScript  []byte           // Locking Script itself
