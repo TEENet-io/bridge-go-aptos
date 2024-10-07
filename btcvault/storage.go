@@ -48,6 +48,8 @@ type VaultUTXOStorage interface {
 	SetTimeout(txID string, vout int32, timeout int64) error
 
 	// SumMoney calculates the total amount of all VaultUTXOs
+	// Excludes locked UTXOs.
+	// Excludes spent UTXOs.
 	SumMoney() (int64, error)
 }
 
