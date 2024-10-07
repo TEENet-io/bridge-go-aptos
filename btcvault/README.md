@@ -41,12 +41,14 @@ table spent_utxo (optional)
 - tx_id (string 64),
 - vin (int32)
 
-# Concret SQLite Design
+# Detailed SQLite Implementation
 
 see `sqlite_db.go`.
 
 Detailed implementation of above ADT in the SQLite environment.
 
-# Go back to write Vault
+# Vault Implemenation
+
+Vault is the wrapper and outmost exposing entity that user should call.
 
 see `vault.go`
