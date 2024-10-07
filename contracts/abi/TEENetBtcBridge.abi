@@ -33,6 +33,17 @@
     "type": "error"
   },
   {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "btcTxId",
+        "type": "bytes32"
+      }
+    ],
+    "name": "BtcTxIdAlreadyUsed",
+    "type": "error"
+  },
+  {
     "inputs": [],
     "name": "EmptyOutpointIdxs",
     "type": "error"
@@ -242,6 +253,25 @@
       }
     ],
     "name": "isPrepared",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "btcTxId",
+        "type": "bytes32"
+      }
+    ],
+    "name": "isUsed",
     "outputs": [
       {
         "internalType": "bool",

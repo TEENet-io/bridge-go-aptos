@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	logger "github.com/0xPolygonHermez/zkevm-node/log"
+	"github.com/ethereum/go-ethereum"
 )
 
 var (
@@ -13,8 +14,6 @@ var (
 	ErrEthermanTransactionReceipt  = errors.New("failed to get transaction receipt")
 	ErrEthermanHeaderByNumber      = errors.New("failed to get latest block header by number")
 	ErrEthermanHeaderByHash        = errors.New("failed to get latest block header by hash")
-
-	ErrMsgNotFound = "not found"
 )
 
 // monitor monitors the tx until it is mined or timeout
@@ -29,7 +28,7 @@ func (txmgr *EthTxManager) monitorPendingTxs(ctx context.Context, mtx *Monitored
 
 	// get transaction receipt
 	receipt, err := txmgr.etherman.Client().TransactionReceipt(ctx, mtx.TxHash)
-	if err != nil && err.Error() != ErrMsgNotFound {
+	if err != nil && err.Error() != ethereum.NotFound.Error() {
 		newLogger.Errorf("failed to get transaction receipt: err=%v", err)
 		return ErrEthermanTransactionReceipt
 	}
