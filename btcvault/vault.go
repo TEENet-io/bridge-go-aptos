@@ -13,9 +13,9 @@ const (
 // TreasureVault is a vault that stores UTXOs
 // that is related to a btcAddress
 type TreasureVault struct {
-	BtcAddress string
-	backend    VaultUTXOStorage
-	updateMu   sync.Mutex
+	BtcAddress string           // the wallet holds the money
+	backend    VaultUTXOStorage // the backend engine
+	updateMu   sync.Mutex       // prevent concurrent updates
 }
 
 // NewTreasureVault contains one btc address as identifier.

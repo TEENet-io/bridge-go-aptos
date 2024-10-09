@@ -10,6 +10,7 @@ type PublisherService struct {
 	DepositObservers         []chan btcaction.DepositAction
 	WithdrawObservers        []chan btcaction.WithdrawAction
 	UnknownTransferObservers []chan btcaction.UnknownTransferAction
+	UTXOObservers            []chan ObservedUTXO
 	mu                       sync.Mutex
 }
 
@@ -19,6 +20,7 @@ func NewPublisherService() *PublisherService {
 		DepositObservers:         make([]chan btcaction.DepositAction, 0),
 		WithdrawObservers:        make([]chan btcaction.WithdrawAction, 0),
 		UnknownTransferObservers: make([]chan btcaction.UnknownTransferAction, 0),
+		UTXOObservers:            make([]chan ObservedUTXO, 0),
 	}
 }
 
@@ -41,6 +43,13 @@ func (m *PublisherService) RegisterUnknownTransferObserver(observer chan btcacti
 	defer m.mu.Unlock()
 
 	m.UnknownTransferObservers = append(m.UnknownTransferObservers, observer)
+}
+
+func (m *PublisherService) RegisterUTXOObserver(observer chan ObservedUTXO) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.UTXOObservers = append(m.UTXOObservers, observer)
 }
 
 // // RegisterObserver adds an observer channel to the list
@@ -107,6 +116,22 @@ func (m *PublisherService) NotifyUnknownTransfer(uta btcaction.UnknownTransferAc
 			// Handle the case where the observer's channel is full
 			go func(obs chan btcaction.UnknownTransferAction) {
 				obs <- uta
+			}(observer)
+		}
+	}
+}
+
+func (m *PublisherService) NotifyUTXO(data ObservedUTXO) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	for _, observer := range m.UTXOObservers {
+		select {
+		case observer <- data:
+		default:
+			// Handle the case where the observer's channel is full
+			go func(obs chan ObservedUTXO) {
+				obs <- data
 			}(observer)
 		}
 	}
