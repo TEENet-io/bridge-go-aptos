@@ -29,7 +29,33 @@ func (st *State) initEthFinalizedBlock() error {
 			logger.Errorf("stored last finalized block number is invalid: %v", stored)
 			return ErrStoredEthFinalizedBlockNumberInvalid
 		}
-		st.cache.lastEthFinalized.Store(stored)
+		st.cache.lastEthFinalized.Store(stored.Bytes())
+	}
+	return nil
+}
+
+func (st *State) initEthChainID() error {
+	storedBytes32, ok, err := st.statedb.GetKeyedValue(KeyEthChainId)
+	if err != nil {
+		return ErrGetEthChainId
+	}
+
+	if !ok {
+		logger.Warnf("no stored chain id found, save the input value %v", st.cfg.EthChainId)
+		// save the default value
+		err := st.statedb.SetKeyedValue(KeyEthChainId, common.BigInt2Bytes32(st.cfg.EthChainId))
+		if err != nil {
+			return ErrSetEthChainId
+		}
+		st.cache.ethChainId.Store(st.cfg.EthChainId.Bytes())
+	} else {
+		stored := new(big.Int).SetBytes(storedBytes32[:])
+
+		if stored.Cmp(st.cfg.EthChainId) != 0 {
+			logger.Errorf("current chain id does not match the stored: curr=%v, stored=%v", st.cfg.EthChainId, stored)
+			return ErrEthChainIdUnmatchedStored
+		}
+		st.cache.ethChainId.Store(stored.Bytes())
 	}
 	return nil
 }
