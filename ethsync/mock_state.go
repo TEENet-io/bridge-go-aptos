@@ -64,10 +64,6 @@ func (st *MockState) GetEthFinalizedBlockNumber() (*big.Int, error) {
 	return st.lastEthFinalized, nil
 }
 
-func (st *MockState) GetBtcFinalizedBlockNumber() (*big.Int, error) {
-	return st.lastBtcFinalized, nil
-}
-
 func (st *MockState) Start(ctx context.Context) error {
 	logger.Info("starting mock state")
 	defer logger.Info("stopping mock state")

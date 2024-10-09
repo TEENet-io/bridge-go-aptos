@@ -14,14 +14,10 @@ import (
 const MinTickerDuration = 100 * time.Millisecond
 
 type Synchronizer struct {
-	cfg *Config
-
-	etherman *etherman.Etherman
-
-	st State
-
-	ethFinalizedBlockNumber *big.Int
-	btcFinalizedBlockNumber *big.Int
+	cfg           *Config
+	etherman      *etherman.Etherman
+	st            State
+	lastFinalized *big.Int
 }
 
 func New(
@@ -45,18 +41,11 @@ func New(
 		return nil, err
 	}
 
-	btcStored, err := st.GetBtcFinalizedBlockNumber()
-	if err != nil {
-		logger.Error("failed to get btc finalized block number from database when initializing eth synchronizer")
-		return nil, err
-	}
-
 	return &Synchronizer{
-		etherman:                etherman,
-		ethFinalizedBlockNumber: ethStored,
-		btcFinalizedBlockNumber: btcStored,
-		st:                      st,
-		cfg:                     cfg,
+		etherman:      etherman,
+		lastFinalized: ethStored,
+		st:            st,
+		cfg:           cfg,
 	}, nil
 }
 
@@ -68,15 +57,11 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 
 	ethTicker := time.NewTicker(s.cfg.FrequencyToCheckEthFinalizedBlock)
 	defer ethTicker.Stop()
-	btcTicker := time.NewTicker(s.cfg.FrequencyToCheckBtcFinalizedBlock)
-	defer btcTicker.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-btcTicker.C:
-			// TODO: implement
 		case <-ethTicker.C:
 			newFinalized, err := s.etherman.GetLatestFinalizedBlockNumber()
 			if err != nil {
@@ -84,7 +69,7 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 			}
 
 			// continue if new finalized block number is less than the last processed block number
-			if newFinalized.Cmp(s.ethFinalizedBlockNumber) != 1 {
+			if newFinalized.Cmp(s.lastFinalized) != 1 {
 				continue
 			}
 
@@ -93,7 +78,7 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 			// For each block with height starting from lastFinalized + 1 to newFinalized,
 			// extract all the TWBTC minted, redeem request and redeem prepared events.
 			// Send all the events to the relevant states via channels.
-			num := new(big.Int).Add(s.ethFinalizedBlockNumber, big.NewInt(1))
+			num := new(big.Int).Add(s.lastFinalized, big.NewInt(1))
 			for num.Cmp(newFinalized) != 1 {
 				minted, requested, prepared, err := s.etherman.GetEventLogs(num)
 				if err != nil {
@@ -143,7 +128,7 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 				num.Add(num, big.NewInt(1))
 			}
 
-			s.ethFinalizedBlockNumber = new(big.Int).Set(newFinalized)
+			s.lastFinalized = new(big.Int).Set(newFinalized)
 		}
 	}
 }

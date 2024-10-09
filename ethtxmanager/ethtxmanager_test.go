@@ -22,7 +22,6 @@ import (
 const (
 	// eth synchronizer config
 	frequencyToCheckEthFinalizedBlock = 100 * time.Millisecond
-	frequencyToCheckBtcFinalizedBlock = 100 * time.Millisecond
 
 	// eth tx manager config
 	frequencyToPrepareRedeem      = 500 * time.Millisecond
@@ -74,7 +73,6 @@ func newTestEnv(t *testing.T, file string) *testEnv {
 		st,
 		&ethsync.Config{
 			FrequencyToCheckEthFinalizedBlock: frequencyToCheckEthFinalizedBlock,
-			FrequencyToCheckBtcFinalizedBlock: frequencyToCheckBtcFinalizedBlock,
 			BtcChainConfig:                    common.MainNetParams(),
 			EthChainID:                        chainID,
 		},
