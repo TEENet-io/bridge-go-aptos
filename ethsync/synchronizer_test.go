@@ -33,7 +33,6 @@ func TestSync(t *testing.T) {
 
 	cfg := &Config{
 		FrequencyToCheckEthFinalizedBlock: 500 * time.Millisecond,
-		FrequencyToCheckBtcFinalizedBlock: 500 * time.Millisecond,
 		BtcChainConfig:                    common.MainNetParams(),
 		EthChainID:                        chainID,
 	}
@@ -57,13 +56,13 @@ func TestSync(t *testing.T) {
 	blk, _ := env.Chain.Backend.Client().BlockByNumber(context.Background(), nil)
 	start := blk.Number()
 	assert.NoError(t, err)
-	for start.Cmp(synchronizer.ethFinalizedBlockNumber) != 1 {
+	for start.Cmp(synchronizer.lastFinalized) != 1 {
 		env.Chain.Backend.Commit()
 		start.Add(start, big.NewInt(1))
 	}
 	blk, _ = env.Chain.Backend.Client().BlockByNumber(context.Background(), nil)
 	assert.Equal(t, blk.Number(),
-		synchronizer.ethFinalizedBlockNumber.Add(synchronizer.ethFinalizedBlockNumber, big.NewInt(1)))
+		synchronizer.lastFinalized.Add(synchronizer.lastFinalized, big.NewInt(1)))
 
 	go st.Start(ctx2)
 	go synchronizer.Sync(ctx2)

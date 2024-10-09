@@ -12,5 +12,4 @@ type State interface {
 	GetNewMintedEventChannel() chan<- *MintedEvent
 
 	GetEthFinalizedBlockNumber() (*big.Int, error)
-	GetBtcFinalizedBlockNumber() (*big.Int, error)
 }
