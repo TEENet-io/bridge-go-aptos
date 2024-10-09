@@ -13,9 +13,7 @@ type Basic struct {
 type DepositAction struct {
 	Basic
 	DepositValue    int64
-	DepositReceiver string // on btc
-	ChangeValue     int64
-	ChangeReceiver  string // on btc
+	DepositReceiver string // on btc (our wallet address)
 	EvmID           int32
 	EvmAddr         string // 0x... on EVM
 }
@@ -83,3 +81,22 @@ type UnknownTransferStorage interface {
 	// GetUnknownTransferByReceiver queries UnknownTransferAction by TransferReceiver.
 	GetUnknownTransferByReceiver(receiver string) ([]UnknownTransferAction, error)
 }
+
+// // RefundAction is a struct that represents a refund transaction.
+// type RefundAction struct {
+// 	Basic
+// 	Receiver       string // on btc
+// 	RefTxHash      string // previous transaction hash
+// }
+
+// // RefundStorage is an interface for storing and querying RefundAction.
+// type RefundStorage interface {
+// 	// AddRefund adds a new RefundAction.
+// 	AddRefund(refund RefundAction) error
+
+// 	// GetRefundByTxHash queries RefundAction by TxHash.
+// 	GetRefundByTxHash(txHash string) ([]RefundAction, error)
+
+// 	// GetRefundByReceiver queries RefundAction by Receiver.
+// 	GetRefundByReceiver(receiver string) ([]RefundAction, error)
+// }

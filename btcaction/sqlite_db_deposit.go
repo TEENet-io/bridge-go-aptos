@@ -37,8 +37,6 @@ func (s *SQLiteDepositStorage) init() error {
 		tx_hash TEXT,
 		deposit_value INTEGER,
 		deposit_receiver TEXT,
-		change_value INTEGER,
-		change_receiver TEXT,
 		evm_id INTEGER,
 		evm_addr TEXT
 	);
@@ -51,13 +49,13 @@ func (s *SQLiteDepositStorage) init() error {
 }
 
 func (s *SQLiteDepositStorage) AddDeposit(deposit DepositAction) error {
-	query := `INSERT INTO btc_action_deposit (block_number, block_hash, tx_hash, deposit_value, deposit_receiver, change_value, change_receiver, evm_id, evm_addr) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	_, err := s.db.Exec(query, deposit.BlockNumber, deposit.BlockHash, deposit.TxHash, deposit.DepositValue, deposit.DepositReceiver, deposit.ChangeValue, deposit.ChangeReceiver, deposit.EvmID, deposit.EvmAddr)
+	query := `INSERT INTO btc_action_deposit (block_number, block_hash, tx_hash, deposit_value, deposit_receiver, evm_id, evm_addr) VALUES (?, ?, ?, ?, ?, ?, ?)`
+	_, err := s.db.Exec(query, deposit.BlockNumber, deposit.BlockHash, deposit.TxHash, deposit.DepositValue, deposit.DepositReceiver, deposit.EvmID, deposit.EvmAddr)
 	return err
 }
 
 func (s *SQLiteDepositStorage) GetDepositByTxHash(txHash string) ([]DepositAction, error) {
-	query := `SELECT block_number, block_hash, tx_hash, deposit_value, deposit_receiver, change_value, change_receiver, evm_id, evm_addr FROM btc_action_deposit WHERE tx_hash = ?`
+	query := `SELECT block_number, block_hash, tx_hash, deposit_value, deposit_receiver, evm_id, evm_addr FROM btc_action_deposit WHERE tx_hash = ?`
 	rows, err := s.db.Query(query, txHash)
 	if err != nil {
 		return nil, err
@@ -67,7 +65,7 @@ func (s *SQLiteDepositStorage) GetDepositByTxHash(txHash string) ([]DepositActio
 	var deposits []DepositAction
 	for rows.Next() {
 		var deposit DepositAction
-		err := rows.Scan(&deposit.BlockNumber, &deposit.BlockHash, &deposit.TxHash, &deposit.DepositValue, &deposit.DepositReceiver, &deposit.ChangeValue, &deposit.ChangeReceiver, &deposit.EvmID, &deposit.EvmAddr)
+		err := rows.Scan(&deposit.BlockNumber, &deposit.BlockHash, &deposit.TxHash, &deposit.DepositValue, &deposit.DepositReceiver, &deposit.EvmID, &deposit.EvmAddr)
 		if err != nil {
 			return nil, err
 		}
@@ -77,7 +75,7 @@ func (s *SQLiteDepositStorage) GetDepositByTxHash(txHash string) ([]DepositActio
 }
 
 func (s *SQLiteDepositStorage) GetDepositByReceiver(receiver string) ([]DepositAction, error) {
-	query := `SELECT block_number, block_hash, tx_hash, deposit_value, deposit_receiver, change_value, change_receiver, evm_id, evm_addr FROM btc_action_deposit WHERE deposit_receiver = ?`
+	query := `SELECT block_number, block_hash, tx_hash, deposit_value, deposit_receiver, evm_id, evm_addr FROM btc_action_deposit WHERE deposit_receiver = ?`
 	rows, err := s.db.Query(query, receiver)
 	if err != nil {
 		return nil, err
@@ -87,7 +85,7 @@ func (s *SQLiteDepositStorage) GetDepositByReceiver(receiver string) ([]DepositA
 	var deposits []DepositAction
 	for rows.Next() {
 		var deposit DepositAction
-		err := rows.Scan(&deposit.BlockNumber, &deposit.BlockHash, &deposit.TxHash, &deposit.DepositValue, &deposit.DepositReceiver, &deposit.ChangeValue, &deposit.ChangeReceiver, &deposit.EvmID, &deposit.EvmAddr)
+		err := rows.Scan(&deposit.BlockNumber, &deposit.BlockHash, &deposit.TxHash, &deposit.DepositValue, &deposit.DepositReceiver, &deposit.EvmID, &deposit.EvmAddr)
 		if err != nil {
 			return nil, err
 		}
@@ -97,7 +95,7 @@ func (s *SQLiteDepositStorage) GetDepositByReceiver(receiver string) ([]DepositA
 }
 
 func (s *SQLiteDepositStorage) GetDepositByEVM(evmAddr string, evmID int32) ([]DepositAction, error) {
-	query := `SELECT block_number, block_hash, tx_hash, deposit_value, deposit_receiver, change_value, change_receiver, evm_id, evm_addr FROM btc_action_deposit WHERE evm_addr = ? AND evm_id = ?`
+	query := `SELECT block_number, block_hash, tx_hash, deposit_value, deposit_receiver, evm_id, evm_addr FROM btc_action_deposit WHERE evm_addr = ? AND evm_id = ?`
 	rows, err := s.db.Query(query, evmAddr, evmID)
 	if err != nil {
 		return nil, err
@@ -107,7 +105,7 @@ func (s *SQLiteDepositStorage) GetDepositByEVM(evmAddr string, evmID int32) ([]D
 	var deposits []DepositAction
 	for rows.Next() {
 		var deposit DepositAction
-		err := rows.Scan(&deposit.BlockNumber, &deposit.BlockHash, &deposit.TxHash, &deposit.DepositValue, &deposit.DepositReceiver, &deposit.ChangeValue, &deposit.ChangeReceiver, &deposit.EvmID, &deposit.EvmAddr)
+		err := rows.Scan(&deposit.BlockNumber, &deposit.BlockHash, &deposit.TxHash, &deposit.DepositValue, &deposit.DepositReceiver, &deposit.EvmID, &deposit.EvmAddr)
 		if err != nil {
 			return nil, err
 		}
