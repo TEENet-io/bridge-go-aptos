@@ -26,7 +26,7 @@ func (dd *DepositData) Serialize() ([]byte, error) {
 }
 
 // util: convert evm_chain_id to [4]byte
-func intToByteArray(n int) ([4]byte, error) {
+func IntToByteArray(n int) ([4]byte, error) {
 	// Check for overflow
 	if n < 0 || n > 4294967295 {
 		return [4]byte{}, errors.New("integer overflow: value must be between 0 and 4294967295")
@@ -44,8 +44,13 @@ func intToByteArray(n int) ([4]byte, error) {
 	return byteArray, nil
 }
 
+// util: convert [4]byte to int
+func ByteArrayToInt(b [4]byte) int {
+	return int(b[0])<<24 | int(b[1])<<16 | int(b[2])<<8 | int(b[3])
+}
+
 // util: convert evm_address to [20]byte
-func evmAddrToByteArray(evm_addr string) ([20]byte, error) {
+func EvmAddrToByteArray(evm_addr string) ([20]byte, error) {
 	var r [20]byte
 	address := common.HexToAddress(evm_addr)
 	byteSlice := address.Bytes()
@@ -56,18 +61,33 @@ func evmAddrToByteArray(evm_addr string) ([20]byte, error) {
 	return r, nil
 }
 
+// util: convert [20]byte to hex string (no "0x" prefix)
+func ByteArrayToHexString(b [20]byte) string {
+	return common.BytesToAddress(b[:]).Hex()
+}
+
 // Util: Create a []byte as an OP_RETURN data via evm chain id and receiver's address
 func MakeOpReturnData(evm_chain_id int, evm_addr string) ([]byte, error) {
-	evmId, err := intToByteArray(evm_chain_id)
+	evmId, err := IntToByteArray(evm_chain_id)
 	if err != nil {
 		return nil, err
 	}
 
-	evmAddr, err := evmAddrToByteArray(evm_addr)
+	evmAddr, err := EvmAddrToByteArray(evm_addr)
 	if err != nil {
 		return nil, err
 	}
 
 	dd := DepositData{evmId, evmAddr}
 	return dd.Serialize()
+}
+
+// DecodeOpReturnData deposit data from RLP encoded []byte
+func DecodeOpReturnData(data []byte) (*DepositData, error) {
+	var dd DepositData
+	err := rlp.DecodeBytes(data, &dd)
+	if err != nil {
+		return nil, err
+	}
+	return &dd, nil
 }

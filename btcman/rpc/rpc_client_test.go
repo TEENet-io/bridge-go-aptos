@@ -1,4 +1,4 @@
-package btcman
+package rpc
 
 import (
 	"os"
