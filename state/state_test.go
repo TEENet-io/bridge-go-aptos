@@ -22,7 +22,7 @@ func newTestStateEnv(t *testing.T) (
 	statedb, err := NewStateDB(sqlDB)
 	assert.NoError(t, err)
 
-	st, err = New(statedb, &Config{ChannelSize: 1})
+	st, err = New(statedb, &Config{ChannelSize: 1, EthChainId: big.NewInt(1337)})
 	assert.NoError(t, err)
 
 	ctx, cancel = context.WithCancel(context.Background())
@@ -33,6 +33,35 @@ func newTestStateEnv(t *testing.T) (
 	}
 
 	return
+}
+
+func TestInitChainId(t *testing.T) {
+	st, _, cancel, close := newTestStateEnv(t)
+	defer close()
+	defer cancel()
+
+	b := st.cache.ethChainId.Load().([]byte)
+	assert.NotNil(t, b)
+	chainId := new(big.Int).SetBytes(b)
+	assert.Equal(t, chainId, big.NewInt(1337))
+
+	bs, ok, err := st.statedb.GetKeyedValue(KeyEthChainId)
+	assert.NoError(t, err)
+	assert.True(t, ok)
+	assert.Equal(t, chainId, new(big.Int).SetBytes(bs[:]))
+}
+
+func TestUnmatchedChainId(t *testing.T) {
+	sqlDB := getMemoryDB()
+
+	statedb, err := NewStateDB(sqlDB)
+	assert.NoError(t, err)
+	err = statedb.SetKeyedValue(KeyEthChainId, common.BigInt2Bytes32(big.NewInt(1338)))
+	assert.NoError(t, err)
+
+	st, err := New(statedb, &Config{ChannelSize: 1, EthChainId: big.NewInt(1337)})
+	assert.Equal(t, err, ErrEthChainIdUnmatchedStored)
+	assert.Nil(t, st)
 }
 
 func TestNewStateWithoutStored(t *testing.T) {

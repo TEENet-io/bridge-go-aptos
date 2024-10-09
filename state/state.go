@@ -15,11 +15,15 @@ import (
 var (
 	KeyEthFinalizedBlock = crypto.Keccak256Hash([]byte("KeyEthFinalizedBlock"))
 	KeyBtcFinalizedBlock = crypto.Keccak256Hash([]byte("KeyBtcFinalizedBlock"))
+	KeyEthChainId        = crypto.Keccak256Hash([]byte("KeyEthChainId"))
 
 	ErrSetEthFinalizedBlockNumber           = errors.New("failed to set eth finalized block number in statedb")
 	ErrGetEthFinalizedBlockNumber           = errors.New("failed to get eth finalized block number from statedb")
 	ErrStoredEthFinalizedBlockNumberInvalid = errors.New("stored eth finalized block number is invalid")
 	ErrKeyValueNotFound                     = errors.New("key value not found")
+	ErrGetEthChainId                        = errors.New("failed to get eth chain id from statedb")
+	ErrSetEthChainId                        = errors.New("failed to set eth chain id in statedb")
+	ErrEthChainIdUnmatchedStored            = errors.New("current chain id does not match the stored")
 
 	ErrUpdateInvalidRedeem    = errors.New("redeem is invalid and cannot be updated")
 	ErrPreparedEventUnmatched = errors.New("redeem prepared event is unmatched with stored requested redeem")
@@ -46,6 +50,7 @@ type State struct {
 	cache struct {
 		lastEthFinalized atomic.Value // uint64
 		lastBtcFinalized atomic.Value // uint64
+		ethChainId       atomic.Value // uint64
 	}
 }
 
@@ -60,8 +65,11 @@ func New(statedb *StateDB, cfg *Config) (*State, error) {
 		newRedeemPreparedEvCh:  make(chan *ethsync.RedeemPreparedEvent, cfg.ChannelSize),
 	}
 
-	err := st.initEthFinalizedBlock()
-	if err != nil {
+	if err := st.initEthFinalizedBlock(); err != nil {
+		return nil, err
+	}
+
+	if err := st.initEthChainID(); err != nil {
 		return nil, err
 	}
 
