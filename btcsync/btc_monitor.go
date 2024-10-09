@@ -82,7 +82,15 @@ func (m *BTCMonitor) Scan() error {
 					return fmt.Errorf("failed to craft deposit action: %v", err)
 					//TODO: shall add refund BTC logic here.
 				}
+				observedUTXO := &ObservedUTXO{
+					BlockNumber: blockHeight,
+					BlockHash:   block.BlockHash().String(),
+					TxID:        tx.TxHash().String(),
+					Vout:        0, // deposit tx always has vout 0
+					Amount:      deposit.DepositValue,
+				}
 				m.Publisher.NotifyDeposit(*deposit)
+				m.Publisher.NotifyUTXO(*observedUTXO)
 			} else {
 				// check if the tx is a withdraw
 				// check if the tx is an unknown transfer
