@@ -1,5 +1,3 @@
-/*
- */
 package btcsync
 
 import (
@@ -14,6 +12,10 @@ type ObservedUTXO struct {
 	Amount      int64
 }
 
+/*
+ObserverUTXOVault is an observer that once a new UTXO is pushed from channel,
+It will add the UTXO to the backend.
+*/
 type ObserverUTXOVault struct {
 	Backend *btcvault.TreasureVault
 	Ch      chan ObservedUTXO

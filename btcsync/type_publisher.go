@@ -14,6 +14,8 @@ type PublisherService struct {
 }
 
 // NewPublisherService creates a new PublisherService
+// Currently the observers are empty.
+// Add some observers via register.
 func NewPublisherService() *PublisherService {
 	return &PublisherService{
 		DepositObservers:       make([]chan btcaction.DepositAction, 0),
@@ -59,17 +61,17 @@ func (m *PublisherService) NotifyDeposit(da btcaction.DepositAction) {
 	}
 }
 
-func (m *PublisherService) NotifyOtherTransfer(uta btcaction.OtherTransferAction) {
+func (m *PublisherService) NotifyOtherTransfer(ota btcaction.OtherTransferAction) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	for _, observer := range m.OtherTransferObservers {
 		select {
-		case observer <- uta:
+		case observer <- ota:
 		default:
 			// Handle the case where the observer's channel is full
 			go func(obs chan btcaction.OtherTransferAction) {
-				obs <- uta
+				obs <- ota
 			}(observer)
 		}
 	}

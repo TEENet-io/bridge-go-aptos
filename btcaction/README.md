@@ -20,18 +20,8 @@ output #3 = {value} {to change receiver}
 }
 
 ```
-**Withdraw Actions**
 
-```
-Tx: {
-input #1 - #n {from us}
----------------------------
-output #1 = {value} {to user}
-output #2 = {value} {to us}
-}
-```
-
-**Unknown Transfers Actions** (non-of-the-two actions above)
+**Other Transfers Actions** (money transfer-in other than deposit)
 ```
 Tx: {
 inputs: we don't care
