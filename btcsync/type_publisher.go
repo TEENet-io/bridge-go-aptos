@@ -7,20 +7,18 @@ import (
 )
 
 type PublisherService struct {
-	DepositObservers         []chan btcaction.DepositAction
-	WithdrawObservers        []chan btcaction.WithdrawAction
-	UnknownTransferObservers []chan btcaction.UnknownTransferAction
-	UTXOObservers            []chan ObservedUTXO
-	mu                       sync.Mutex
+	DepositObservers       []chan btcaction.DepositAction
+	OtherTransferObservers []chan btcaction.OtherTransferAction
+	UTXOObservers          []chan ObservedUTXO
+	mu                     sync.Mutex
 }
 
 // NewPublisherService creates a new PublisherService
 func NewPublisherService() *PublisherService {
 	return &PublisherService{
-		DepositObservers:         make([]chan btcaction.DepositAction, 0),
-		WithdrawObservers:        make([]chan btcaction.WithdrawAction, 0),
-		UnknownTransferObservers: make([]chan btcaction.UnknownTransferAction, 0),
-		UTXOObservers:            make([]chan ObservedUTXO, 0),
+		DepositObservers:       make([]chan btcaction.DepositAction, 0),
+		OtherTransferObservers: make([]chan btcaction.OtherTransferAction, 0),
+		UTXOObservers:          make([]chan ObservedUTXO, 0),
 	}
 }
 
@@ -31,18 +29,11 @@ func (m *PublisherService) RegisterDepositObserver(observer chan btcaction.Depos
 	m.DepositObservers = append(m.DepositObservers, observer)
 }
 
-func (m *PublisherService) RegisterWithdrawObserver(observer chan btcaction.WithdrawAction) {
+func (m *PublisherService) RegisterOtherTransferObserver(observer chan btcaction.OtherTransferAction) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	m.WithdrawObservers = append(m.WithdrawObservers, observer)
-}
-
-func (m *PublisherService) RegisterUnknownTransferObserver(observer chan btcaction.UnknownTransferAction) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	m.UnknownTransferObservers = append(m.UnknownTransferObservers, observer)
+	m.OtherTransferObservers = append(m.OtherTransferObservers, observer)
 }
 
 func (m *PublisherService) RegisterUTXOObserver(observer chan ObservedUTXO) {
@@ -51,27 +42,6 @@ func (m *PublisherService) RegisterUTXOObserver(observer chan ObservedUTXO) {
 
 	m.UTXOObservers = append(m.UTXOObservers, observer)
 }
-
-// // RegisterObserver adds an observer channel to the list
-// // observers are classified by the type of action they are interested in
-// func (m *PublisherService) RegisterObserver(observer interface{}) error {
-// 	m.mu.Lock()
-// 	defer m.mu.Unlock()
-
-// 	switch observer := observer.(type) {
-// 	case chan btcaction.DepositAction:
-// 		m.DepositObservers = append(m.DepositObservers, observer)
-// 		return nil
-// 	case chan btcaction.WithdrawAction:
-// 		m.WithdrawObservers = append(m.WithdrawObservers, observer)
-// 		return nil
-// 	case chan btcaction.UnknownTransferAction:
-// 		m.UnknownTransferObservers = append(m.UnknownTransferObservers, observer)
-// 		return nil
-// 	default:
-// 		return fmt.Errorf("invalid observer type")
-// 	}
-// }
 
 func (m *PublisherService) NotifyDeposit(da btcaction.DepositAction) {
 	m.mu.Lock()
@@ -89,32 +59,16 @@ func (m *PublisherService) NotifyDeposit(da btcaction.DepositAction) {
 	}
 }
 
-func (m *PublisherService) NotifyWithdraw(wa btcaction.WithdrawAction) {
+func (m *PublisherService) NotifyOtherTransfer(uta btcaction.OtherTransferAction) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	for _, observer := range m.WithdrawObservers {
-		select {
-		case observer <- wa:
-		default:
-			// Handle the case where the observer's channel is full
-			go func(obs chan btcaction.WithdrawAction) {
-				obs <- wa
-			}(observer)
-		}
-	}
-}
-
-func (m *PublisherService) NotifyUnknownTransfer(uta btcaction.UnknownTransferAction) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	for _, observer := range m.UnknownTransferObservers {
+	for _, observer := range m.OtherTransferObservers {
 		select {
 		case observer <- uta:
 		default:
 			// Handle the case where the observer's channel is full
-			go func(obs chan btcaction.UnknownTransferAction) {
+			go func(obs chan btcaction.OtherTransferAction) {
 				obs <- uta
 			}(observer)
 		}

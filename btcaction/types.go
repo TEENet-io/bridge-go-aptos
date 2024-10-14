@@ -1,5 +1,6 @@
 package btcaction
 
+// Basic is the information that should be included in all types of actions.
 type Basic struct {
 	BlockNumber int
 	BlockHash   string
@@ -33,53 +34,25 @@ type DepositStorage interface {
 	GetDepositByEVM(evmAddr string, evmID int32) ([]DepositAction, error)
 }
 
-// WithdrawAction is a struct that represents a withdraw transaction
-// from EVM to BTC.
-type WithdrawAction struct {
-	Basic
-	WithdrawValue    int64  // in satoshi
-	WithdrawReceiver string // on btc
-	ChangeValue      int64
-	ChangeReceiver   string // on btc
-}
-
-// WithdrawStorage is an interface for storing and querying WithdrawAction.
-type WithdrawStorage interface {
-	// AddWithdraw adds a new WithdrawAction.
-	AddWithdraw(withdraw WithdrawAction) error
-
-	// GetWithdrawByTxHash queries WithdrawAction by TxHash.
-	GetWithdrawByTxHash(txHash string) ([]WithdrawAction, error)
-
-	// GetWithdrawByValue queries WithdrawAction by WithdrawValue.
-	GetWithdrawByValue(value int64) ([]WithdrawAction, error)
-
-	// GetWithdrawByReceiver queries WithdrawAction by WithdrawReceiver.
-	GetWithdrawByReceiver(receiver string) ([]WithdrawAction, error)
-
-	// GetWithdrawByChangeReceiver queries WithdrawAction by ChangeReceiver.
-	GetWithdrawByChangeReceiver(receiver string) ([]WithdrawAction, error)
-}
-
-// UnknownTransferAction is a struct that represents an unknown transfer
+// OtherTransferAction is a struct that represents an unknown transfer
 // to us in BTC.
-type UnknownTransferAction struct {
+type OtherTransferAction struct {
 	Basic
 	Vout             int
 	TransferValue    int64
 	TransferReceiver string // on btc
 }
 
-// UnknownTransferStorage is an interface for storing and querying UnknownTransferAction.
-type UnknownTransferStorage interface {
-	// AddUnknownTransfer adds a new UnknownTransferAction.
-	AddUnknownTransfer(transfer UnknownTransferAction) error
+// OtherTransferStorage is an interface for storing and querying OtherTransferAction.
+type OtherTransferStorage interface {
+	// AddOtherTransfer adds a new OtherTransferAction.
+	AddOtherTransfer(transfer OtherTransferAction) error
 
-	// GetUnknownTransferByTxHash queries UnknownTransferAction by TxHash.
-	GetUnknownTransferByTxHash(txHash string) ([]UnknownTransferAction, error)
+	// GetOtherTransferByTxHash queries OtherTransferAction by TxHash.
+	GetOtherTransferByTxHash(txHash string) ([]OtherTransferAction, error)
 
-	// GetUnknownTransferByReceiver queries UnknownTransferAction by TransferReceiver.
-	GetUnknownTransferByReceiver(receiver string) ([]UnknownTransferAction, error)
+	// GetOtherTransferByReceiver queries OtherTransferAction by TransferReceiver.
+	GetOtherTransferByReceiver(receiver string) ([]OtherTransferAction, error)
 }
 
 // // RefundAction is a struct that represents a refund transaction.
@@ -99,4 +72,14 @@ type UnknownTransferStorage interface {
 
 // 	// GetRefundByReceiver queries RefundAction by Receiver.
 // 	GetRefundByReceiver(receiver string) ([]RefundAction, error)
+// }
+
+// // WithdrawAction is a struct that represents a withdraw transaction
+// // from EVM to BTC.
+// type WithdrawAction struct {
+// 	Basic
+// 	WithdrawValue    int64  // in satoshi
+// 	WithdrawReceiver string // on btc
+// 	ChangeValue      int64
+// 	ChangeReceiver   string // on btc
 // }

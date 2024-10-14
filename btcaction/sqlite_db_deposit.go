@@ -1,3 +1,8 @@
+/*
+SQLiteDepositStorage represents a "storage" implemenation of "deposit action" from BTC to EVM.
+
+It uses SQLite as the underlying storage engine.
+*/
 package btcaction
 
 import (
@@ -6,11 +11,6 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-/*
-SQLiteDepositStorage represents a "storage" implemenation of "deposit action" from BTC to EVM.
-
-It uses SQLite as the underlying storage engine.
-*/
 type SQLiteDepositStorage struct {
 	db *sql.DB
 }
