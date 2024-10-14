@@ -2,8 +2,7 @@
 BTC monitor is a type of publisher.
 It scan the btc chain and watch for interested actions.
 1) deposit
-2) withdraw
-3) unknown transfer
+2) other transfer to us
 
 Once an interested action is found, the monitor will notify all the observers.
 */
@@ -27,15 +26,15 @@ import (
 
 const (
 	CONSIDER_FINALIZED = 6                // 6 blocks we consider finalized
-	SCAN_INTERVAL      = 10 * time.Second // 10 seconds then we scan again
+	SCAN_INTERVAL      = 10 * time.Second // 10 seconds, then we scan again
 )
 
 type BTCMonitor struct {
-	BridgeBTCAddress      btcutil.Address // btc address of the bridge wallet.
-	Publisher             *PublisherService
-	LastVistedBlockHeight int64            // last block height visited
+	BridgeBTCAddress      btcutil.Address  // btc address of the bridge wallet.
+	LastVistedBlockHeight int64            // last btc block height visited
 	ChainConfig           *chaincfg.Params // which btc chain
-	RpcClient             *rpc.RpcClient   // rpc client to interact with btc node
+	Publisher             *PublisherService
+	RpcClient             *rpc.RpcClient // rpc client to interact with btc node
 }
 
 func NewBTCMonitor(addressStr string, chainConfig *chaincfg.Params, rpcClient *rpc.RpcClient) (*BTCMonitor, error) {
@@ -45,9 +44,9 @@ func NewBTCMonitor(addressStr string, chainConfig *chaincfg.Params, rpcClient *r
 	}
 	return &BTCMonitor{
 		BridgeBTCAddress:      _address,
-		Publisher:             NewPublisherService(),
 		LastVistedBlockHeight: 0,
 		ChainConfig:           chainConfig,
+		Publisher:             NewPublisherService(),
 		RpcClient:             rpcClient,
 	}, nil
 }
@@ -92,8 +91,7 @@ func (m *BTCMonitor) Scan() error {
 				m.Publisher.NotifyDeposit(*deposit)
 				m.Publisher.NotifyUTXO(*observedUTXO)
 			} else {
-				// check if the tx is a withdraw
-				// check if the tx is an unknown transfer
+				// check if the tx is an other transfer
 			}
 		}
 	}
