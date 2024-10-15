@@ -30,6 +30,11 @@ var (
 		value CHAR(64) NOT NULL
 	);`
 
+	// This table stores a BTC2EVM Token Mint.
+	// btcTxId is the hash of the BTC transaction which user deposits BTC to the bridge.
+	// mintTxHash is the hash of the mint transaction on the EVM side.
+	// receiver is the address of the receiver on the EVM side.
+	// amount is the amount of the minted token (satoshi).
 	mintTable = `CREATE TABLE IF NOT EXISTS mint (
 		btcTxId CHAR(64) PRIMARY KEY NOT NULL,
 		mintTxHash CHAR(64) UNIQUE,

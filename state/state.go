@@ -17,6 +17,8 @@ var (
 	KeyBtcFinalizedBlock = crypto.Keccak256Hash([]byte("KeyBtcFinalizedBlock"))
 	KeyEthChainId        = crypto.Keccak256Hash([]byte("KeyEthChainId"))
 
+	ErrSetBtcFinalizedBlockNumber           = errors.New("failed to set btc finalized block number in statedb")
+	ErrGetBtcFinalizedBlockNumber           = errors.New("failed to get btc finalized block number from statedb")
 	ErrSetEthFinalizedBlockNumber           = errors.New("failed to set eth finalized block number in statedb")
 	ErrGetEthFinalizedBlockNumber           = errors.New("failed to get eth finalized block number from statedb")
 	ErrStoredEthFinalizedBlockNumberInvalid = errors.New("stored eth finalized block number is invalid")
@@ -260,6 +262,7 @@ func (st *State) Start(ctx context.Context) error {
 	}
 }
 
+// Fetch latest finalized eth block number from statedb
 func (st *State) GetEthFinalizedBlockNumber() (*big.Int, error) {
 	if v := st.cache.lastEthFinalized.Load(); v != nil {
 		return new(big.Int).SetBytes(v.([]byte)), nil
@@ -277,31 +280,7 @@ func (st *State) GetEthFinalizedBlockNumber() (*big.Int, error) {
 	return b.Big(), nil
 }
 
-func (st *State) GetBtcFinalizedBlockNumber() (*big.Int, error) {
-	//TODO: implement this
-	return big.NewInt(1), nil
-}
-
-func (st *State) GetNewEthFinalizedBlockChannel() chan<- *big.Int {
-	return st.newEthFinalizedBlockCh
-}
-
-func (st *State) GetNewBtcFinalizedBlockChannel() chan<- *big.Int {
-	return st.newBtcFinalizedBlockCh
-}
-
-func (st *State) GetNewRedeemRequestedEventChannel() chan<- *ethsync.RedeemRequestedEvent {
-	return st.newRedeemRequestedEvCh
-}
-
-func (st *State) GetNewRedeemPreparedEventChannel() chan<- *ethsync.RedeemPreparedEvent {
-	return st.newRedeemPreparedEvCh
-}
-
-func (st *State) GetNewMintedEventChannel() chan<- *ethsync.MintedEvent {
-	return st.newMintedEventCh
-}
-
+// Set finalized ETH block number into state (update underlying db).
 func (st *State) setEthFinalizedBlockNumber(fbNum *big.Int) error {
 	if err := st.statedb.SetKeyedValue(KeyEthFinalizedBlock, common.BigInt2Bytes32(fbNum)); err != nil {
 		return err
@@ -309,4 +288,63 @@ func (st *State) setEthFinalizedBlockNumber(fbNum *big.Int) error {
 	st.cache.lastEthFinalized.Store(fbNum.Bytes())
 
 	return nil
+}
+
+// Fetch latest btc finalized block number from statedb
+func (st *State) GetBtcFinalizedBlockNumber() (*big.Int, error) {
+	if v := st.cache.lastBtcFinalized.Load(); v != nil {
+		return new(big.Int).SetBytes(v.([]byte)), nil
+	}
+
+	b, ok, err := st.statedb.GetKeyedValue(KeyBtcFinalizedBlock)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, ErrKeyValueNotFound
+	}
+	st.cache.lastBtcFinalized.Store(b.Big().Bytes())
+
+	return b.Big(), nil
+}
+
+// Set finalized BTC block number into state (update underlying db).
+func (st *State) SetBtcFinalizedBlockNumber(fbNum *big.Int) error {
+	if err := st.statedb.SetKeyedValue(KeyBtcFinalizedBlock, common.BigInt2Bytes32(fbNum)); err != nil {
+		return err
+	}
+	st.cache.lastBtcFinalized.Store(fbNum.Bytes())
+
+	return nil
+}
+
+// Return a channel
+func (st *State) GetNewEthFinalizedBlockChannel() chan<- *big.Int {
+	return st.newEthFinalizedBlockCh
+}
+
+// Return a channel
+func (st *State) GetNewBtcFinalizedBlockChannel() chan<- *big.Int {
+	return st.newBtcFinalizedBlockCh
+}
+
+// Return a channel
+func (st *State) GetNewRedeemRequestedEventChannel() chan<- *ethsync.RedeemRequestedEvent {
+	return st.newRedeemRequestedEvCh
+}
+
+// Return a channel
+func (st *State) GetNewRedeemPreparedEventChannel() chan<- *ethsync.RedeemPreparedEvent {
+	return st.newRedeemPreparedEvCh
+}
+
+// Return a channel
+func (st *State) GetNewMintedEventChannel() chan<- *ethsync.MintedEvent {
+	return st.newMintedEventCh
+}
+
+// Insert a new BTC2EVM mint record into state db
+func (st *State) SetNewBTC2EVMMint(m *Mint) error {
+	err := st.statedb.UpdateMint(m)
+	return err
 }
