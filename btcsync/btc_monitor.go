@@ -1,4 +1,9 @@
 /*
+Package btcsync syncs with BTC blockchain and publishes actions to observers.
+*/
+package btcsync
+
+/*
 BTC monitor is a type of publisher.
 It scan the btc chain and watch for interested actions.
 1) deposit
@@ -6,7 +11,6 @@ It scan the btc chain and watch for interested actions.
 
 Once an interested action is found, the monitor will notify all the observers.
 */
-package btcsync
 
 import (
 	"fmt"

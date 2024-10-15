@@ -21,6 +21,7 @@ func (m *Mint) String() string {
 	return fmt.Sprintf("%+v", *m)
 }
 
+// convert MintedEvent to Mint.
 func createMintFromMintedEvent(ev *ethsync.MintedEvent) *Mint {
 	return &Mint{
 		BtcTxId:    ev.BtcTxId,
@@ -37,6 +38,7 @@ type sqlMint struct {
 	Amount     uint64
 }
 
+// encode converts Mint to sqlMint
 func (s *sqlMint) encode(m *Mint) (*sqlMint, error) {
 	s = &sqlMint{}
 	s.BtcTxId = m.BtcTxId.String()[2:]
@@ -47,6 +49,7 @@ func (s *sqlMint) encode(m *Mint) (*sqlMint, error) {
 	return s, nil
 }
 
+// decode converts sqlMint to Mint
 func (s *sqlMint) decode() (*Mint, error) {
 	return &Mint{
 		BtcTxId:    common.HexStrToBytes32("0x" + s.BtcTxId),

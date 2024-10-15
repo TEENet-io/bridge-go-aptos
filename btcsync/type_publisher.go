@@ -6,6 +6,9 @@ import (
 	"github.com/TEENet-io/bridge-go/btcaction"
 )
 
+// PublisherService is a concurrent-safe service that
+// could "Notify" channels of observers.
+// Please "Register" observers via RegisterXXXObserver before Notify.
 type PublisherService struct {
 	DepositObservers       []chan btcaction.DepositAction
 	OtherTransferObservers []chan btcaction.OtherTransferAction
@@ -24,6 +27,7 @@ func NewPublisherService() *PublisherService {
 	}
 }
 
+// RegisterDepositObserver registers a new observer for deposit action.
 func (m *PublisherService) RegisterDepositObserver(observer chan btcaction.DepositAction) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -31,6 +35,7 @@ func (m *PublisherService) RegisterDepositObserver(observer chan btcaction.Depos
 	m.DepositObservers = append(m.DepositObservers, observer)
 }
 
+// RegisterOtherTransferObserver registers a new observer for other transfer action.
 func (m *PublisherService) RegisterOtherTransferObserver(observer chan btcaction.OtherTransferAction) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -38,6 +43,7 @@ func (m *PublisherService) RegisterOtherTransferObserver(observer chan btcaction
 	m.OtherTransferObservers = append(m.OtherTransferObservers, observer)
 }
 
+// RegisterUTXOObserver registers a new observer for UTXO action.
 func (m *PublisherService) RegisterUTXOObserver(observer chan ObservedUTXO) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

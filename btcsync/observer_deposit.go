@@ -1,8 +1,9 @@
-/*
-This file implements the deposit action observer.
-It will store the deposit action.
-*/
 package btcsync
+
+/*
+This file implements the DepositAction observer.
+It stores the DepositAction into backend.
+*/
 
 import (
 	"github.com/TEENet-io/bridge-go/btcaction"
@@ -21,7 +22,7 @@ func NewObserverDepositAction(backend btcaction.DepositStorage, bufferSize int) 
 }
 
 // GetNotifiedDeposit implements the DepositObserver interface
-// You should call it as a separate goroutine
+// You should init it as a separate goroutine (with go)
 func (s *ObserverDepositAction) GetNotifiedDeposit() {
 	for data := range s.Ch {
 		s.backend.AddDeposit(data)
