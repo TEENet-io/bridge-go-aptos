@@ -10,6 +10,8 @@ import (
 	"github.com/TEENet-io/bridge-go/common"
 	"github.com/TEENet-io/bridge-go/ethsync"
 	"github.com/ethereum/go-ethereum/crypto"
+
+	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 var (
@@ -362,6 +364,11 @@ func (st *State) GetPreparedRedeems() ([]*Redeem, error) {
 
 // Update existing redeem record in the state db.
 // Set the status to from "prepared" to "completed"
-func (st *State) SetRedeemCompleted(r *Redeem) error {
+func (st *State) SetRedeemCompleted(ethReqTxHash ethcommon.Hash, btcTxHash ethcommon.Hash) error {
+	r := &Redeem{
+		RequestTxHash: ethReqTxHash,
+		BtcTxId:       btcTxHash,
+		Status:        "completed",
+	}
 	return st.statedb.UpdateAfterRedeemed(r)
 }

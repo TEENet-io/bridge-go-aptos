@@ -1,5 +1,9 @@
 package btcsync
 
+// This file implements an observer
+// that writes "mint" table in shared state.
+// (which later will trigger BTC2EVM Mint on ETH side).
+
 import (
 	"math/big"
 
@@ -8,10 +12,6 @@ import (
 	"github.com/TEENet-io/bridge-go/state"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 )
-
-// This file implements an observer
-// that writes "mint" table in shared state.
-// (which later will trigger BTC2EVM Mint on ETH side).
 
 type BTC2EVMObserver struct {
 	sharedState *state.State
