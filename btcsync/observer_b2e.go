@@ -14,11 +14,11 @@ import (
 // (which later will trigger BTC2EVM Mint on ETH side).
 
 type BTC2EVMObserver struct {
-	sharedState state.State
+	sharedState *state.State
 	Ch          chan btcaction.DepositAction // communication channel
 }
 
-func NewBTC2EVMObserver(state state.State, bufferSize int) *BTC2EVMObserver {
+func NewBTC2EVMObserver(state *state.State, bufferSize int) *BTC2EVMObserver {
 	return &BTC2EVMObserver{
 		sharedState: state,
 		Ch:          make(chan btcaction.DepositAction, bufferSize),
@@ -27,7 +27,7 @@ func NewBTC2EVMObserver(state state.State, bufferSize int) *BTC2EVMObserver {
 
 // GetNotifiedDeposit implements the DepositObserver interface
 // it writes to shared state to allow following actions being taken.
-// You should init it as a separate goroutine (with go)
+// You should call it as a separate goroutine (with go)
 func (s *BTC2EVMObserver) GetNotifiedDeposit() {
 	for data := range s.Ch {
 		// type conversion

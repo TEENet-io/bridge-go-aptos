@@ -135,6 +135,9 @@ func (txmgr *EthTxManager) Start(ctx context.Context) error {
 				}()
 			}
 			wg.Wait()
+
+		// Read State DB & get redeems with status "requested".
+		// Prepare those redeems: gather UTXOs, sign, call/post tx of "RedeemPrepare" on ETH side.
 		case <-tickerToPrepare.C:
 			redeemsFromDB, err := txmgr.statedb.GetRedeemsByStatus(state.RedeemStatusRequested)
 			if err != nil {

@@ -1,12 +1,13 @@
+package assembler
+
 /*
-This file implements "Locker" interface.
+This file implements BTC "Locker" interface.
 
 Since locking scripts do not require any prior knowledge of private keys,
 it is universal to all wallet implementations.
 
 So we can do it here.
 */
-package assembler
 
 import (
 	"errors"

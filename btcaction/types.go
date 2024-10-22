@@ -2,9 +2,9 @@ package btcaction
 
 // Basic is the information that should be included in all types of actions.
 type Basic struct {
-	BlockNumber int
-	BlockHash   string
-	TxHash      string
+	BlockNumber int    // btc
+	BlockHash   string // btc
+	TxHash      string // TxHash is btc TxHash
 }
 
 // DepositAction is a struct that represents a deposit transaction
@@ -16,7 +16,7 @@ type DepositAction struct {
 	DepositValue    int64
 	DepositReceiver string // on btc (our wallet address)
 	EvmID           int32
-	EvmAddr         string // 0x... on EVM
+	EvmAddr         string // No 0x prefix
 }
 
 // DepositStorage is an interface for storing and querying DepositAction.
@@ -32,6 +32,28 @@ type DepositStorage interface {
 
 	// GetDepositByEVM queries DepositAction by EvmAddr and EvmID.
 	GetDepositByEVM(evmAddr string, evmID int32) ([]DepositAction, error)
+}
+
+// RedeemAction is a management action.
+// After sent the redeem btc, we fill in EthRequestTxID, BtcHash, and mark Sent.
+// After the redeem btc is mined, we mark Mined, and Basic
+type RedeemAction struct {
+	Basic                 // fill this after <mined>.
+	EthRequestTxID string // 0x + 64 hex (32 byte) on EVM, fill this after <sent>.
+	BtcHash        string // fill this after <sent>.
+	Sent           bool   // mark this after <sent>.
+	Mined          bool   // mark this after <mined>.
+}
+
+type RedeemActionStorage interface {
+	// Insert a new redeem
+	InsertRedeem(r *RedeemAction) error
+
+	// Check if the redeem has not been mined
+	HasNotMined(ethRequestTxID string) (bool, error)
+
+	// Complete (finish) the redeem
+	CompleteRedeem(ethRequestTxID string, b *Basic) error
 }
 
 // OtherTransferAction is a struct that represents an unknown transfer

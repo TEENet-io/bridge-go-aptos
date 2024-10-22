@@ -26,13 +26,21 @@ func NewTreasureVault(btcAddress string, backend VaultUTXOStorage) *TreasureVaul
 
 // AddUTXO adds a new UTXO to the treasure vault
 // It returns an error if the UTXO already exists (won't insert duplicates)
-func (tv *TreasureVault) AddUTXO(blockNumber int32, blockHash string, txID string, vout int32, amount int64) error {
+func (tv *TreasureVault) AddUTXO(
+	blockNumber int32,
+	blockHash string,
+	txID string,
+	vout int32,
+	amount int64,
+	pkScript []byte,
+) error {
 	utxo := VaultUTXO{
 		BlockNumber: blockNumber,
 		BlockHash:   blockHash,
 		TxID:        txID,
 		Vout:        vout,
 		Amount:      amount,
+		PkScript:    pkScript,
 		Lockup:      false,
 		Spent:       false,
 		Timeout:     0,
@@ -121,4 +129,16 @@ func (tv *TreasureVault) ReleaseByCommand(txID string, vout int32) error {
 	}
 
 	return nil
+}
+
+// Fetch detailed information of a UTXO from vault.
+func (tv *TreasureVault) GetUTXODetail(txID string, vout int32) (*VaultUTXO, error) {
+	utxo, err := tv.backend.QueryByTxIDAndVout(txID, vout)
+	if err != nil {
+		return nil, err
+	}
+	if utxo == nil {
+		return nil, fmt.Errorf("utxo not found")
+	}
+	return utxo, nil
 }
