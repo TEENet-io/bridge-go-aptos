@@ -11,6 +11,7 @@ import (
 // Please "Register" observers via RegisterXXXObserver before Notify.
 type PublisherService struct {
 	DepositObservers       []chan btcaction.DepositAction
+	RedeemObservers        []chan btcaction.RedeemAction
 	OtherTransferObservers []chan btcaction.OtherTransferAction
 	UTXOObservers          []chan ObservedUTXO
 	mu                     sync.Mutex
@@ -22,6 +23,7 @@ type PublisherService struct {
 func NewPublisherService() *PublisherService {
 	return &PublisherService{
 		DepositObservers:       make([]chan btcaction.DepositAction, 0),
+		RedeemObservers:        make([]chan btcaction.RedeemAction, 0),
 		OtherTransferObservers: make([]chan btcaction.OtherTransferAction, 0),
 		UTXOObservers:          make([]chan ObservedUTXO, 0),
 	}
@@ -33,6 +35,13 @@ func (m *PublisherService) RegisterDepositObserver(observer chan btcaction.Depos
 	defer m.mu.Unlock()
 
 	m.DepositObservers = append(m.DepositObservers, observer)
+}
+
+func (m *PublisherService) RegisterRedeemObserver(observer chan btcaction.RedeemAction) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.RedeemObservers = append(m.RedeemObservers, observer)
 }
 
 // RegisterOtherTransferObserver registers a new observer for other transfer action.
@@ -62,6 +71,23 @@ func (m *PublisherService) NotifyDeposit(da btcaction.DepositAction) {
 			// Handle the case where the observer's channel is full
 			go func(obs chan btcaction.DepositAction) {
 				obs <- da
+			}(observer)
+		}
+	}
+}
+
+// Notify "redeem completed" to observers.
+func (m *PublisherService) NotifyRedeem(ra btcaction.RedeemAction) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	for _, observer := range m.RedeemObservers {
+		select {
+		case observer <- ra:
+		default:
+			// Handle the case where the observer's channel is full
+			go func(obs chan btcaction.RedeemAction) {
+				obs <- ra
 			}(observer)
 		}
 	}

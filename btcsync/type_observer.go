@@ -9,6 +9,11 @@ type DepositObserver interface {
 	GetNotifiedDeposit()
 }
 
+// Observer on redeem completed.
+type RedeemCompletedObserver interface {
+	GetNotifiedRedeemCompleted()
+}
+
 // Observer on other transfer than deposit
 type OtherTransferObserver interface {
 	GetNotifiedOtherTransfer()

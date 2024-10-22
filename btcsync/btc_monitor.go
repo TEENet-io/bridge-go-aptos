@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/TEENet-io/bridge-go/btcaction"
 	"github.com/TEENet-io/bridge-go/btcman/rpc"
 	"github.com/TEENet-io/bridge-go/btcman/utils"
 	"github.com/btcsuite/btcd/btcutil"
@@ -38,7 +39,24 @@ type BTCMonitor struct {
 	LastVistedBlockHeight int64            // last btc block height visited
 	ChainConfig           *chaincfg.Params // which btc chain
 	Publisher             *PublisherService
-	RpcClient             *rpc.RpcClient // rpc client to interact with btc node
+	RpcClient             *rpc.RpcClient                // rpc client to interact with btc node
+	mgrState              btcaction.RedeemActionStorage // tracker of redeems.
+}
+
+// CheckRedeemTx checks if a given BTC transaction ID matches a record in the database
+func (m *BTCMonitor) ReverseQueryRedeemTx(btcTxID string) bool {
+	reqTxHash, err := m.mgrState.QueryByBtcTxId(btcTxID)
+	if len(reqTxHash) == 0 || err != nil {
+		return false
+	}
+	return true
+}
+
+// FinishRedeem marks a redeem as mined in the database
+func (m *BTCMonitor) FinishRedeem(btcTxID string) string {
+	reqTxHash, _ := m.mgrState.QueryByBtcTxId(btcTxID)
+	_ = m.mgrState.CompleteRedeem(reqTxHash)
+	return reqTxHash
 }
 
 func NewBTCMonitor(addressStr string, chainConfig *chaincfg.Params, rpcClient *rpc.RpcClient) (*BTCMonitor, error) {
@@ -102,15 +120,21 @@ func (m *BTCMonitor) Scan() error {
 				continue
 			}
 
-			// check if the BTC tx is a bridge withdraw (created by us)
-			if utils.MaybeRedeemTx(tx, m.BridgeBTCAddress, m.ChainConfig) {
-				// withdraw, err := utils.CraftWithdrawAction(tx, blockHeight, block, m.BridgeBTCAddress, m.ChainConfig)
-				// if err != nil {
-				// 	return fmt.Errorf("failed to craft withdraw action: %v", err)
-				// }
-				// // Notify Observers
-				// m.Publisher.NotifyWithdraw(*withdraw)
-				// skip the rest of the conditions
+			// check if the BTC tx matches a bridge withdraw in our managment state.
+			// if so, set the redeem state of mgr state to be minted.
+			// notify observers to set the state on core shared state.
+			_btc_txid := tx.TxHash().String()
+			if m.ReverseQueryRedeemTx(_btc_txid) {
+				reqTxHash := m.FinishRedeem(_btc_txid)
+
+				// Notify Observers
+				m.Publisher.NotifyRedeem(btcaction.RedeemAction{
+					EthRequestTxID: reqTxHash,
+					BtcHash:        _btc_txid,
+					Sent:           true,
+					Mined:          true,
+				})
+				// TODO: shall notify the "change" utxo as observedUTXO for redeem tx
 				continue
 			}
 		}

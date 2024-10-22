@@ -1,11 +1,21 @@
 package btctxmanager
 
+/*
+	This file focus on EVM2BTC redeem withdraw action.
+
+	1. Finds "prepared" redeems from local shared "state".
+	2. Fetches details of UTXOs for a single given redeem.
+	3. Sign and send out raw BTC Tx to do the real redeem.
+	4. Insert a record in RedeemActionStorage to track the status.
+*/
+
 import (
-	"strings"
 	"time"
 
+	"github.com/TEENet-io/bridge-go/btcaction"
 	"github.com/TEENet-io/bridge-go/btcman/assembler"
 	"github.com/TEENet-io/bridge-go/btcman/rpc"
+	"github.com/TEENet-io/bridge-go/btcman/utils"
 	"github.com/TEENet-io/bridge-go/btcman/utxo"
 	"github.com/TEENet-io/bridge-go/btcvault"
 	"github.com/TEENet-io/bridge-go/state"
@@ -18,20 +28,12 @@ const (
 	BTC_TX_FEE        = int64(0.001 * 1e8)
 )
 
-// Remove0xPrefix removes the "0x" prefix from a string if it exists
-// It is helpful because BTC address/txid don't have the "0x" prefix.
-func Remove0xPrefix(input string) string {
-	if strings.HasPrefix(input, "0x") {
-		return input[2:]
-	}
-	return input
-}
-
 type BtcTxManager struct {
-	treasureVault btcvault.TreasureVault // where to query details of UTXOs.
-	legacySigner  assembler.LegacySigner // who to sign the txs.
-	myBtcClient   rpc.RpcClient          // send/query btc blockchain.
-	sharedState   state.State            // fetch and update the shared state.
+	treasureVault *btcvault.TreasureVault       // where to query details of UTXOs.
+	legacySigner  *assembler.LegacySigner       // who to sign the txs.
+	myBtcClient   *rpc.RpcClient                // send/query btc blockchain.
+	sharedState   *state.State                  // fetch and update the shared state. (communicate with eth side)
+	mgrState      btcaction.RedeemActionStorage // tracker of redeems.
 }
 
 // Find "prepared" redeems from local shared "state"
@@ -87,8 +89,8 @@ func (m *BtcTxManager) CollectUTXOs(redeem *state.Redeem) ([]*utxo.UTXO, error) 
 	return utxos, nil
 }
 
-// CreateBTCRedeem creates a redeem transaction for the given redeem.
-func (m *BtcTxManager) CreateBTCRedeem(redeem *state.Redeem) (*wire.MsgTx, error) {
+// CreateBTCRedeemTx creates a redeem transaction for the given redeem.
+func (m *BtcTxManager) CreateBTCRedeemTx(redeem *state.Redeem) (*wire.MsgTx, error) {
 	// Collect UTXOs to be spent
 	utxos, err := m.CollectUTXOs(redeem)
 	if err != nil {
@@ -99,7 +101,7 @@ func (m *BtcTxManager) CreateBTCRedeem(redeem *state.Redeem) (*wire.MsgTx, error
 	copy(requestTxHash[:], redeem.RequestTxHash.Bytes())
 
 	redeemTx, err := m.legacySigner.MakeRedeemTx(
-		Remove0xPrefix(redeem.Receiver),
+		utils.Remove0xPrefix(redeem.Receiver),
 		redeem.Amount.Int64(),
 		requestTxHash, // we just fill in the eth redeem request tx hash as the identifier.
 		m.legacySigner.P2PKH.EncodeAddress(),
@@ -116,7 +118,7 @@ func (m *BtcTxManager) CreateBTCRedeem(redeem *state.Redeem) (*wire.MsgTx, error
 // WithdrawBTC sends a redeem transaction to the Bitcoin network.
 func (m *BtcTxManager) WithdrawBTC(redeem *state.Redeem) (*chainhash.Hash, error) {
 
-	redeemTx, err := m.CreateBTCRedeem(redeem)
+	redeemTx, err := m.CreateBTCRedeemTx(redeem)
 	if err != nil {
 		return nil, err
 	}
@@ -127,4 +129,57 @@ func (m *BtcTxManager) WithdrawBTC(redeem *state.Redeem) (*chainhash.Hash, error
 	}
 
 	return txHash, nil
+}
+
+// WithdrawLoop continuously finds redeems and processes them.
+// Call it in a separate go routine.
+func (m *BtcTxManager) WithdrawLoop() {
+	for {
+		redeems, err := m.FindRedeems()
+		if err != nil {
+			// Log the error and continue
+			// Assuming there's a logger in the actual implementation
+			// log.Errorf("Failed to find redeems: %v", err)
+			time.Sleep(QUERY_DB_INTERVAL)
+			continue
+		}
+
+		for _, redeem := range redeems {
+
+			// Check if the redeem requestTxId already exists in mgrState
+			reqTxHash := utils.Remove0xPrefix(redeem.PrepareTxHash.String())
+			exists, err := m.mgrState.HasRedeem(reqTxHash)
+			if err != nil {
+				// Log the error and continue with the next redeem
+				// log.Errorf("Failed to check redeem record for %v: %v", redeem.RequestTxId, err)
+				continue
+			}
+
+			if exists {
+				// If a record of the redeem already exists, continue with the next redeem
+				continue
+			}
+
+			// New Redeem!
+			btcTxId, err := m.WithdrawBTC(redeem)
+			if err != nil {
+				// Log the error and continue with the next redeem
+				// log.Errorf("Failed to withdraw BTC for redeem %v: %v", redeem, err)
+				continue
+			}
+
+			// Insert the redeem record in mgrState (wait for future update)
+			err = m.mgrState.InsertRedeem(&btcaction.RedeemAction{
+				EthRequestTxID: reqTxHash,
+				BtcHash:        btcTxId.String(),
+				Sent:           true,
+			})
+			if err != nil {
+				// Log the error and continue with the next redeem
+				continue
+			}
+		}
+
+		time.Sleep(QUERY_DB_INTERVAL)
+	}
 }
