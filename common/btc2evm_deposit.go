@@ -1,10 +1,11 @@
+package common
+
 /*
 Defines a BTC2EVM deposit data that user shall send along with btc coins to the bridge.
 This piece of data contains EVM_CHAIN_ID and EVM_ADDR.
 After RLP encoding, the encoded []byte shall be sent as OP_RETURN data in BTC transaction.
-See MakeOpReturnData() for more details.
+See MakeDepositOpReturnData() for more details.
 */
-package common
 
 import (
 	"errors"
@@ -67,7 +68,7 @@ func ByteArrayToHexString(b [20]byte) string {
 }
 
 // Util: Create a []byte as an OP_RETURN data via evm chain id and receiver's address
-func MakeOpReturnData(evm_chain_id int, evm_addr string) ([]byte, error) {
+func MakeDepositOpReturnData(evm_chain_id int, evm_addr string) ([]byte, error) {
 	evmId, err := IntToByteArray(evm_chain_id)
 	if err != nil {
 		return nil, err
@@ -83,6 +84,7 @@ func MakeOpReturnData(evm_chain_id int, evm_addr string) ([]byte, error) {
 }
 
 // DecodeOpReturnData deposit data from RLP encoded []byte
+// TODO: OP_RETURN data may not be handled properly.
 func DecodeOpReturnData(data []byte) (*DepositData, error) {
 	var dd DepositData
 	err := rlp.DecodeBytes(data, &dd)

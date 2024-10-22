@@ -37,7 +37,7 @@ var (
 type Redeem struct {
 	RequestTxHash ethcommon.Hash
 	PrepareTxHash ethcommon.Hash
-	BtcTxId       ethcommon.Hash
+	BtcTxId       ethcommon.Hash // [32]byte
 	Requester     ethcommon.Address
 	Receiver      string // receiver btc address
 	Amount        *big.Int
@@ -45,6 +45,9 @@ type Redeem struct {
 	Status        RedeemStatus
 }
 
+// Created a new Redeem object when user requests.
+// redeem.status = invalid if the receiver is invalid.
+// redeem.status = rquested if everything is okay.
 func createRedeemFromRequestedEvent(ev *ethsync.RedeemRequestedEvent) (*Redeem, error) {
 	r := &Redeem{}
 
@@ -73,6 +76,9 @@ func createRedeemFromRequestedEvent(ev *ethsync.RedeemRequestedEvent) (*Redeem, 
 	return r, nil
 }
 
+// This function is important.
+// It updates the "Redeem" object from a "RedeemPrepared" event.
+// The "Redeem" status is switched from "requested" to "prepared".
 func (r *Redeem) updateFromPreparedEvent(ev *ethsync.RedeemPreparedEvent) (*Redeem, error) {
 	if ev.RequestTxHash != r.RequestTxHash {
 		return nil, ErrorRequestTxHashUnmatched
@@ -94,20 +100,28 @@ func (r *Redeem) updateFromPreparedEvent(ev *ethsync.RedeemPreparedEvent) (*Rede
 		return nil, ErrorPrepareTxHashEmpty
 	}
 
+	// Check
 	if len(ev.OutpointTxIds) == 0 ||
 		len(ev.OutpointIdxs) == 0 ||
 		len(ev.OutpointTxIds) != len(ev.OutpointIdxs) {
 		return nil, ErrorOutpointsInvalid
 	}
 
+	// Check
 	for i := range ev.OutpointIdxs {
 		if ev.OutpointTxIds[i] == [32]byte{} {
 			return nil, ErrorOutpointTxIdInvalid
 		}
 	}
 
+	// Set Prepare ETH Transaction Hash
 	r.PrepareTxHash = ev.PrepareTxHash
+
+	// Set the status to be "prepared"
+	// This is where the real "prepared" status is set to a redeem record.
 	r.Status = RedeemStatusPrepared
+
+	// Set the outpoints
 	r.Outpoints = []Outpoint{}
 	for i := range ev.OutpointTxIds {
 		r.Outpoints = append(r.Outpoints, Outpoint{

@@ -7,6 +7,10 @@ var (
 	strZeroBytes20 = strings.Repeat("0", 40)
 
 	// table that stores the life cycle of a redeem request
+	// flow: request -> prepare -> redeem
+	// request: requestTxHash, requester, receiver, amount, status=requested
+	// prepare: prepareTxHash, status=prepared, outpoints
+	// redeem: btcTxId, status=completed
 	redeemTable = `CREATE TABLE IF NOT EXISTS redeem (
 		requestTxHash CHAR(64) PRIMARY KEY NOT NULL,
 		prepareTxHash CHAR(64) UNIQUE,
@@ -16,7 +20,7 @@ var (
 		amount BIGINT UNSIGNED NOT NULL,
 		outpoints BLOB,
 		status VARCHAR(10) NOT NULL,
-		CONSTRAINT chk_status CHECK (status IN ('requested', 'prepared', 'redeemed', 'invalid')),
+		CONSTRAINT chk_status CHECK (status IN ('requested', 'prepared', 'completed', 'invalid')),
 		CONSTRAINT chk_amount CHECK (amount > 0)
 		CONSTRAINT chk_requestTxHash CHECK (requestTxHash != '` + strZeroBytes32 + `'),
 		CONSTRAINT chk_prepareTxHash CHECK (prepareTxHash IS NULL OR prepareTxHash != '` + strZeroBytes32 + `'),

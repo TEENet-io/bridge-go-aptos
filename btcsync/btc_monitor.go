@@ -58,7 +58,7 @@ func NewBTCMonitor(addressStr string, chainConfig *chaincfg.Params, rpcClient *r
 // Scan represents a signle round of scanning the blockchain
 // It will return nothing if success, otherwise an error
 func (m *BTCMonitor) Scan() error {
-	// loop and scrap blockchain
+	// Scrap blockchain
 
 	// Fetch and compare lateset blocks with local records
 	latestBlockHeight, err := m.RpcClient.GetLatestBlockHeight()
@@ -66,6 +66,7 @@ func (m *BTCMonitor) Scan() error {
 		return fmt.Errorf("failed to get latest block height: %v", err)
 	}
 
+	// If no new blocks to scan.
 	if latestBlockHeight <= m.LastVistedBlockHeight {
 		return nil // no blocks to scan. and no error
 	}
@@ -78,8 +79,8 @@ func (m *BTCMonitor) Scan() error {
 			if err != nil {
 				return fmt.Errorf("failed to get block height via hash: %v", err)
 			}
-			// check if the tx is a deposit
-			if utils.IsDepositTx(tx, m.BridgeBTCAddress, m.ChainConfig) {
+			// check if the BTC tx is a bridge deposit
+			if utils.MaybeDepositTx(tx, m.BridgeBTCAddress, m.ChainConfig) {
 				deposit, err := utils.CraftDepositAction(tx, blockHeight, block, m.BridgeBTCAddress, m.ChainConfig)
 				if err != nil {
 					return fmt.Errorf("failed to craft deposit action: %v", err)
@@ -91,11 +92,26 @@ func (m *BTCMonitor) Scan() error {
 					TxID:        tx.TxHash().String(),
 					Vout:        0, // deposit tx always has vout 0
 					Amount:      deposit.DepositValue,
+					PkScript:    tx.TxOut[0].PkScript,
 				}
+
+				// Notify Observers
 				m.Publisher.NotifyDeposit(*deposit)
 				m.Publisher.NotifyUTXO(*observedUTXO)
-			} else {
-				// check if the tx is an other transfer
+				// skip the rest of the conditions
+				continue
+			}
+
+			// check if the BTC tx is a bridge withdraw (created by us)
+			if utils.MaybeRedeemTx(tx, m.BridgeBTCAddress, m.ChainConfig) {
+				// withdraw, err := utils.CraftWithdrawAction(tx, blockHeight, block, m.BridgeBTCAddress, m.ChainConfig)
+				// if err != nil {
+				// 	return fmt.Errorf("failed to craft withdraw action: %v", err)
+				// }
+				// // Notify Observers
+				// m.Publisher.NotifyWithdraw(*withdraw)
+				// skip the rest of the conditions
+				continue
 			}
 		}
 	}

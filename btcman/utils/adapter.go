@@ -10,14 +10,14 @@ import (
 	"github.com/TEENet-io/bridge-go/common"
 )
 
-// IsDepositTx checks if the given tx is a bridge deposit tx
-func IsDepositTx(tx *wire.MsgTx, targetAddress btcutil.Address, chainParams *chaincfg.Params) bool {
+// MaybeDepositTx checks if the given tx is really a bridge deposit tx.
+func MaybeDepositTx(tx *wire.MsgTx, targetAddress btcutil.Address, chainParams *chaincfg.Params) bool {
 	// Check if the tx has at least 2 outputs
 	if len(tx.TxOut) < 2 {
 		return false
 	}
 
-	// Check output #1, if pays to us?
+	// Check output #0, if pays to us?
 	flag1 := false
 	output1 := tx.TxOut[0]
 	_, addresses, _, err := txscript.ExtractPkScriptAddrs(output1.PkScript, chainParams)
@@ -27,7 +27,7 @@ func IsDepositTx(tx *wire.MsgTx, targetAddress btcutil.Address, chainParams *cha
 		flag1 = true
 	}
 
-	// Check output #2, if OP_RETURN?
+	// Check output #1, if OP_RETURN?
 	flag2 := false
 	output2 := tx.TxOut[1]
 	if output2.Value == 0 && txscript.IsNullData(output2.PkScript) {
@@ -44,6 +44,7 @@ func CraftDepositAction(tx *wire.MsgTx, blockHeight int32, block *wire.MsgBlock,
 
 	// Decode the op_retun data
 	output2 := tx.TxOut[1]
+	// TODO: OP_RETURN data may not be in good shape
 	data, err := common.DecodeOpReturnData(output2.PkScript)
 	if err != nil {
 		return nil, err
@@ -63,4 +64,37 @@ func CraftDepositAction(tx *wire.MsgTx, blockHeight int32, block *wire.MsgBlock,
 	}
 
 	return deposit, nil
+}
+
+// MaybeRedeemTx checks if the given tx may be is a redeem.
+func MaybeRedeemTx(tx *wire.MsgTx, changeAddress btcutil.Address, chainParams *chaincfg.Params) bool {
+	// Check if the tx has at least 3 outputs
+	if len(tx.TxOut) < 3 {
+		return false
+	}
+
+	// output #0 = pay to user (we don't care)
+	// output #1 = OP_RETURN + data
+	// output #2 = pay to change (which is us)
+
+	// Check output #1, if OP_RETURN + data?
+	flag_op := false
+	output_n_1 := tx.TxOut[1]
+	if output_n_1.Value == 0 && txscript.IsNullData(output_n_1.PkScript) {
+		flag_op = true
+	} else {
+		flag_op = false
+	}
+
+	// Check output #2, if pays to us?
+	flag_to_us := false
+	output_n_2 := tx.TxOut[2]
+	_, addresses, _, err := txscript.ExtractPkScriptAddrs(output_n_2.PkScript, chainParams)
+	if err != nil || len(addresses) == 0 || addresses[0].EncodeAddress() != changeAddress.EncodeAddress() || output_n_2.Value == 0 {
+		flag_to_us = false
+	} else {
+		flag_to_us = true
+	}
+
+	return flag_op && flag_to_us
 }

@@ -6,9 +6,9 @@ import (
 	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
+// Insert after receiving a new redeem requested event (from user). Only fields
+// requestTxHash, requester, receiver, amount, and status are required.
 func (st *StateDB) InsertAfterRequested(redeem *Redeem) error {
-	// Insert after receiving a new redeem requested event. Only fields
-	// requestTxHash, requester, receiver, amount, and status are required.
 	query := `INSERT OR IGNORE INTO redeem (` + statusRequestedParamList + `) VALUES (?, ?, ?, ?, ?)`
 
 	stmt, err := st.stmtCache.Prepare(query)
@@ -35,10 +35,12 @@ func (st *StateDB) InsertAfterRequested(redeem *Redeem) error {
 	return nil
 }
 
+// Update the db, after receiving a new "RedeemPrepared" event.
+// New fields to update to said (found) redeem are:
+// prepareTxHash, outpoints, and status.
 func (st *StateDB) UpdateAfterPrepared(redeem *Redeem) error {
-	// Update after receiving a new redeem prepared event. Only fields
-	// prepareTxHash, outpoints, and status are required.
 	var query string
+	// "ok" marks if the redeems is found in the database.
 	_, ok, err := st.GetRedeem(redeem.RequestTxHash)
 	if err != nil {
 		return err
@@ -81,6 +83,32 @@ func (st *StateDB) UpdateAfterPrepared(redeem *Redeem) error {
 	return nil
 }
 
+// UpdateAfterRedeemed updates the database row,
+// after a redeem is sent out on BTC side.
+// It uses requestTxHash (from redeem param) to look for a redeem record in the database.
+// Then writes in the btcTxId (from redeem param) and set status to completed on the database record.
+func (st *StateDB) UpdateAfterRedeemed(redeem *Redeem) error {
+	query := `UPDATE redeem SET btcTxId = ?, status = ? WHERE requestTxHash = ?`
+
+	stmt, err := st.stmtCache.Prepare(query)
+	if err != nil {
+		return err
+	}
+
+	r := &sqlRedeem{}
+	r, err = r.encode(redeem)
+	if err != nil {
+		return err
+	}
+
+	if _, err := stmt.Exec(r.BtcTxId, r.Status, r.RequestTxHash); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Query Redeem from the database by "status".
 func (st *StateDB) GetRedeemsByStatus(status RedeemStatus) ([]*Redeem, error) {
 	query := `SELECT * FROM redeem WHERE status = ?`
 
@@ -107,8 +135,8 @@ func (st *StateDB) GetRedeemsByStatus(status RedeemStatus) ([]*Redeem, error) {
 		var r sqlRedeem
 		if err := rows.Scan(
 			&r.RequestTxHash,
-			&prepareTxHash,
-			&btcTxId,
+			&prepareTxHash, // temp fill, fill later.
+			&btcTxId,       // temp fill, fill later
 			&r.Requester,
 			&r.Receiver,
 			&r.Amount,
@@ -136,6 +164,8 @@ func (st *StateDB) GetRedeemsByStatus(status RedeemStatus) ([]*Redeem, error) {
 	return redeems, nil
 }
 
+// Query Redeem from database via requestTxHash.
+// Return (*Redeem, bool: found/not found, error)
 func (st *StateDB) GetRedeem(requestTxHash ethcommon.Hash) (*Redeem, bool, error) {
 	query := `SELECT * FROM redeem WHERE requestTxHash = ?;`
 
@@ -182,6 +212,8 @@ func (st *StateDB) GetRedeem(requestTxHash ethcommon.Hash) (*Redeem, bool, error
 	return redeem, true, nil
 }
 
+// Query if a redeem exists in the database via requestTxHash.
+// Return (bool: found/not found, RedeemStatus, error)
 func (st *StateDB) HasRedeem(requestTxHash ethcommon.Hash) (bool, RedeemStatus, error) {
 	query := `SELECT status FROM redeem WHERE requestTxHash = ?`
 	stmt, err := st.stmtCache.Prepare(query)

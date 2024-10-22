@@ -30,6 +30,7 @@ func (s *sqlRedeem) encode(r *Redeem) (*sqlRedeem, error) {
 
 	s.RequestTxHash = r.RequestTxHash.String()[2:]
 	s.PrepareTxHash = r.PrepareTxHash.String()[2:]
+	// btc txid is 32bytes long, but it doesn't usually prefix with 0x
 	s.BtcTxId = r.BtcTxId.String()[2:]
 	s.Requester = r.Requester.String()[2:]
 	s.Receiver = r.Receiver

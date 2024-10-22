@@ -28,6 +28,14 @@ func setup() bool {
 	}
 }
 
+func convertToPointerSlice(utxos []utxo.UTXO) []*utxo.UTXO {
+	utxoPtrs := make([]*utxo.UTXO, len(utxos))
+	for i := range utxos {
+		utxoPtrs[i] = &utxos[i]
+	}
+	return utxoPtrs
+}
+
 func TestListUtxosLegacy(t *testing.T) {
 	if !setup() {
 		t.Fatal("export env variables first: SERVER, PORT, USER, PASS before running the tests")
@@ -59,8 +67,8 @@ func TestListUtxosLegacy(t *testing.T) {
 	}
 }
 
+// Legacy wallet transfers some bitcoins out to an address
 func TestLegacySignerTransfer(t *testing.T) {
-	// Legacy wallet transfers some bitcoins out to an address
 	// Set up rpc client
 	if !setup() {
 		t.Fatal("export env variables first: SERVER, PORT, USER, PASS before running the tests")
@@ -105,7 +113,7 @@ func TestLegacySignerTransfer(t *testing.T) {
 	var fee_amount = int64(0.1 * 1e8)
 
 	// Select barely enough UTXO(s) to spend
-	selected_utxos, err := utxo.SelectUtxo(utxos, dst_amount, fee_amount)
+	selected_utxos, err := utxo.SelectUtxo(convertToPointerSlice(utxos), dst_amount, fee_amount)
 	if err != nil {
 		t.Fatalf("cannot select enough utxos: %v", err)
 	}
@@ -172,12 +180,11 @@ func TestLegacySignerMakeBridgeDeposit(t *testing.T) {
 	// Make up a fake bridge deposit
 	var btc_bridge_amount = int64(5 * 1e8)                     // deposit 5 btc
 	btc_bridge_address := "moHYHpgk4YgTCeLBmDE2teQ3qVLUtM95Fn" // let's try a legacy receiver as bridge receiver.
-	// btc_bridge_address := "bcrt1qa3ma47jt8mdqq699vv2f0f0ahpp66f2tj0pa0f" // let's try a segwit receiver as bridge receiver.
-	btc_change_addr := wallet.P2PKH.EncodeAddress() // send back to wallet itself
+	btc_change_addr := wallet.P2PKH.EncodeAddress()            // send back to wallet
 	var fee_amount = int64(0.1 * 1e8)
 
 	// Select barely enough UTXO(s) to spend
-	selected_utxos, err := utxo.SelectUtxo(utxos, btc_bridge_amount, fee_amount)
+	selected_utxos, err := utxo.SelectUtxo(convertToPointerSlice(utxos), btc_bridge_amount, fee_amount)
 	if err != nil {
 		t.Fatalf("cannot select enough utxos: %v", err)
 	}

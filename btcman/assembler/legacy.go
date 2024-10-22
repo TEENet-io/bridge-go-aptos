@@ -4,7 +4,6 @@ package assembler
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcutil"
@@ -57,7 +56,7 @@ func NewLegacySigner(bw BasicSigner) (*LegacySigner, error) {
 // with every previous output, make a SignatureScript (to unlock it).
 // Warning: You should generate Locking Scripts (outputs) firstly on tx,
 // then call this function to generate the inputs.
-func (lw *LegacySigner) Unlock(tx *wire.MsgTx, prevOutputs []utxo.UTXO) (*wire.MsgTx, error) {
+func (lw *LegacySigner) Unlock(tx *wire.MsgTx, prevOutputs []*utxo.UTXO) (*wire.MsgTx, error) {
 	// Trick:
 	// Both tx.TxIn[] and tx.TxOut[] shall be ready, then you can create sign scripts.
 	// If they are not ready the sign will create wrong signature (won't pass the validation of node)
@@ -68,15 +67,11 @@ func (lw *LegacySigner) Unlock(tx *wire.MsgTx, prevOutputs []utxo.UTXO) (*wire.M
 	}
 	// In following step signature script is filled with real stuff.
 	for idx, item := range prevOutputs {
-		if item.PkScriptT == utxo.P2PKH_SCRIPT_T {
-			script, err := txscript.SignatureScript(tx, idx, item.PkScript, txscript.SigHashAll, lw.PrivKey, true)
-			if err != nil {
-				return nil, err
-			}
-			tx.TxIn[idx].SignatureScript = script
-		} else {
-			return nil, fmt.Errorf("UTXO[%d] is not P2PKH script, cannot unlock", idx)
+		script, err := txscript.SignatureScript(tx, idx, item.PkScript, txscript.SigHashAll, lw.PrivKey, true)
+		if err != nil {
+			return nil, err
 		}
+		tx.TxIn[idx].SignatureScript = script
 	}
 	return tx, nil
 }
@@ -87,7 +82,7 @@ func (lw *LegacySigner) Unlock(tx *wire.MsgTx, prevOutputs []utxo.UTXO) (*wire.M
 // sum(utxo) = dst_amount + fee_amount + change_amount
 func (lw *LegacySigner) craftTransferOutOutput(
 	tx *wire.MsgTx,
-	prevOutputs []utxo.UTXO, // UTXO(s) to spend from.
+	prevOutputs []*utxo.UTXO, // UTXO(s) to spend from.
 	dst_addr string, // receiver
 	dst_amount int64, // btc amount to receiver in satoshi
 	change_addr string, // receiver to receive the change
@@ -129,7 +124,7 @@ func (lw *LegacySigner) MakeTransferOutTx(
 	dst_amount int64,
 	change_addr string,
 	fee_amount int64,
-	prevOutputs []utxo.UTXO,
+	prevOutputs []*utxo.UTXO,
 ) (*wire.MsgTx, error) {
 	// Create a new transaction
 	tx := wire.NewMsgTx(wire.TxVersion)
@@ -157,6 +152,98 @@ func (lw *LegacySigner) MakeTransferOutTx(
 	return tx, nil
 }
 
+// craftRedeemOutput creates a Redeem (withdraw) Tx.
+// output #1, satoshi to the user receiver.
+// output #2, redeem data to be sent in OP_RETURN.
+// output #3, satoshi to the our change receiver.
+func (lw *LegacySigner) craftRedeemOutput(
+	tx *wire.MsgTx,
+	prevOutputs []*utxo.UTXO, // UTXO(s) to spend from.
+	dst_addr string, // receiver
+	dst_amount int64, // btc amount to receiver in satoshi
+	redeemData common.RedeemData, // data to be sent in OP_RETURN
+	change_addr string, // receiver to receive the change
+	fee_amount int64, // amount of mining fee in satoshi
+) (*wire.MsgTx, error) {
+	var sum int64
+	for _, item := range prevOutputs {
+		sum += item.Amount
+	}
+	// Calc change_amount
+	change_amount := sum - dst_amount - fee_amount
+	if change_amount < 0 {
+		return nil, errors.New("change_amount < 0")
+	}
+
+	// 1st output: to the dst receiver
+	tx, err := AddPayToAddress(tx, lw.ChainConfig, dst_addr, dst_amount)
+	if err != nil {
+		return nil, err
+	}
+
+	// 2nd output: OP_RETURN data
+	// Output #2, OP_RETURN
+	opReturnData, err := common.MakeRedeemOpReturnData(redeemData)
+	if err != nil {
+		return nil, err
+	}
+	opReturnScript, err := txscript.NullDataScript(opReturnData)
+	if err != nil {
+		return nil, err
+	}
+	txOut2 := wire.NewTxOut(0, opReturnScript) // No value for OP_RETURN
+	tx.AddTxOut(txOut2)
+
+	// 3rd output: to the change receiver (if change > 0)
+	// if change == 0 no need to add this clause.
+	if change_amount > 0 {
+		tx, err = AddPayToAddress(tx, lw.ChainConfig, change_addr, change_amount)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return tx, nil
+}
+
+// Make a raw tx that transfer some bitcoin to dst_addr.
+// It takes care of both locking + unlocking.
+// After deduction of mining fee, keep the change to change_addr.
+// You need to send the Tx later via PRC.
+func (lw *LegacySigner) MakeRedeemTx(
+	dst_addr string,
+	dst_amount int64,
+	redeemData common.RedeemData, // data to be sent in OP_RETURN
+	change_addr string,
+	fee_amount int64,
+	prevOutputs []*utxo.UTXO,
+) (*wire.MsgTx, error) {
+	// Create a new transaction
+	tx := wire.NewMsgTx(wire.TxVersion)
+
+	// Stuff the locking scripts first.
+	tx, err := lw.craftRedeemOutput(
+		tx,
+		prevOutputs,
+		dst_addr,
+		dst_amount,
+		redeemData,
+		change_addr,
+		fee_amount,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// Stuff the unlocking scripts, secondly.
+	// Calculate & sign the Tx inputs (by unlocking previous outputs we received)
+	tx, err = lw.Unlock(tx, prevOutputs)
+	if err != nil {
+		return nil, err
+	}
+
+	return tx, nil
+}
+
 // Create 3 locking scripts on a given Tx.
 // These 3 scripts combined is recognized as "BTC2EVM deposit".
 // Output #1 to bridge BTC wallet address, with BTC value.
@@ -164,7 +251,7 @@ func (lw *LegacySigner) MakeTransferOutTx(
 // Output #3 to the change address, with remainder BTC value.
 func (lw *LegacySigner) craftBridgeDepositOutputs(
 	tx *wire.MsgTx,
-	prevOutputs []utxo.UTXO,
+	prevOutputs []*utxo.UTXO,
 	btc_bridge_address string, // bridge wallet address on BTC (either P2PKH or P2WPKH type)
 	btc_bridge_amount int64, // amount to send to the bridge on BTC (in satoshi)
 	fee_amount int64, // amount of mining fee (in satoshi)
@@ -189,7 +276,7 @@ func (lw *LegacySigner) craftBridgeDepositOutputs(
 	}
 
 	// Output #2, OP_RETURN
-	opReturnData, err := common.MakeOpReturnData(evm_chain_id, evm_addr)
+	opReturnData, err := common.MakeDepositOpReturnData(evm_chain_id, evm_addr)
 	if err != nil {
 		return nil, err
 	}
@@ -214,7 +301,7 @@ func (lw *LegacySigner) craftBridgeDepositOutputs(
 // This function is run by the user to generate a legit deposit Tx of BTC to our bridge.
 // The user needs to call PRC to send the raw Tx later.
 func (lw *LegacySigner) MakeBridgeDepositTx(
-	prevOutputs []utxo.UTXO,
+	prevOutputs []*utxo.UTXO,
 	btc_bridge_address string, // bridge wallet address on BTC (either P2PKH or P2WPKH type)
 	btc_bridge_amount int64, // amount to send to the bridge on BTC (in satoshi)
 	fee_amount int64, // amount of mining fee (in satoshi)
@@ -249,22 +336,3 @@ func (lw *LegacySigner) MakeBridgeDepositTx(
 
 	return tx, nil
 }
-
-// SegWitWallet receives funds via a segwit address.
-// It can combine inputs (segwit) and send out to
-// both P2PKH & P2WPKH receivers specified in Locking interface.
-// type SegWitWallet struct {
-// 	BasicSigner
-// 	P2WPKH *btcutil.AddressWitnessPubKeyHash // Native segwit address, .encodeAddress() to get human readable hex represented address
-// }
-
-// func NewSegWitWallet(bw BasicSigner) (*SegWitWallet, error) {
-// 	// Recover a P2WPKH (Bech32) address
-// 	p2wpkhAddr, err := btcutil.NewAddressWitnessPubKeyHash(btcutil.Hash160(bw.PubKey.SerializeCompressed()), bw.ChainConfig)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	return &SegWitWallet{bw, p2wpkhAddr}, nil
-// }
-
-// witness, err := txscript.WitnessSignature(tx, &txscript.TxSigHashes{}, input_idx, int64(item.Amount))

@@ -109,7 +109,6 @@ func (st *State) Start(ctx context.Context) error {
 				logger.Fatal(err)
 			}
 			return err
-		// TODO: implement case <-st.newBtcFinalizedBlockCh:
 		case blkNum := <-st.newEthFinalizedBlockCh:
 			newLogger := logger.WithFields("newFinalized", blkNum.String())
 
@@ -219,6 +218,9 @@ func (st *State) Start(ctx context.Context) error {
 				var redeem *Redeem
 
 				if ok {
+					// Even though the "RedeemPrepare" is newly mined on ETH chain,
+					// correspoinding state DB record should be still "requested" status.
+					// If found "prepared" or "completed" status, skip the event.
 					if status == RedeemStatusPrepared || status == RedeemStatusCompleted {
 						return nil
 					}
@@ -343,8 +345,23 @@ func (st *State) GetNewMintedEventChannel() chan<- *ethsync.MintedEvent {
 	return st.newMintedEventCh
 }
 
-// Insert a new BTC2EVM mint record into state db
+// Insert a new BTC2EVM mint record into state db.
 func (st *State) SetNewBTC2EVMMint(m *Mint) error {
 	err := st.statedb.UpdateMint(m)
 	return err
+}
+
+// GetPreparedRedeems fetches all redeems with status "prepared" from the statedb.
+func (st *State) GetPreparedRedeems() ([]*Redeem, error) {
+	redeems, err := st.statedb.GetRedeemsByStatus(RedeemStatusPrepared)
+	if err != nil {
+		return nil, err
+	}
+	return redeems, nil
+}
+
+// Update existing redeem record in the state db.
+// Set the status to from "prepared" to "completed"
+func (st *State) SetRedeemCompleted(r *Redeem) error {
+	return st.statedb.UpdateAfterRedeemed(r)
 }
