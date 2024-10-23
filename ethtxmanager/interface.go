@@ -20,8 +20,8 @@ type BtcWallet interface {
 	// outpoints with a timeout. It should also monitor the RedeemPrepared
 	// events emitted from the bridge for permanent locking.
 	Request(
-		Id ethcommon.Hash,
+		reqTxId ethcommon.Hash, // eth requestTxHash
 		amount *big.Int,
-		ch chan<- []state.Outpoint,
+		ch chan<- []state.Outpoint, // this channel receives a slice of outputs.
 	) error
 }
