@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/TEENet-io/bridge-go/state"
+	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 const (
@@ -141,4 +144,28 @@ func (tv *TreasureVault) GetUTXODetail(txID string, vout int32) (*VaultUTXO, err
 		return nil, fmt.Errorf("utxo not found")
 	}
 	return utxo, nil
+}
+
+// Implement BtcWallet interface
+// to interact with ETH Tx Manager
+func (tv *TreasureVault) Request(
+	reqTxId ethcommon.Hash,
+	amount int64,
+	ch chan<- []state.Outpoint,
+) error {
+	utxos, err := tv.ChooseAndLock(amount)
+	if err != nil {
+		return err
+	}
+
+	outpoints := make([]state.Outpoint, len(utxos))
+	for i, utxo := range utxos {
+		outpoints[i] = state.Outpoint{
+			TxId: ethcommon.HexToHash(utxo.TxID),
+			Idx:  uint16(utxo.Vout),
+		}
+	}
+
+	ch <- outpoints
+	return nil
 }
