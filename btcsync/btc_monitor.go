@@ -90,10 +90,10 @@ func (m *BTCMonitor) Scan() error {
 	}
 
 	numbersToFetch := latestBlockHeight - m.LastVistedBlockHeight
-	blocks, err := m.RpcClient.GetFinalizedBlocks(int(numbersToFetch), CONSIDER_FINALIZED)
+	blocks, err := m.RpcClient.GetBlocks(int(numbersToFetch), CONSIDER_FINALIZED)
 	for _, block := range blocks {
 		for _, tx := range block.Transactions {
-			blockHeight, err := m.RpcClient.GetBlockHeightViaHash(btcutil.NewBlock(block).Hash())
+			blockHeight, err := m.RpcClient.GetBlockHeightByHash(btcutil.NewBlock(block).Hash())
 			if err != nil {
 				return fmt.Errorf("failed to get block height via hash: %v", err)
 			}

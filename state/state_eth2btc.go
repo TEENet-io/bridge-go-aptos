@@ -7,6 +7,9 @@ import (
 	"github.com/TEENet-io/bridge-go/common"
 )
 
+// Fetch ETH Finalized Block from the state db.
+// If not found, use 0 instead.
+// Set the value to st.cache
 func (st *State) initEthFinalizedBlock() error {
 	storedBytes32, ok, err := st.statedb.GetKeyedValue(KeyEthFinalizedBlock)
 	if err != nil {
@@ -34,6 +37,8 @@ func (st *State) initEthFinalizedBlock() error {
 	return nil
 }
 
+// Same as above.
+// Fetch ETH chain ID, if not found set the default value.
 func (st *State) initEthChainID() error {
 	storedBytes32, ok, err := st.statedb.GetKeyedValue(KeyEthChainId)
 	if err != nil {

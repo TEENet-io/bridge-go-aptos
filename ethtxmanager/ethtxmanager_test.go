@@ -46,8 +46,10 @@ type testEnv struct {
 }
 
 func newTestEnv(t *testing.T, file string) *testEnv {
+
 	sim, err := etherman.NewSimEtherman()
 	assert.NoError(t, err)
+
 	chainID, err := sim.Etherman.Client().ChainID(context.Background())
 	assert.NoError(t, err)
 

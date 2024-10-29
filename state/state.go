@@ -51,10 +51,11 @@ type State struct {
 	newRedeemRequestedEvCh chan *ethsync.RedeemRequestedEvent
 	newRedeemPreparedEvCh  chan *ethsync.RedeemPreparedEvent
 
+	// temp, in-meory cache
 	cache struct {
 		lastEthFinalized atomic.Value // uint64
-		lastBtcFinalized atomic.Value // uint64
 		ethChainId       atomic.Value // uint64
+		lastBtcFinalized atomic.Value // uint64
 	}
 }
 
