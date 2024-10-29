@@ -29,6 +29,11 @@ func NewSQLiteRedeemStorage(dbPath string) (*SQLiteRedeemStorage, error) {
 	return storage, nil
 }
 
+// Close closes the database connection
+func (s *SQLiteRedeemStorage) Close() error {
+	return s.db.Close()
+}
+
 func (s *SQLiteRedeemStorage) init() error {
 	query := `
 	CREATE TABLE IF NOT EXISTS btc_action_redeem (
@@ -54,7 +59,7 @@ func (s *SQLiteRedeemStorage) HasRedeem(ethRequestTxID string) (bool, error) {
 	return count > 0, nil
 }
 
-func (s *SQLiteRedeemStorage) InsertRedeem(redeem RedeemAction) error {
+func (s *SQLiteRedeemStorage) InsertRedeem(redeem *RedeemAction) error {
 	query := `INSERT INTO btc_action_redeem (EthRequestTxID, BtcHash, Sent) VALUES (?, ?, ?)`
 	_, err := s.db.Exec(query, redeem.EthRequestTxID, redeem.BtcHash, true)
 	return err
