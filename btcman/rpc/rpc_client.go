@@ -13,9 +13,11 @@ import (
 )
 
 const (
-	CONFIRM_THRESHOLD = 6 // minimum confirm threshold to consider Tx is finalized.
+	CONFIRM_SAFE = 6 // minimum confirm threshold to consider Tx is finalized.
+	MAX_CONFIRM  = 9999999
 )
 
+// Wrapper of btc rpc client.
 type RpcClient struct {
 	ServerAddr string // ip address of server
 	Port       string // port of server
@@ -33,8 +35,8 @@ func NewRpcClient(server string, port string, username string, password string) 
 		Host:         server + ":" + port,
 		User:         username,
 		Pass:         password,
-		HTTPPostMode: true,
-		DisableTLS:   true,
+		HTTPPostMode: true, // original bitcoin only supports HTTP POST mode
+		DisableTLS:   true, // original bitcoin does not support TLS
 	}, nil)
 
 	if err != nil {
@@ -63,7 +65,7 @@ func (r *RpcClient) GetTx(TxID string) (*btcutil.Tx, error) {
 	return txRaw, nil
 }
 
-// Get the latest block height from the bitcoin node.
+// Get the latest block height.
 func (r *RpcClient) GetLatestBlockHeight() (int64, error) {
 	latestHeight, err := r.client.GetBlockCount()
 	if err != nil {
@@ -72,8 +74,8 @@ func (r *RpcClient) GetLatestBlockHeight() (int64, error) {
 	return latestHeight, nil
 }
 
-// Get the block height via block hash.
-func (r *RpcClient) GetBlockHeightViaHash(blockHash *chainhash.Hash) (int32, error) {
+// Get the block height by providing block hash.
+func (r *RpcClient) GetBlockHeightByHash(blockHash *chainhash.Hash) (int32, error) {
 	blockHeaderVerbose, err := r.client.GetBlockHeaderVerbose(blockHash)
 	if err != nil {
 		return 0, err
@@ -84,11 +86,11 @@ func (r *RpcClient) GetBlockHeightViaHash(blockHash *chainhash.Hash) (int32, err
 	return blockHeight, nil
 }
 
-// Fetch nearest n blocks that is surely finalized (at least offset blocks old).
+// Fetch nearest n blocks that is finalized (at least offset blocks old).
 // Specify the amount of blocks to retrieve via n.
 // Specify the offset (maturity, suggest 6) via offset.
 // Return blocks is ordered from new to old.
-func (r *RpcClient) GetFinalizedBlocks(n int, offset int) ([]*wire.MsgBlock, error) {
+func (r *RpcClient) GetBlocks(n int, offset int) ([]*wire.MsgBlock, error) {
 	// latest height of blockchain
 	latestHeight, err := r.client.GetBlockCount()
 	if err != nil {
@@ -121,13 +123,13 @@ func (r *RpcClient) GetFinalizedBlocks(n int, offset int) ([]*wire.MsgBlock, err
 }
 
 // Get the UTXO(s) of an address.
-// Notice: You need to turn on option -index
+// Notice: You need to turn on option -txindex on bitcoin node.
 // Notice: This is not very accurate, btc nodes tend to forget to track.
 // Notice: This won't scale well once the query goes very large.
 // Notice: You fill in either P2PKH or P2WPKH address, the result is specific to that address type.
-func (r *RpcClient) GetUtxoList(myAddress btcutil.Address) ([]utxo.UTXO, error) {
+func (r *RpcClient) GetUtxoList(myAddress btcutil.Address, offset int) ([]utxo.UTXO, error) {
 	// Get the list of unspent transaction outputs
-	unspentOutputs, err := r.client.ListUnspentMinMaxAddresses(1, 9999999, []btcutil.Address{myAddress})
+	unspentOutputs, err := r.client.ListUnspentMinMaxAddresses(offset, MAX_CONFIRM, []btcutil.Address{myAddress})
 	if err != nil {
 		return nil, err
 	}
@@ -143,9 +145,10 @@ func (r *RpcClient) GetUtxoList(myAddress btcutil.Address) ([]utxo.UTXO, error) 
 		var pkType utxo.PubKeyScriptType
 		if txscript.IsPayToPubKeyHash(outputPoint.PkScript) {
 			pkType = utxo.P2PKH_SCRIPT_T
-		}
-		if txscript.IsPayToWitnessPubKeyHash(outputPoint.PkScript) {
+		} else if txscript.IsPayToWitnessPubKeyHash(outputPoint.PkScript) {
 			pkType = utxo.P2WPKH_SCRIPT_T
+		} else {
+			pkType = utxo.ANY_SCRIPT_T
 		}
 
 		u = append(u, utxo.UTXO{TxID: item.TxID, TxHash: txRaw.Hash(), Vout: item.Vout, Amount: outputPoint.Value, PkScriptT: pkType, PkScript: outputPoint.PkScript})
@@ -161,4 +164,46 @@ func (r *RpcClient) SendRawTx(tx *wire.MsgTx) (*chainhash.Hash, error) {
 	// false = may reject; true = accept it anyway
 	txHash, err := r.client.SendRawTransaction(tx, true)
 	return txHash, err
+}
+
+// Unfortunately there is no direct "get balance of an address" on btc node.
+// To get the total balance of an address,
+// this function sums up the value of all UTXOs associated with the given address.
+// Note: if balance = 0, it can mean
+// 1) the address really doesn't have any money.
+// 2) the address is not tracked by the node.
+func (r *RpcClient) GetBalance(myAddress btcutil.Address, offset int) (int64, error) {
+	utxos, err := r.GetUtxoList(myAddress, offset)
+	if err != nil {
+		return 0, err
+	}
+
+	var totalBalance int64
+	for _, utxo := range utxos {
+		totalBalance += utxo.Amount
+	}
+
+	return totalBalance, nil
+}
+
+// Import a private key to the Bitcoin node's wallet.
+// Note: Only imported private keys are monitored by bitcoin core!
+// Note: If the priv key exists, it won't raise exception.
+func (r *RpcClient) ImportPrivateKey(wif *btcutil.WIF, label string) error {
+	err := r.client.ImportPrivKeyRescan(wif, label, true)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// Generate a given number of blocks.
+// This function is useful for testing purposes.
+// Unfortunately, the original r.client.Generate() is deprecated in the library.
+func (r *RpcClient) GenerateBlocks(numBlocks int64, coinbase btcutil.Address) ([]*chainhash.Hash, error) {
+	blockHashes, err := r.client.GenerateToAddress(numBlocks, coinbase, nil)
+	if err != nil {
+		return nil, err
+	}
+	return blockHashes, nil
 }
