@@ -28,16 +28,16 @@ type BasicSigner struct {
 // private key (in wallet-import-format)
 // This is the standard private key string that btc-core software exports.
 func NewBasicSigner(priv_key_wif_str string, chain_config *chaincfg.Params) (*BasicSigner, error) {
-	priv_key_wif, err := btcutil.DecodeWIF(priv_key_wif_str)
+	priv_key_wif, err := DecodeWIF(priv_key_wif_str)
 	if err != nil {
 		return nil, err
 	}
 	return &BasicSigner{chain_config, priv_key_wif.PrivKey, priv_key_wif.PrivKey.PubKey()}, nil
 }
 
-// LegacySigner receives funds via a legacy address.
-// It can combine inputs (legacy) and send out to
-// both P2PKH & P2WPKH receivers specified in Locking interface.
+// LegacySigner receives funds via a legacy address (P2PKH).
+// It can combine inputs and can send out to
+// both P2PKH & P2WPKH receivers.
 type LegacySigner struct {
 	BasicSigner
 	P2PKH *btcutil.AddressPubKeyHash // legacy address, call .encodeAddress() to get human readable hex represented address

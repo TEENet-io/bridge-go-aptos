@@ -15,6 +15,7 @@ func NewStmtCache(db *sql.DB) *StmtCache {
 	return &StmtCache{db: db}
 }
 
+// Wrapped [Prepare()] with a cache (type sync.Map)
 func (sc *StmtCache) Prepare(query string) (*sql.Stmt, error) {
 	cached, _ := sc.m.Load(query)
 	if cached == nil {
@@ -28,6 +29,7 @@ func (sc *StmtCache) Prepare(query string) (*sql.Stmt, error) {
 	return cached.(*sql.Stmt), nil
 }
 
+// Clear cached statement
 func (sc *StmtCache) Clear() {
 	sc.m.Range(func(k, v interface{}) bool {
 		_ = v.(*sql.Stmt).Close()

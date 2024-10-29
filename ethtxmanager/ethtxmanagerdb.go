@@ -20,6 +20,7 @@ type EthTxManagerDB struct {
 }
 
 func NewEthTxManagerDB(db *sql.DB) (*EthTxManagerDB, error) {
+	// Create tables.
 	if _, err := db.Exec(MonitoredTxTable); err != nil {
 		return nil, err
 	}

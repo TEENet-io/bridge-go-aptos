@@ -13,10 +13,12 @@ type StateDB struct {
 }
 
 func NewStateDB(db *sql.DB) (*StateDB, error) {
+	// 1. Create the tables.
 	if _, err := db.Exec(redeemTable + kvTable + mintTable); err != nil {
 		return nil, err
 	}
 
+	// 2. A stmt cache + db.
 	return &StateDB{
 		stmtCache: database.NewStmtCache(db),
 	}, nil

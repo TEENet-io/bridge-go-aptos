@@ -9,7 +9,7 @@ Package definition see respective `README.md` files in each folder.
 ## Test
 Use a MODIFIED `bitcoin-testnet-box` as local testing.
 
-## Regtest bitcoin core node
+## Regtest bitcoin core node Configuration
 
 localhost
 19001
@@ -27,21 +27,29 @@ PRIV    cT7QVDDEmtNRhSSAhSuUm8PYud18eQbDKnt68839CcVXswy5HfRX
 
 Tricks:
 
-- start bitcoin core with `-txindex` otherwise query Tx via TxID is a problem.
-- assign a minimum relay fee before start.
-- Call `importprivkey [priv] [label_name] [true]` on bitcoin core to add several wallets or bitcoin core won't track the UTXO related to it.
+- Start bitcoin core with `-txindex` otherwise query Tx via TxID is a problem.
+- Start bitcoin core with `-fallbackfee` a minimum relay fee.
+- Use `bitcoin-cli importprivkey [priv_in_WIF_format] [label_name] [rescan:true]` to import a private key. This will keep track of the corresponding address.
+- Use `bitcoin-cli importaddress "address" "label" [rescan:true]` to keep track on an address (but cannot spend the funds)
+
+Query for balances/utxo/txs:
+
+```bash
+listbalance
+listunspent
+listtransactions
+```
 
 ### Example - Create legacy address and dump its private key:
 
-(Only required after 0.17.0 version)
+(Required after 0.17.0 version)
 
-`bitcoin-cli -datadir=1 getnewaddress "" "legacy"`
+`bitcoin-cli -datadir=1 getnewaddress "label" "legacy"`
 moHYHpgk4YgTCeLBmDE2teQ3qVLUtM95Fn
 
 `bitcoin-cli -datadir=1 dumpprivkey "moHYHpgk4YgTCeLBmDE2teQ3qVLUtM95Fn"`
 cQthTMaKUU9f6br1hMXdGFXHwGaAfFFerNkn632BpGE6KXhTMmGY
 
-3, 4, 10
 mkVXZnqaaKt4puQNr4ovPHYg48mjguFCnT
 cNSHjGk52rQ6iya8jdNT9VJ8dvvQ8kPAq5pcFHsYBYdDqahWuneH
 
@@ -53,10 +61,10 @@ bcrt1q8eqm6dwmt23k246f4fmkruwd5pjupqs7l0l3dl
 `bitcoin-cli -datadir=1 dumpprivkey bcrt1q8eqm6dwmt23k246f4fmkruwd5pjupqs7l0l3dl`
 cPKT92sLkVEVmrZ9ojjWxmtLvmhbuCnUmbmo93bVDRqdMpcqCAGZ
 
-### Common Bitcoin address and private key:
+### Format of Bitcoin address and private key:
 [link](https://github.com/citizen010/bitcoin-prefixes-address-list)
 
-### Bitcoin WIF format of private key
+### Bitcoin WIF (Wallet Import Format) of private key
 
 str = `Base58(<0x80><32-byte-private-key><0x01><4-byte-checksum>)`
 
@@ -76,4 +84,4 @@ on testnet:
 if final str begins with 9, uncompressed;
 if final str begins with c, compressed;
 
-Bitcoin private key is always the same, regardless what type of address you derive from it.
+Bitcoin private key is always the same (random 256bit/32byte), regardless what type of address you derive from it.
