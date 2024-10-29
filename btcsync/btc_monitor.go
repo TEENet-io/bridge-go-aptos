@@ -14,11 +14,12 @@ Once an interested action is found, the monitor will notify all the observers.
 
 import (
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/TEENet-io/bridge-go/btcaction"
 	"github.com/TEENet-io/bridge-go/btcman/rpc"
-	"github.com/TEENet-io/bridge-go/btcman/utils"
+	myutils "github.com/TEENet-io/bridge-go/btcman/utils"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
 )
@@ -30,8 +31,8 @@ import (
 // Once an interested action is found, notify all the observers.
 
 const (
-	CONSIDER_FINALIZED = 6                // 6 blocks we consider finalized
-	SCAN_INTERVAL      = 10 * time.Second // 10 seconds, then we scan again
+	CONSIDER_FINALIZED = 6               // 6 blocks we consider finalized
+	SCAN_INTERVAL      = 3 * time.Second // 3 seconds, then we scan again
 )
 
 type BTCMonitor struct {
@@ -43,8 +44,8 @@ type BTCMonitor struct {
 	mgrState              btcaction.RedeemActionStorage // tracker of redeems.
 }
 
-// CheckRedeemTx checks if a given BTC transaction ID matches a record in the database
-func (m *BTCMonitor) ReverseQueryRedeemTx(btcTxID string) bool {
+// Given a BTC transaction ID, finds a record in the database
+func (m *BTCMonitor) QueryRedeemTx(btcTxID string) bool {
 	reqTxHash, err := m.mgrState.QueryByBtcTxId(btcTxID)
 	if len(reqTxHash) == 0 || err != nil {
 		return false
@@ -52,24 +53,25 @@ func (m *BTCMonitor) ReverseQueryRedeemTx(btcTxID string) bool {
 	return true
 }
 
-// FinishRedeem marks a redeem as mined in the database
+// FinishRedeem marks a redeem as completed in the database
 func (m *BTCMonitor) FinishRedeem(btcTxID string) string {
 	reqTxHash, _ := m.mgrState.QueryByBtcTxId(btcTxID)
 	_ = m.mgrState.CompleteRedeem(reqTxHash)
 	return reqTxHash
 }
 
-func NewBTCMonitor(addressStr string, chainConfig *chaincfg.Params, rpcClient *rpc.RpcClient) (*BTCMonitor, error) {
-	_address, err := btcutil.DecodeAddress(addressStr, &chaincfg.MainNetParams)
+func NewBTCMonitor(addressStr string, chainConfig *chaincfg.Params, rpcClient *rpc.RpcClient, startBlock int64, mgrState btcaction.RedeemActionStorage) (*BTCMonitor, error) {
+	_address, err := btcutil.DecodeAddress(addressStr, chainConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode address: %v", err)
 	}
 	return &BTCMonitor{
 		BridgeBTCAddress:      _address,
-		LastVistedBlockHeight: 0,
+		LastVistedBlockHeight: startBlock,
 		ChainConfig:           chainConfig,
 		Publisher:             NewPublisherService(),
 		RpcClient:             rpcClient,
+		mgrState:              mgrState,
 	}, nil
 }
 
@@ -89,21 +91,30 @@ func (m *BTCMonitor) Scan() error {
 		return nil // no blocks to scan. and no error
 	}
 
-	numbersToFetch := latestBlockHeight - m.LastVistedBlockHeight
+	numbersToFetch := latestBlockHeight - m.LastVistedBlockHeight - CONSIDER_FINALIZED
 	blocks, err := m.RpcClient.GetBlocks(int(numbersToFetch), CONSIDER_FINALIZED)
 	for _, block := range blocks {
+		if len(block.Transactions) == 0 {
+			continue
+		}
 		for _, tx := range block.Transactions {
 			blockHeight, err := m.RpcClient.GetBlockHeightByHash(btcutil.NewBlock(block).Hash())
 			if err != nil {
 				return fmt.Errorf("failed to get block height via hash: %v", err)
 			}
 			// check if the BTC tx is a bridge deposit
-			if utils.MaybeDepositTx(tx, m.BridgeBTCAddress, m.ChainConfig) {
-				deposit, err := utils.CraftDepositAction(tx, blockHeight, block, m.BridgeBTCAddress, m.ChainConfig)
+			if myutils.MaybeDepositTx(tx, m.BridgeBTCAddress, m.ChainConfig) {
+				deposit, err := myutils.CraftDepositAction(tx, blockHeight, block, m.BridgeBTCAddress, m.ChainConfig)
 				if err != nil {
 					return fmt.Errorf("failed to craft deposit action: %v", err)
 					//TODO: shall add refund BTC logic here.
 				}
+				log.Printf("Deposit: %v", deposit.TxHash)
+				log.Printf("Value: %v", deposit.DepositValue)
+				log.Printf("Receiver: %v", deposit.DepositReceiver)
+				log.Printf("EVM ID: %v", deposit.EvmID)
+				log.Printf("EVM Addr: %v", deposit.EvmAddr)
+
 				observedUTXO := &ObservedUTXO{
 					BlockNumber: blockHeight,
 					BlockHash:   block.BlockHash().String(),
@@ -124,7 +135,7 @@ func (m *BTCMonitor) Scan() error {
 			// if so, set the redeem state of mgr state to be minted.
 			// notify observers to set the state on core shared state.
 			_btc_txid := tx.TxHash().String()
-			if m.ReverseQueryRedeemTx(_btc_txid) {
+			if m.QueryRedeemTx(_btc_txid) {
 				reqTxHash := m.FinishRedeem(_btc_txid)
 
 				// Notify Observers
