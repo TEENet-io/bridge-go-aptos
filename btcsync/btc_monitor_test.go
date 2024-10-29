@@ -292,7 +292,7 @@ func TestDeposit(t *testing.T) {
 
 	t.Logf("Bridge balance (satoshi): %d", p3_balance_2)
 
-	// If the balance is increased, the transfer is successful on blockchain
+	// If the balance is increased, the transfer is successful on the blockchain.
 	if p3_balance_2 > p3_balance_1 {
 		t.Logf("Transfer successful on blockchain")
 	} else {
