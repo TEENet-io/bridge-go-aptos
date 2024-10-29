@@ -84,10 +84,11 @@ func MakeDepositOpReturnData(evm_chain_id int, evm_addr string) ([]byte, error) 
 }
 
 // DecodeOpReturnData deposit data from RLP encoded []byte
-// TODO: OP_RETURN data may not be handled properly.
+// OP_RETURN data is of <OP_RETURN> <OP_PUSHBYTES_x> <real_data>
+// Need to cut off the first two bytes.
 func DecodeOpReturnData(data []byte) (*DepositData, error) {
 	var dd DepositData
-	err := rlp.DecodeBytes(data, &dd)
+	err := rlp.DecodeBytes(data[2:], &dd)
 	if err != nil {
 		return nil, err
 	}

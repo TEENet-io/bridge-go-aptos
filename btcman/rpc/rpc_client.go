@@ -101,8 +101,7 @@ func (r *RpcClient) GetBlocks(n int, offset int) ([]*wire.MsgBlock, error) {
 		return nil, fmt.Errorf("invalid offset or number of blocks: offset=%d, n=%d", offset, n)
 	}
 
-	// allocate slice of n
-	myBlocks := make([]*wire.MsgBlock, n)
+	var myBlocks []*wire.MsgBlock
 
 	for i := 0; i < n; i++ {
 		targetHeight := int(latestHeight) - offset - i
