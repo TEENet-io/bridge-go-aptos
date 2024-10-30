@@ -14,11 +14,13 @@ import (
 	"github.com/TEENet-io/bridge-go/btcman/assembler"
 	"github.com/TEENet-io/bridge-go/btcman/rpc"
 	"github.com/TEENet-io/bridge-go/btcman/utxo"
+	"github.com/TEENet-io/bridge-go/btcvault"
 	sharedcommon "github.com/TEENet-io/bridge-go/common"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 const (
+	RETRY_TIMES         = 10 // retry times for checking the deposit/utxo
 	CHANNEL_BUFFER_SIZE = 10
 
 	MAX_BLOCKS  = 107 // Generate > 100 blocks to get recognized balance on bitcoin core.
@@ -88,19 +90,19 @@ func setupClient(t *testing.T) (*rpc.RpcClient, error) {
 	return r, err
 }
 
+// Random file name generator
 func randFileName(prefix string, suffix string) string {
 	return prefix + ethcommon.Hash(sharedcommon.RandBytes32()).String() + suffix
+}
+
+// call it once to get the db file name in this run.
+func setupDBFile() string {
+	return randFileName("test_", ".db")
 }
 
 // call it in defer
 func rmFile(name string) {
 	os.Remove(name)
-}
-
-// call it once to get the db file name in this run.
-func setupDBFile() string {
-	db_file_name := randFileName("test_", ".db")
-	return db_file_name
 }
 
 // Set up the BTC Monitor
@@ -153,13 +155,13 @@ func TestDeposit(t *testing.T) {
 
 	// Setup the observers
 
-	// Deposit observer
+	// *** Deposit observer ***
 	// 1) Create deposit storage
 	depo_st, err := btcaction.NewSQLiteDepositStorage(db_file_name)
 	if err != nil {
 		t.Fatalf("cannot create deposit storage %v", err)
 	}
-	// 2) Create observer
+	// 2) Create deposit observer
 	d_observer, err := setupObserverDeposit(depo_st)
 	if err != nil {
 		t.Fatalf("cannot create monitor, %v", err)
@@ -170,7 +172,30 @@ func TestDeposit(t *testing.T) {
 	// Register Deposit Observer to publisher
 	monitor.Publisher.RegisterDepositObserver(d_observer.Ch)
 
+	// *** UTXO Observer ***
+	// Storage -> UTXO Vault -> Observer
+
+	// Create a vault storage,
+	// specific to the a certain receiver address
+	vault_st, err := btcvault.NewSQLiteStorage(db_file_name, p3_legacy_addr_str)
+	if err != nil {
+		t.Fatalf("cannot create vault storage %v", err)
+	}
+
+	// Create a btc vault
+	my_btc_vault := btcvault.NewTreasureVault(p3_legacy_addr_str, vault_st)
+
+	// Create a new UTXO observer
+	utxo_observer := NewObserverUTXOVault(my_btc_vault, CHANNEL_BUFFER_SIZE)
+
+	// Observer starts listening to the UTXO channel
+	go utxo_observer.GetNotifiedUtxo()
+
+	// Register UTXO Observer to publisher
+	monitor.Publisher.RegisterUTXOObserver(utxo_observer.Ch)
+
 	// Turn on the monitor scan loop
+	// So it can publish events to observers
 	go monitor.ScanLoop()
 
 	// Send the deposit p2 -> p3
@@ -209,7 +234,7 @@ func TestDeposit(t *testing.T) {
 	change_addr := wallet_addr_str           // send back to p2 wallet
 	fee_amount := int64(FEE_SATOSHI)         // fee
 
-	// 1) Check balance of bridge
+	// 1) Check balance of bridge wallet
 	p3_addr, err := assembler.DecodeAddress(p3_legacy_addr_str, assembler.GetRegtestParams())
 	if err != nil {
 		t.Fatalf("cannot decode address %s, error %v", p3_legacy_addr_str, err)
@@ -255,7 +280,7 @@ func TestDeposit(t *testing.T) {
 
 	t.Logf("transaction sent, txHash is %s", txHash.String())
 
-	// Generate enough blocks
+	// Generate enough blocks on bitcoin blockchain to confirm the Tx
 	p1_addr, _ := assembler.DecodeAddress(p1_legacy_addr_str, assembler.GetRegtestParams())
 	r.GenerateBlocks(MAX_BLOCKS, p1_addr)
 
@@ -267,22 +292,25 @@ func TestDeposit(t *testing.T) {
 
 	t.Logf("Bridge balance (satoshi): %d", p3_balance_2)
 
-	// If the balance is increased, the transfer is successful
+	// If the balance is increased, the transfer is successful on blockchain
 	if p3_balance_2 > p3_balance_1 {
-		t.Logf("Transfer successful")
+		t.Logf("Transfer successful on blockchain")
 	} else {
 		t.Fatalf("Transfer failed")
 	}
 
-	// Check on monitor side if the deposit is captured
-	// Check if the deposit is captured in the storage
+	// Check on btc monitor side if the deposit is captured
+	// 1) Check if the deposit is stored in the deposit storage
 	var deposits []btcaction.DepositAction
-	for i := 0; i < 10; i++ {
+	for i := 0; i < RETRY_TIMES; i++ {
 		deposits, err = depo_st.GetDepositByTxHash(txHash.String())
 		if err != nil {
 			t.Fatalf("error retrieving deposit by tx hash: %v", err)
 		}
 		if len(deposits) > 0 {
+			for _, deposit := range deposits {
+				t.Logf("Deposit: TxHash %s, Value %d, Receiver %s, EVM ID %d, EVM Addr %s", deposit.TxHash, deposit.DepositValue, deposit.DepositReceiver, deposit.EvmID, deposit.EvmAddr)
+			}
 			break
 		}
 		time.Sleep(3 * time.Second)
@@ -292,5 +320,27 @@ func TestDeposit(t *testing.T) {
 		t.Logf("Deposit captured successfully")
 	} else {
 		t.Fatalf("Deposit not captured")
+	}
+
+	// 2) Check if the UTXO is stored in the UTXO Treasure Vault
+	var utxosInVault []btcvault.VaultUTXO
+	for i := 0; i < RETRY_TIMES; i++ {
+		utxosInVault, err = vault_st.QueryByTxID(txHash.String())
+		if err != nil {
+			t.Fatalf("error retrieving utxos from vault storage: %v", err)
+		}
+		if len(utxosInVault) > 0 {
+			for _, utxo := range utxosInVault {
+				t.Logf("UTXO: TxID %s, Vout %d, Amount %d", utxo.TxID, utxo.Vout, utxo.Amount)
+			}
+			break
+		}
+		time.Sleep(3 * time.Second)
+	}
+
+	if len(utxosInVault) > 0 {
+		t.Logf("UTXO captured successfully")
+	} else {
+		t.Fatalf("UTXO not captured")
 	}
 }

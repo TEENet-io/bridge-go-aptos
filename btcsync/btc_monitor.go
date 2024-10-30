@@ -110,10 +110,10 @@ func (m *BTCMonitor) Scan() error {
 					//TODO: shall add refund BTC logic here.
 				}
 				log.Printf("Deposit: %v", deposit.TxHash)
-				log.Printf("Value: %v", deposit.DepositValue)
-				log.Printf("Receiver: %v", deposit.DepositReceiver)
-				log.Printf("EVM ID: %v", deposit.EvmID)
-				log.Printf("EVM Addr: %v", deposit.EvmAddr)
+				// log.Printf("Value: %v", deposit.DepositValue)
+				// log.Printf("Receiver: %v", deposit.DepositReceiver)
+				// log.Printf("EVM ID: %v", deposit.EvmID)
+				// log.Printf("EVM Addr: %v", deposit.EvmAddr)
 
 				observedUTXO := &ObservedUTXO{
 					BlockNumber: blockHeight,
