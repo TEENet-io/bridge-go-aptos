@@ -9,12 +9,13 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
+// Real params to call Ethereum contract mint()
 type MintParams struct {
-	BtcTxId  ethcommon.Hash
+	BtcTxId  ethcommon.Hash // bitcoin transaction hash
 	Amount   *big.Int
-	Receiver ethcommon.Address
-	Rx       *big.Int
-	S        *big.Int
+	Receiver ethcommon.Address // ethereum address
+	Rx       *big.Int          // part of schnorr signature
+	S        *big.Int          // part of schnorr signature
 }
 
 func (params *MintParams) SigningHash() ethcommon.Hash {
@@ -25,22 +26,25 @@ func (params *MintParams) SigningHash() ethcommon.Hash {
 	))
 }
 
+// Real params to call Ethereum contract Redeem's Request()
 type RequestParams struct {
 	Amount   *big.Int
 	Receiver string
 }
 
+// Real params to call Ethereum contract Redeem's Prepare()
 type PrepareParams struct {
-	RequestTxHash ethcommon.Hash
-	Requester     ethcommon.Address
-	Receiver      string
+	RequestTxHash ethcommon.Hash    // eth transaction id
+	Requester     ethcommon.Address // eth address
+	Receiver      string            // btc address
 	Amount        *big.Int
-	OutpointTxIds []ethcommon.Hash
-	OutpointIdxs  []uint16
+	OutpointTxIds []ethcommon.Hash // btc_tx_id(s) to be spent
+	OutpointIdxs  []uint16         // corresponding output vout to btc_tx_id(s)
 	Rx            *big.Int
 	S             *big.Int
 }
 
+// seraialize the parameters and create a hash
 func (p *PrepareParams) SigningHash() ethcommon.Hash {
 	outpointIdxs := []*big.Int{}
 	for _, idx := range p.OutpointIdxs {

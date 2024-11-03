@@ -22,7 +22,8 @@ func MainNetParams() *chaincfg.Params {
 }
 
 // btcec.PrivateKey == btcutil.WIF.PrivKey (same type)
-// TODO possible duplicate code, single sign version
+// TODO possible duplicate code, single sign version of schnorr signature
+// return (rx, s)
 func Sign(sk *btcec.PrivateKey, msg []byte) (*big.Int, *big.Int, error) {
 	sig, err := schnorr.Sign(sk, msg[:])
 	if err != nil {

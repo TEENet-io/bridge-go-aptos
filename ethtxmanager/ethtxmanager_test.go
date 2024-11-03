@@ -34,6 +34,7 @@ const (
 	// blockInterval = 100 * time.Millisecond
 )
 
+// Gather test tools
 type testEnv struct {
 	sim *etherman.SimEtherman
 
@@ -75,8 +76,9 @@ func newTestEnv(t *testing.T, file string) *testEnv {
 		st,
 		&ethsync.Config{
 			FrequencyToCheckEthFinalizedBlock: frequencyToCheckEthFinalizedBlock,
-			BtcChainConfig:                    common.MainNetParams(),
-			EthChainID:                        chainID,
+			// TODO, can be other network params.
+			BtcChainConfig: common.MainNetParams(),
+			EthChainID:     chainID,
 		},
 	)
 	assert.NoError(t, err)
@@ -90,7 +92,9 @@ func newTestEnv(t *testing.T, file string) *testEnv {
 		TimeoutOnWaitingForOutpoints:  timtoutOnWaitingForOutpoints,
 		TimeoutOnMonitoringPendingTxs: timeoutOnMonitoringPendingTxs,
 	}
+	// TODO use our btc wallet instead
 	btcWallet := &MockBtcWallet{}
+	// TODO change to network based schnorr wallet
 	schnorrWallet := &MockSchnorrThresholdWallet{sim}
 	mgr, err := New(cfg, sim.Etherman, statedb, mgrdb, schnorrWallet, btcWallet)
 	assert.NoError(t, err)
@@ -108,6 +112,9 @@ func randFile() string {
 	return ethcommon.Hash(common.RandBytes32()).String() + ".db"
 }
 
+// 1) simulate a mint() Tx on EVM
+// 2) simulate/insert a Mint Event in statedb (should be created by btc side).
+// It checks if the Mint is captured and monitored by the manager.
 func TestOnIsMinted(t *testing.T) {
 	common.Debug = true
 	file := randFile()
@@ -120,10 +127,13 @@ func TestOnIsMinted(t *testing.T) {
 	defer env.close()
 	commit := env.sim.Chain.Backend.Commit
 
-	// mint the btcTxId on chain
-	_, params := env.sim.Mint(1, 100)
+	// simulate a mint() on EVM chain
+	// btctxid is random
+	_, params := env.sim.Mint(common.RandBytes32(), 1, 100)
 	commit()
 
+	// Also simulate that BTC side has
+	// Inserted mint event to the database.
 	mint := &state.Mint{
 		BtcTxId:  params.BtcTxId,
 		Receiver: params.Receiver,
@@ -132,10 +142,16 @@ func TestOnIsMinted(t *testing.T) {
 	err := env.statedb.InsertMint(mint)
 	assert.NoError(t, err)
 
+	// Start manager, to monitor the minted tx on EVM
+	// 1) gather from statedb about suppose to be minted evm tx.
+	// 2) track the tx.
+	// 2) update mgrdb about sucessful minted evm tx.
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() { err = env.mgr.Start(ctx) }()
 	time.Sleep(frequencyToMint * 2)
 	cancel()
+
+	// Check if the minted tx is mined and mgrdb captured it.
 	mts, err := env.mgrdb.GetMonitoredTxsById(mint.BtcTxId)
 	assert.NoError(t, err)
 	assert.Len(t, mts, 0)
@@ -387,6 +403,8 @@ func TestMainRoutine(t *testing.T) {
 
 	env := newTestEnv(t, file)
 	defer env.close()
+
+	// shortcut
 	commit := env.sim.Chain.Backend.Commit
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -411,7 +429,7 @@ func TestMainRoutine(t *testing.T) {
 
 	time.Sleep(1 * time.Second)
 
-	// 2. mint twbtc tokens
+	// 2. mint twbtc tokens (directly insert Mint events into the state db)
 	mints := []*state.Mint{
 		{
 			BtcTxId:  common.RandBytes32(),
@@ -431,16 +449,19 @@ func TestMainRoutine(t *testing.T) {
 	time.Sleep(1 * time.Second)
 	commit()
 
-	// 3. approve twbtc tokens
+	// 3. approve twbtc tokens on ethereum
 	env.sim.Approve(1, 90)
 	env.sim.Approve(2, 100)
 	commit()
 	printCurrBlockNumber(env, "approved")
 
-	// 4. request redeem
-	tx1, _ := env.sim.Request(env.sim.GetAuth(1), 1, 60, 0)  // valid btc address
-	tx2, _ := env.sim.Request(env.sim.GetAuth(1), 1, 30, -1) // invalid btc address
-	tx3, _ := env.sim.Request(env.sim.GetAuth(2), 2, 100, 1) // valid btc address
+	// 4. request the redeem on ethereum
+	// from eth account at idx [1] with 60 satoshi to btc address at idx [0] (valid btc address)
+	tx1, _ := env.sim.Request(env.sim.GetAuth(1), 1, 60, 0)
+	// from eth account at idx [1] with 30 satoshi to btc adddress at idx [-1] (invalid btc address)
+	tx2, _ := env.sim.Request(env.sim.GetAuth(1), 1, 30, -1)
+	// from eth account at idx [2] with 100 satoshi to btc address at idx [1] (valid btc address)
+	tx3, _ := env.sim.Request(env.sim.GetAuth(2), 2, 100, 1)
 	commit()
 	printCurrBlockNumber(env, "requested")
 

@@ -95,7 +95,10 @@ func sendTxs(t *testing.T, env *etherman.SimEtherman) (
 	preparedEvs []*RedeemPreparedEvent,
 ) {
 	// 1
-	mintParams := env.GenMintParams(&etherman.ParamConfig{Receiver: 1, Amount: big.NewInt(100)})
+	mintParams := env.GenMintParams(
+		&etherman.ParamConfig{Receiver: 1, Amount: big.NewInt(100)},
+		common.RandBytes32(),
+	)
 	tx, err := env.Etherman.Mint(mintParams)
 	if err != nil {
 		t.Fatal(err)

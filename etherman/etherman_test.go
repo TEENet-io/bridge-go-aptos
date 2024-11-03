@@ -16,12 +16,12 @@ func TestNonce(t *testing.T) {
 	env, err := NewSimEtherman()
 	assert.NoError(t, err)
 
-	env.Mint(1, 100)
+	env.Mint(common.RandBytes32(), 1, 100)
 	env.Chain.Backend.Commit()
 	nonce, err := env.Etherman.ethClient.PendingNonceAt(context.Background(), env.Chain.Accounts[0].From)
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(2), nonce)
-	env.Mint(2, 100)
+	env.Mint(common.RandBytes32(), 2, 100)
 	nonce, err = env.Etherman.ethClient.PendingNonceAt(context.Background(), env.Chain.Accounts[0].From)
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(3), nonce)
@@ -51,7 +51,10 @@ func TestIsMinted(t *testing.T) {
 	etherman := env.Etherman
 	commit := env.Chain.Backend.Commit
 
-	params := env.GenMintParams(&ParamConfig{Receiver: 1, Amount: big.NewInt(100)})
+	params := env.GenMintParams(
+		&ParamConfig{Receiver: 1, Amount: big.NewInt(100)},
+		common.RandBytes32(),
+	)
 	assert.NotNil(t, params)
 	_, err = etherman.Mint(params)
 	assert.NoError(t, err)
@@ -68,7 +71,7 @@ func TestGetEventLogs(t *testing.T) {
 
 	commit := env.Chain.Backend.Commit
 
-	_, mintParams := env.Mint(1, 100)
+	_, mintParams := env.Mint(common.RandBytes32(), 1, 100)
 	txHash, prepareParams := env.Prepare(4, 400, 0, 1)
 	commit()
 
@@ -84,12 +87,12 @@ func TestGetEventLogs(t *testing.T) {
 	checkMintedEvent(t, &minted[0], mintParams)
 	checkPreparedEvent(t, &prepared[0], prepareParams)
 
-	requester := 1
-
 	env.Approve(1, 80)
 	commit()
 
-	txHash, requestParams := env.Request(env.GetAuth(requester), 1, 80, 0)
+	// Request a redeem
+	// from eth account at idx [1], with 80 satoshi, to btc address at idx [0]
+	txHash, requestParams := env.Request(env.GetAuth(1), 1, 80, 0)
 	commit()
 
 	num = curentBlockNum(t, env)
@@ -123,7 +126,7 @@ func TestRedeemRequest(t *testing.T) {
 	commit := env.Chain.Backend.Commit
 
 	// Mint tokens
-	env.Mint(1, 100)
+	env.Mint(common.RandBytes32(), 1, 100)
 	commit()
 
 	// Approve tokens to bridge
@@ -155,7 +158,10 @@ func TestMint(t *testing.T) {
 	etherman := env.Etherman
 	commit := env.Chain.Backend.Commit
 
-	params := env.GenMintParams(&ParamConfig{Receiver: 1, Amount: big.NewInt(100)})
+	params := env.GenMintParams(
+		&ParamConfig{Receiver: 1, Amount: big.NewInt(100)},
+		common.RandBytes32(),
+	)
 	assert.NotNil(t, params)
 	_, err = etherman.Mint(params)
 	assert.NoError(t, err)
