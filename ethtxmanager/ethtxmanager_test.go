@@ -14,6 +14,7 @@ import (
 	"github.com/TEENet-io/bridge-go/etherman"
 	"github.com/TEENet-io/bridge-go/ethsync"
 	"github.com/TEENet-io/bridge-go/state"
+	"github.com/btcsuite/btcd/chaincfg"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
@@ -25,7 +26,7 @@ const (
 
 	// eth tx manager config
 	frequencyToPrepareRedeem      = 500 * time.Millisecond
-	frequencyToMint               = 500 * time.Millisecond
+	frequencyToMint               = 500 * time.Millisecond // 0.5 second
 	frequencyToMonitorPendingTxs  = 500 * time.Millisecond
 	timeoutOnWaitingForSignature  = 1 * time.Second
 	timtoutOnWaitingForOutpoints  = 1 * time.Second
@@ -34,7 +35,7 @@ const (
 	// blockInterval = 100 * time.Millisecond
 )
 
-// Gather test tools
+// Gather test tools on Ethereum side.
 type testEnv struct {
 	sim *etherman.SimEtherman
 
@@ -46,7 +47,7 @@ type testEnv struct {
 	sync    *ethsync.Synchronizer
 }
 
-func newTestEnv(t *testing.T, file string) *testEnv {
+func newTestEnv(t *testing.T, file string, btcChainConfig *chaincfg.Params) *testEnv {
 
 	sim, err := etherman.NewSimEtherman()
 	assert.NoError(t, err)
@@ -77,7 +78,7 @@ func newTestEnv(t *testing.T, file string) *testEnv {
 		&ethsync.Config{
 			FrequencyToCheckEthFinalizedBlock: frequencyToCheckEthFinalizedBlock,
 			// TODO, can be other network params.
-			BtcChainConfig: common.MainNetParams(),
+			BtcChainConfig: btcChainConfig,
 			EthChainID:     chainID,
 		},
 	)
@@ -96,7 +97,7 @@ func newTestEnv(t *testing.T, file string) *testEnv {
 	btcWallet := &MockBtcWallet{}
 	// TODO change to network based schnorr wallet
 	schnorrWallet := &MockSchnorrThresholdWallet{sim}
-	mgr, err := New(cfg, sim.Etherman, statedb, mgrdb, schnorrWallet, btcWallet)
+	mgr, err := NewEthTxManager(cfg, sim.Etherman, statedb, mgrdb, schnorrWallet, btcWallet)
 	assert.NoError(t, err)
 
 	return &testEnv{sim, sqldb, statedb, st, mgrdb, mgr, sync}
@@ -123,7 +124,8 @@ func TestOnIsMinted(t *testing.T) {
 		os.Remove(file)
 	}()
 
-	env := newTestEnv(t, file)
+	// Test is done on mainnet of bitcoin
+	env := newTestEnv(t, file, common.MainNetParams())
 	defer env.close()
 	commit := env.sim.Chain.Backend.Commit
 
@@ -166,7 +168,7 @@ func TestOnCheckBeforeMint(t *testing.T) {
 		os.Remove(file)
 	}()
 
-	env := newTestEnv(t, file)
+	env := newTestEnv(t, file, common.MainNetParams())
 	defer env.close()
 
 	unMinted := state.RandMint(false)
@@ -236,7 +238,7 @@ func TestIsPrepared(t *testing.T) {
 		os.Remove(file)
 	}()
 
-	env := newTestEnv(t, file)
+	env := newTestEnv(t, file, common.MainNetParams())
 	defer env.close()
 	commit := env.sim.Chain.Backend.Commit
 
@@ -277,7 +279,7 @@ func TestOnCheckBeforePrepare(t *testing.T) {
 		os.Remove(file)
 	}()
 
-	env := newTestEnv(t, file)
+	env := newTestEnv(t, file, common.MainNetParams())
 	defer env.close()
 
 	redeem := state.RandRedeem(state.RedeemStatusRequested)
@@ -349,7 +351,7 @@ func TestMonitorOnTimeout(t *testing.T) {
 		os.Remove(file)
 	}()
 
-	env := newTestEnv(t, file)
+	env := newTestEnv(t, file, common.MainNetParams())
 	defer env.close()
 	commit := env.sim.Chain.Backend.Commit
 
@@ -380,18 +382,19 @@ func TestMonitorOnTimeout(t *testing.T) {
 
 // Main routine test procedures:
 //  1. Start main routines of eth2btc state, eth tx manager, eth synchronizer, and mock wallet
-//  2. Mint twbtc tokens for account [1] and [2]
+//  2. Mock Mint twbtc tokens for account [1] and [2]
 //     a. create two mint requests for [1] and [2]
 //     b. insert the mint requests to the state db
-//  3. Approve twbtc tokens for the two users
-//  4. Request redeem
+//     c. mgr caputres "mint" automatically (every 0.5 second) and do real token mint on ethereum.
+//  3. Two users approve twbtc tokens to be spent by bridge.
+//  4. Two users Request redeems
 //     [tx1]: from [1] with valid btc address
 //     [tx2]: from [1] with invalid btc address
 //     [tx3]: from [2] with valid btc address
-//  5. Check for monitored tx -- Here we do not commit a new block for the sent txs
+//  5. Check for monitored Request tx -- Here we do not commit a new block for the sent txs
 //     have row for [tx1, tx3]
-//  6. commit a new block
-//  7. Check monitor pending txs
+//  6. Commit a new block
+//  7. Check monitor pending Request txs
 //     status == success for [tx1, tx3]
 func TestMainRoutine(t *testing.T) {
 	common.Debug = true
@@ -401,7 +404,7 @@ func TestMainRoutine(t *testing.T) {
 		os.Remove(file)
 	}()
 
-	env := newTestEnv(t, file)
+	env := newTestEnv(t, file, common.MainNetParams())
 	defer env.close()
 
 	// shortcut
@@ -429,7 +432,9 @@ func TestMainRoutine(t *testing.T) {
 
 	time.Sleep(1 * time.Second)
 
-	// 2. mint twbtc tokens (directly insert Mint events into the state db)
+	// 2. mock mint twbtc tokens (directly insert Mint events into the state db)
+	// TODO: in real life, btc side shall use observers to insert into statedb about "mint"
+	// TODO: so btcTxId can be real.
 	mints := []*state.Mint{
 		{
 			BtcTxId:  common.RandBytes32(),
@@ -446,12 +451,18 @@ func TestMainRoutine(t *testing.T) {
 		err := env.statedb.InsertMint(mint)
 		assert.NoError(t, err)
 	}
+	// it only takes 0.5 for mgr to capture the un-minted,
+	// and creates a token mint Tx on Ethereum automatcially.
+	// so 1 second is long enough.
 	time.Sleep(1 * time.Second)
-	commit()
 
-	// 3. approve twbtc tokens on ethereum
-	env.sim.Approve(1, 90)
-	env.sim.Approve(2, 100)
+	// Move ethereum blockchain forward to contain the token mint Tx.
+	commit()
+	// At this step, user's token balance on eth-side is credited.
+
+	// 3. Two users (owner) approve twbtc tokens on ethereum (spender=bridge)
+	env.sim.Approve(1, 90)  // 90 < 100
+	env.sim.Approve(2, 100) // 100 < 200
 	commit()
 	printCurrBlockNumber(env, "approved")
 
@@ -494,8 +505,8 @@ func TestMainRoutine(t *testing.T) {
 	assert.Len(t, mts, 1)
 	assert.Equal(t, Success, mts[0].Status)
 
-	cancel()
-	wg.Wait()
+	cancel()  // guess: cancel() ends sub go routines politely.
+	wg.Wait() // wait for all the routines to complete.
 }
 
 func printCurrBlockNumber(env *testEnv, txt string) {

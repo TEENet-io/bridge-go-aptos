@@ -29,15 +29,19 @@ func (w *MockBtcWallet) Request(
 	return nil
 }
 
+// Mock schnorr threshold wallet
+// uses the sign in sim to emulate a sign.
+// it is actually a single-key schnorr.
 type MockSchnorrThresholdWallet struct {
-	sim *etherman.SimEtherman
+	Sim *etherman.SimEtherman
 }
 
+// Signature request & response via channel
 func (w *MockSchnorrThresholdWallet) Sign(
 	request *SignatureRequest,
 	ch chan<- *SignatureRequest,
 ) error {
-	rx, s, err := w.sim.Sign(request.SigningHash[:])
+	rx, s, err := w.Sim.Sign(request.SigningHash[:])
 
 	// if failed to sign, do nothing to allow the routine
 	// that waits for the signature to timeout
