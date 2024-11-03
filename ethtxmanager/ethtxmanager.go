@@ -34,7 +34,7 @@ type EthTxManager struct {
 	mintLock   sync.Map
 }
 
-func New(
+func NewEthTxManager(
 	cfg *Config,
 	etherman *etherman.Etherman,
 	statedb *state.StateDB,
@@ -207,7 +207,7 @@ func (txmgr *EthTxManager) Start(ctx context.Context) error {
 			// same rules as for check redeems applied here
 			toMints := []*state.Mint{}
 			for _, req := range mintReqs {
-				// Check whether there is a routine currently being handling the mint
+				// Check whether there is a routine currently <handling> the mint
 				monitoredMints, err := txmgr.mgrdb.GetMonitoredTxsById(req.BtcTxId)
 				if err != nil {
 					logger.Errorf("failed to get monitored tx by id: err=%v", err)
