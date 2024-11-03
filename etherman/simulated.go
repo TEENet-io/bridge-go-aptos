@@ -16,10 +16,16 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient/simulated"
 )
 
+const (
+	NUMBER_OF_ACCOUNTS = 10   // Use 10 BTC ccounts for testing
+	CHAIN_ID_INT64     = 1337 // Use 1337 as simulated chain id
+)
+
 var (
-	SimulatedChainID = big.NewInt(1337)
+	SimulatedChainID = big.NewInt(CHAIN_ID_INT64)
 	blockGasLimit    = uint64(999999999999999999)
 
+	// 10 BTC addresses (to simulate receiver of redeem)
 	btcAddrs = []string{
 		"1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
 		"1HLoD9E4SDFFPDiYfNYnkBLQ85Y51J3Zb1",
@@ -34,20 +40,22 @@ var (
 	}
 )
 
+// Simulated Chain with execution backend
+// and some genesis accounts.
 type SimulatedChain struct {
 	Backend  *simulated.Backend
 	Accounts []*bind.TransactOpts
 }
 
 func NewSimulatedChain() *SimulatedChain {
-	// create accounts
-	nAccount := 10
+	// create genesis accounts
+	nAccount := NUMBER_OF_ACCOUNTS
 	accounts := make([]*bind.TransactOpts, nAccount)
 	for i := 0; i < nAccount; i++ {
 		accounts[i] = newAuth()
 	}
 
-	// allocate funds to accounts
+	// allocate funds to genesis accounts
 	genesisAlloc := map[ethcommon.Address]types.Account{}
 	for _, account := range accounts {
 		balance, _ := new(big.Int).SetString("100000000000000000000", 10)
@@ -65,6 +73,8 @@ func NewSimulatedChain() *SimulatedChain {
 	}
 }
 
+// Create a new auth object with a random private key.
+// The auth object is used to sign transactions
 func newAuth() *bind.TransactOpts {
 	sk, _ := crypto.GenerateKey()
 	auth, _ := bind.NewKeyedTransactorWithChainID(sk, SimulatedChainID)
@@ -76,8 +86,8 @@ type ParamConfig struct {
 	// 		< 0 	== accounts[0]
 	// 		[0, 9] 	== accounts[i]
 	// 		> 9		== accounts[9]
-	Receiver  int
-	Requester int
+	Receiver  int // ethereum account index (mint receiver)
+	Requester int // ethereum account index (redeem requester)
 
 	Amount *big.Int
 
@@ -88,37 +98,52 @@ type ParamConfig struct {
 	// 		< 0 	== random and invalid
 	// 		[0, 9] 	== btcAddrs[i]
 	// 		> 0		== btcAddrs[9]
-	BtcAddrIdx int
+	BtcAddrIdx int // btc address index
 }
+
 type SimEtherman struct {
 	Chain    *SimulatedChain
-	Sk       *btcec.PrivateKey
+	Sk       *btcec.PrivateKey // Private key for schnorr signature (simulation of multi-party)
 	Etherman *Etherman
 }
 
 func NewSimEtherman() (*SimEtherman, error) {
 	chain := NewSimulatedChain()
+
+	// Random bitcoin private key.
+	// TODO: Change to a multi-party schnorr private key.
 	sk, err := btcec.NewPrivateKey()
 	if err != nil {
 		return nil, err
 	}
 
+	// X of the pubkey (this is actually a simulation of a multi-party schnorr pubkey)
+	// TODO: Change to a multi-party schnorr pubkey aggregation.
 	pk := sk.PubKey().X()
+
+	// Deploy the bridge contract.
+	// Pubkey is embedded in the bridge contract.
+	// Later the smart contract use this pubkey to verify the validity of signature (Rx, s) of every request.
 	bridgeAddress, _, contract, err := bridge.DeployTEENetBtcBridge(chain.Accounts[0], chain.Backend.Client(), pk)
 	if err != nil {
 		return nil, err
 	}
+	// move the chain to the next block
 	chain.Backend.Commit()
 
+	// bridgeContract is a wrapper around the deployed bridge contract
 	bridgeContract, err := bridge.NewTEENetBtcBridge(bridgeAddress, chain.Backend.Client())
 	if err != nil {
 		return nil, err
 	}
+
+	// TWBTC contract address
 	twbtcAddress, err := bridgeContract.Twbtc(nil)
 	if err != nil {
 		return nil, err
 	}
 
+	// Compare bridge contract public key with the one we provided
 	_pk, err := contract.Pk(nil)
 	if err != nil {
 		return nil, err
@@ -145,11 +170,12 @@ func NewSimEtherman() (*SimEtherman, error) {
 	}, nil
 }
 
-func (env *SimEtherman) GenMintParams(cfg *ParamConfig) *MintParams {
+// Generate Mint parameters from ParamConfig.
+// Translate cfg.Receiver (idx) to a pre-stored ethereum receiver address
+func (env *SimEtherman) GenMintParams(cfg *ParamConfig, btcTxId [32]byte) *MintParams {
 	chain := env.Chain
 	sk := env.Sk
 
-	btcTxId := common.RandBytes32()
 	idx := cfg.Receiver
 	if idx < 0 {
 		idx = 0
@@ -159,12 +185,14 @@ func (env *SimEtherman) GenMintParams(cfg *ParamConfig) *MintParams {
 	}
 	receiver := chain.Accounts[idx].From
 
-	msg := crypto.Keccak256Hash(common.EncodePacked(btcTxId, receiver.String(), cfg.Amount)).Bytes()
-	rx, s, err := Sign(sk, msg[:])
+	// Create (rx, s) schnorr signature of (btctxid, ethaddr, amount)
+	content := crypto.Keccak256Hash(common.EncodePacked(btcTxId, receiver.String(), cfg.Amount)).Bytes()
+	rx, s, err := Sign(sk, content[:])
 	if err != nil {
 		return nil
 	}
 
+	// Assemble Mint parameters
 	return &MintParams{
 		BtcTxId:  btcTxId,
 		Amount:   cfg.Amount,
@@ -174,6 +202,9 @@ func (env *SimEtherman) GenMintParams(cfg *ParamConfig) *MintParams {
 	}
 }
 
+// Generate a Request (= RedeemRequest) parameters from ParamConfig.
+// cfg.Requester = idx of the ethererm requester account in the simulated chain.
+// cfg.BtcAddrIdx = idx of the BTC address in the btcAddrs array or 'invalid_btc_address'.
 func (env *SimEtherman) GenRequestParams(cfg *ParamConfig) *RequestParams {
 	idx1 := cfg.Requester
 	if idx1 < 0 {
@@ -201,6 +232,10 @@ func (env *SimEtherman) GenRequestParams(cfg *ParamConfig) *RequestParams {
 	}
 }
 
+// Generatea Prepare parameters from ParamConfig.
+// cfg.BtcAddrIdx = idx of the BTC address in the btcAddrs array.
+// cfg.Requester = idx of the ethereum requester account in the simulated chain.
+// !!! It fakes random requestTxHash, outpointTxIds, outpointIdxs.
 func (env *SimEtherman) GenPrepareParams(cfg *ParamConfig) (p *PrepareParams) {
 	idx := cfg.BtcAddrIdx
 	if idx < 0 {
@@ -211,26 +246,29 @@ func (env *SimEtherman) GenPrepareParams(cfg *ParamConfig) (p *PrepareParams) {
 	}
 	receiver := btcAddrs[idx]
 
-	idx = cfg.Requester
-	if idx < 0 {
-		idx = 0
+	idx2 := cfg.Requester
+	if idx2 < 0 {
+		idx2 = 0
 	}
-	if idx > 9 {
-		idx = 9
+	if idx2 > 9 {
+		idx2 = 9
 	}
-	requester := env.Chain.Accounts[idx].From
+	requester := env.Chain.Accounts[idx2].From
 
-	txHash := common.RandBytes32()
+	// TODO: Use real ETH Request Transaction Hash
+	reqTxHash := common.RandBytes32()
 	outpointTxIds := []ethcommon.Hash{}
 	outpointIdxs := []uint16{}
 
 	for i := 0; i < cfg.OutpointNum; i++ {
+		// TODO: Use real BTC Outpoint Transaction Hash
 		outpointTxIds = append(outpointTxIds, common.RandBytes32())
+		// TODO: Use real BTC Outpoint VOUT
 		outpointIdxs = append(outpointIdxs, uint16(i))
 	}
 
 	p = &PrepareParams{
-		RequestTxHash: txHash,
+		RequestTxHash: reqTxHash,
 		Requester:     requester,
 		Receiver:      receiver,
 		Amount:        cfg.Amount,
@@ -238,7 +276,9 @@ func (env *SimEtherman) GenPrepareParams(cfg *ParamConfig) (p *PrepareParams) {
 		OutpointIdxs:  outpointIdxs,
 	}
 
+	// create the hash
 	msg := p.SigningHash()
+	// sign the hash
 	rx, s, err := Sign(env.Sk, msg[:])
 	if err != nil {
 		return nil
@@ -250,8 +290,15 @@ func (env *SimEtherman) GenPrepareParams(cfg *ParamConfig) (p *PrepareParams) {
 	return
 }
 
-func (env *SimEtherman) Sign(msg []byte) (*big.Int, *big.Int, error) {
-	sig, err := schnorr.Sign(env.Sk, msg)
+// single-private-key schnorr signature.
+// content is usually the [hash of a message].
+// return (rx, s)
+func (env *SimEtherman) Sign(content []byte) (*big.Int, *big.Int, error) {
+	// Generate a schnorr signature
+	// with a signle private key = (rx, s)
+	// the signature can be combined with other signatures in real production.
+	// Now is only a simulation. So only a single schnorr signature.
+	sig, err := schnorr.Sign(env.Sk, content)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -260,11 +307,22 @@ func (env *SimEtherman) Sign(msg []byte) (*big.Int, *big.Int, error) {
 	return new(big.Int).SetBytes(bytes[:32]), new(big.Int).SetBytes(bytes[32:]), nil
 }
 
-func (env *SimEtherman) Mint(receiver int, amount int) (ethcommon.Hash, *MintParams) {
-	params := env.GenMintParams(&ParamConfig{
-		Receiver: receiver,
-		Amount:   big.NewInt(int64(amount)),
-	})
+// !!! This is a convenient function.
+// It selects a pre-stored ethereum account in as the mint receiver.
+// and mint some TWBTC to the receiver.
+// btcTxId is the bitcoin transaction id that did the deposit on btc side.
+func (env *SimEtherman) Mint(btcTxId [32]byte, receiverIdx int, amount int) (ethcommon.Hash, *MintParams) {
+	// Attention:
+	// Translate from ethereum idx to actual addresses.
+	params := env.GenMintParams(
+		&ParamConfig{
+			Receiver: receiverIdx,
+			Amount:   big.NewInt(int64(amount)),
+		},
+		btcTxId,
+	)
+
+	// Call the real mint() on chain.
 	tx, err := env.Etherman.Mint(params)
 	if err != nil {
 		logger.Fatal(err)
@@ -273,8 +331,16 @@ func (env *SimEtherman) Mint(receiver int, amount int) (ethcommon.Hash, *MintPar
 	return tx.Hash(), params
 }
 
-func (env *SimEtherman) Approve(requester int, amount int) ethcommon.Hash {
-	balBefore, err := env.Etherman.TWBTCBalanceOf(env.Chain.Accounts[requester].From)
+// !!! This is a convenient function.
+// It sends out an Approve() action on Ethereum (user action).
+// It selects a pre-stored eth account in as the requester.
+// and approves some TWBTC to be spent by our bridge.
+func (env *SimEtherman) Approve(requesterIdx int, amount int) ethcommon.Hash {
+	// TODO: auth can be passed in? (align with requesterIdx)
+	// Otherwise nonce maybe reused and creates conflict.
+	auth := env.Chain.Accounts[requesterIdx]
+
+	balBefore, err := env.Etherman.TWBTCBalanceOf(auth.From)
 	if err != nil {
 		logger.Fatal(err)
 	}
@@ -282,7 +348,7 @@ func (env *SimEtherman) Approve(requester int, amount int) ethcommon.Hash {
 		logger.Fatal("insufficient balance")
 	}
 
-	tx, err := env.Etherman.TWBTCApprove(env.Chain.Accounts[requester], big.NewInt(int64(amount)))
+	tx, err := env.Etherman.TWBTCApprove(auth, big.NewInt(int64(amount)))
 	if err != nil {
 		logger.Fatal(err)
 	}
@@ -290,8 +356,14 @@ func (env *SimEtherman) Approve(requester int, amount int) ethcommon.Hash {
 	return tx.Hash()
 }
 
-func (env *SimEtherman) Request(auth *bind.TransactOpts, requester int, amount int, btcAddrIdx int) (ethcommon.Hash, *RequestParams) {
-	allowed, err := env.Etherman.TWBTCAllowance(env.Chain.Accounts[requester].From)
+// !!! This is a convenient function.
+// It sends out a request of redeem on Ethereum (user action).
+// Eth Tx sender is auth, shall be align with requesterIdx.
+// It selects a pre-stored eth account as the requester.
+// It selects a pre-stored btc address as teh receiver.
+func (env *SimEtherman) Request(auth *bind.TransactOpts, requesterIdx int, amount int, btcAddrIdx int) (ethcommon.Hash, *RequestParams) {
+	// Check the allowance of TWBTC
+	allowed, err := env.Etherman.TWBTCAllowance(env.Chain.Accounts[requesterIdx].From)
 	if err != nil {
 		logger.Fatal(err)
 	}
@@ -299,8 +371,11 @@ func (env *SimEtherman) Request(auth *bind.TransactOpts, requester int, amount i
 		logger.Fatal("insufficient allowance")
 	}
 
+	// Attention:
+	// Translate from ethereum idx to actual addresses.
+	// Translate from bitcoin idx to actual addresses.
 	params := env.GenRequestParams(&ParamConfig{
-		Requester:  requester,
+		Requester:  requesterIdx,
 		Amount:     big.NewInt(int64(amount)),
 		BtcAddrIdx: btcAddrIdx,
 	})
@@ -312,15 +387,24 @@ func (env *SimEtherman) Request(auth *bind.TransactOpts, requester int, amount i
 	return tx.Hash(), params
 }
 
+// !!! This is a convenient function.
+// It sends out a prepare of redeem on Ethereum (bridge action).
+// It selects a pre-stored eth account as the requester.
+// It selects a pre-stored btc address as teh receiver.
+// It fakes the outpointTxIds and outpointIdxs (on btc).
+// It also fakes requestTxHash (on ethereum)
 func (env *SimEtherman) Prepare(
-	requester int, amount int, btcAddrIdx int, outpointNum int,
+	requesterIdx int, amount int, btcAddrIdx int, outpointNum int,
 ) (ethcommon.Hash, *PrepareParams) {
+	// Attention:
+	// Create fake "redeem prepare" parameters.
 	params := env.GenPrepareParams(&ParamConfig{
-		Requester:   requester,
+		Requester:   requesterIdx,
 		Amount:      big.NewInt(int64(amount)),
 		BtcAddrIdx:  btcAddrIdx,
 		OutpointNum: outpointNum,
 	})
+	// Do the real redeem prepare on chain.
 	tx, err := env.Etherman.RedeemPrepare(params)
 	if err != nil {
 		logger.Fatal(err)
@@ -329,6 +413,9 @@ func (env *SimEtherman) Prepare(
 	return tx.Hash(), params
 }
 
+// Fetch a pre-stored ethereum account in the simulated chain.
+// Set its nonce +1. Very useful if you send multiple tx in a block.
+// The nonce won't conflict with each other.
 func (env *SimEtherman) GetAuth(idx int) *bind.TransactOpts {
 	if idx < 0 || idx > 9 {
 		logger.Fatal("invalid account index")

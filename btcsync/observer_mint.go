@@ -1,7 +1,8 @@
 package btcsync
 
 // This file implements an observer
-// that writes "mint" table in shared state.
+// that listens to BTC deposit events,
+// then writes "mint" table in shared state.
 // (which later will trigger BTC2EVM Mint on ETH side).
 
 import (

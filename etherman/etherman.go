@@ -49,10 +49,13 @@ type Etherman struct {
 
 	cfg *Config
 
-	auth *bind.TransactOpts
+	auth *bind.TransactOpts // ethereum account controlled by bridge.
 	mu   sync.Mutex
 }
 
+// Create a new Etherman instance.
+// auth is used to sign bridge txs (mint, redeemRequest, redeemPrepare).
+// So auth should have some eth (as gas) within it.
 func NewEtherman(cfg *Config, auth *bind.TransactOpts) (*Etherman, error) {
 	ethClient, err := ethclient.Dial(cfg.URL)
 	if err != nil {
@@ -169,6 +172,9 @@ func (etherman *Etherman) GetEventLogs(blockNum *big.Int) (
 	return minted, redeemRequested, redeemPrepared, nil
 }
 
+// !!! Bridge initiates this tx !!!
+// Call the function mint() on smart contract.
+// This really generates TWBTC to user on the chain.
 func (etherman *Etherman) Mint(params *MintParams) (*types.Transaction, error) {
 	contract, err := etherman.getBridgeContract()
 	if err != nil {
@@ -194,6 +200,11 @@ func (etherman *Etherman) Mint(params *MintParams) (*types.Transaction, error) {
 	)
 }
 
+// !!! User initiates this tx !!!
+// Call the function redeemRequest() on smart contract.
+// sender = auth. (a user/client, ethereum side, the twbtc owner)
+// amount = params.Amount
+// receiver = params.Receiver (btc address)
 func (etherman *Etherman) RedeemRequest(auth *bind.TransactOpts, params *RequestParams) (*types.Transaction, error) {
 	contract, err := etherman.getBridgeContract()
 	if err != nil {
@@ -203,13 +214,17 @@ func (etherman *Etherman) RedeemRequest(auth *bind.TransactOpts, params *Request
 	return contract.RedeemRequest(auth, params.Amount, string(params.Receiver))
 }
 
+// !!! Bridge initiates this tx !!!
+// Create a real "Redeem Prepare" on the bridge contract.
+// This locks a set of BTC UTXOs = list[(txid, vout)] on the bridge contract.
 func (etherman *Etherman) RedeemPrepare(params *PrepareParams) (*types.Transaction, error) {
 	contract, err := etherman.getBridgeContract()
 	if err != nil {
 		return nil, err
 	}
 
-	outpointTxIds := [][32]byte{}
+	// convert ethcommon.Hash to [32]byte
+	outpointTxIds := [][32]byte{} // a slice of [32]byte
 	for _, txid := range params.OutpointTxIds {
 		outpointTxIds = append(outpointTxIds, txid)
 	}
@@ -264,6 +279,7 @@ func (etherman *Etherman) TWBTCBalanceOf(addr ethcommon.Address) (*big.Int, erro
 	return balance, nil
 }
 
+// Approve from auth (owner) the amount of TWBTC that can be spent by our bridge (spender).
 func (etherman *Etherman) TWBTCApprove(auth *bind.TransactOpts, amount *big.Int) (*types.Transaction, error) {
 	contract, err := etherman.getTWBTCContract()
 	if err != nil {
@@ -273,6 +289,7 @@ func (etherman *Etherman) TWBTCApprove(auth *bind.TransactOpts, amount *big.Int)
 	return contract.Approve(auth, etherman.cfg.BridgeContractAddress, amount)
 }
 
+// Check the allowance of TWBTC (from owner) that can be spent by our bridge (spender).
 func (etherman *Etherman) TWBTCAllowance(owner ethcommon.Address) (*big.Int, error) {
 	contract, err := etherman.getTWBTCContract()
 	if err != nil {
