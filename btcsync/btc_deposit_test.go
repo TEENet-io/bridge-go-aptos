@@ -265,17 +265,17 @@ func TestDeposit(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		ethEnv.st.Start(ctx)
+		ethEnv.st.Start(ctx) // state db
 	}()
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		ethEnv.mgr.Start(ctx)
+		ethEnv.mgr.Start(ctx) // eth-side manager
 	}()
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		ethEnv.sync.Sync(ctx)
+		ethEnv.sync.Sync(ctx) // eth-side synchronizer
 	}()
 
 	time.Sleep(1 * time.Second)
@@ -299,7 +299,9 @@ func TestDeposit(t *testing.T) {
 	}
 
 	// Setup the btc monitor
-	monitor, err := setupBtcMonitor(t, r, internal_st, 0)
+	latest_height, _ := r.GetLatestBlockHeight()
+	// Attention: we start from the latest block height on BTC for clean slate.
+	monitor, err := setupBtcMonitor(t, r, internal_st, int(latest_height))
 	if err != nil {
 		t.Fatalf("cannot create monitor, %v", err)
 	}
