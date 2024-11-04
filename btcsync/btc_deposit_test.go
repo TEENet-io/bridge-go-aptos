@@ -22,7 +22,9 @@ import (
 	"github.com/TEENet-io/bridge-go/btcman/assembler"
 	"github.com/TEENet-io/bridge-go/btcman/rpc"
 	"github.com/TEENet-io/bridge-go/btcman/utxo"
+	"github.com/TEENet-io/bridge-go/btctxmanager"
 	"github.com/TEENet-io/bridge-go/btcvault"
+	"github.com/TEENet-io/bridge-go/common"
 	sharedcommon "github.com/TEENet-io/bridge-go/common"
 	"github.com/TEENet-io/bridge-go/etherman"
 	"github.com/TEENet-io/bridge-go/ethsync"
@@ -41,12 +43,13 @@ const (
 	MIN_BLOCKS  = 1   // Minimum step to generate blocks
 	SAFE_BLOCKS = 6   // Minimum confirm threshold to consider Tx is finalized.
 
-	SEND_SATOSHI    = 0.1 * 1e8   // 0.1 btc
+	// SEND_SATOSHI    = 0.1 * 1e8   // 0.1 btc
 	FEE_SATOSHI     = 0.001 * 1e8 // 0.001 btc
 	DEPOSIT_SATOSHI = 0.2 * 1e8   // 0.2 btc
+	REDEEM_SATOSHI  = 0.1 * 1e8   // 0.1 btc (half of deposit)
 
-	TEST_EVM_RECEIVER = "0x8ddF05F9A5c488b4973897E278B58895bF87Cb24" // random pick up from etherscan.io
-	TEST_EVM_ID       = 1                                            // eth mainnet
+	// TEST_EVM_RECEIVER = "0x8ddF05F9A5c488b4973897E278B58895bF87Cb24" // random pick up from etherscan.io
+	// TEST_EVM_ID = 1 // eth mainnet
 
 	// This btc wallet holds a lot of money.
 	// Also acts the coinbase receiver (block mines and reward goes to this address)
@@ -73,11 +76,11 @@ const (
 	timeoutOnMonitoringPendingTxs = 10
 
 	// eth chain
-	CHAIN_ID_INT64 = 1337 // Use 1337 as simulated chain id
+	EVM_CHAIN_ID_INT64 = 1337 // Use 1337 as simulated chain id
 )
 
 // eth chain
-var SimulatedChainID = big.NewInt(CHAIN_ID_INT64)
+var SimulatedChainID = big.NewInt(EVM_CHAIN_ID_INT64)
 
 // *** Begin configuration of BTC side ***
 
@@ -179,7 +182,7 @@ type testEnv struct {
 }
 
 // Setup ETH side facilities
-func newTestEnv(t *testing.T, file string, btcChainConfig *chaincfg.Params) *testEnv {
+func newTestEnv(t *testing.T, file string, btcChainConfig *chaincfg.Params, btcWallet ethtxmanager.BtcWallet) *testEnv {
 
 	sim, err := etherman.NewSimEtherman()
 	assert.NoError(t, err)
@@ -224,8 +227,6 @@ func newTestEnv(t *testing.T, file string, btcChainConfig *chaincfg.Params) *tes
 		TimeoutOnWaitingForOutpoints:  timtoutOnWaitingForOutpoints,
 		TimeoutOnMonitoringPendingTxs: timeoutOnMonitoringPendingTxs,
 	}
-	// TODO use our btc wallet instead (used in redeem, currently no harm in deposit test)
-	btcWallet := &ethtxmanager.MockBtcWallet{}
 	// TODO change to network-based, multi-party schnorr wallet
 	schnorrWallet := &ethtxmanager.MockSchnorrThresholdWallet{Sim: sim}
 	mgr, err := ethtxmanager.NewEthTxManager(cfg, sim.Etherman, statedb, mgrdb, schnorrWallet, btcWallet)
@@ -244,14 +245,29 @@ func (env *testEnv) close() {
 // *** End configuration of ETH side ***
 
 func TestDeposit(t *testing.T) {
+	common.Debug = true
+	defer func() {
+		common.Debug = false
+	}()
+
 	// Setup the db file name,
 	// this HUGE file is shared as a single db file for btc-side and eth-side state storage.
 	db_file_name := setupDBFile()
 	defer rmFile(db_file_name)
 	t.Logf("db file name: %s", db_file_name)
 
+	// 1) Create a UTXO vault storage
+	vault_st, err := btcvault.NewSQLiteStorage(db_file_name, p3_legacy_addr_str)
+	if err != nil {
+		t.Fatalf("cannot create vault storage %v", err)
+	}
+
+	// 2) Create a UTXO vault to track a specific btc address
+	// This is shared between btc monitor and eth tx manager.
+	my_btc_vault := btcvault.NewTreasureVault(p3_legacy_addr_str, vault_st)
+
 	// ** Begins the setup of ETH side ***
-	ethEnv := newTestEnv(t, db_file_name, assembler.GetRegtestParams())
+	ethEnv := newTestEnv(t, db_file_name, assembler.GetRegtestParams(), my_btc_vault)
 	defer ethEnv.close()
 
 	// shortcut to push eth side to mine a block
@@ -291,16 +307,37 @@ func TestDeposit(t *testing.T) {
 	}
 	defer r.Close()
 
-	// Setup the sqlite db for btc-side manager state (for redeem, useless in deposit test)
-	internal_st, err := btcaction.NewSQLiteRedeemStorage(db_file_name)
+	// Setup the sqlite db for btc-side tx manager state (for redeem, useless in deposit test)
+	btc_mgr_st, err := btcaction.NewSQLiteRedeemStorage(db_file_name)
 	if err != nil {
 		t.Fatalf("cannot create backend storage %v", err)
 	}
 
+	// *** Setup the btc tx manager ***
+	// Create a sender (p3)
+	bridge_btc_wallet, err := assembler.NewBasicSigner(p3_legacy_priv_key_str, assembler.GetRegtestParams())
+	if err != nil {
+		t.Fatalf("cannot create wallet from private key %s", p3_legacy_priv_key_str)
+	}
+	bridge_wallet, err := assembler.NewLegacySigner(*bridge_btc_wallet)
+	if err != nil {
+		t.Fatalf("cannot create legacy wallet")
+	}
+
+	bridge_wallet_addr_str := bridge_wallet.P2PKH.EncodeAddress()
+	t.Logf("Bridge btc address: %s", bridge_wallet_addr_str)
+
+	btcTxMgr := btctxmanager.NewBtcTxManager(my_btc_vault, bridge_wallet, r, ethEnv.st, btc_mgr_st)
+
+	// Turn on evm2btc withdraw loop
+	go btcTxMgr.WithdrawLoop()
+
+	// *** End the setup of btc tx manager ***
+
 	// Setup the btc monitor
 	latest_height, _ := r.GetLatestBlockHeight()
 	// Attention: we start from the latest block height on BTC for clean slate.
-	monitor, err := setupBtcMonitor(t, r, internal_st, int(latest_height))
+	monitor, err := setupBtcMonitor(t, r, btc_mgr_st, int(latest_height))
 	if err != nil {
 		t.Fatalf("cannot create monitor, %v", err)
 	}
@@ -340,16 +377,6 @@ func TestDeposit(t *testing.T) {
 	// *** UTXO Observer ***
 	// Setup: UTXO Storage -> UTXO Vault -> UTXO Observer
 
-	// 1) Create a UTXO vault storage,
-	// specific to the a certain receiver address
-	vault_st, err := btcvault.NewSQLiteStorage(db_file_name, p3_legacy_addr_str)
-	if err != nil {
-		t.Fatalf("cannot create vault storage %v", err)
-	}
-
-	// 2) Create a UTXO vault
-	my_btc_vault := btcvault.NewTreasureVault(p3_legacy_addr_str, vault_st)
-
 	// 3) Create a UTXO observer
 	// It will stuff the UTXO vault with UTXO(s) once it gets notified
 	utxo_observer := NewObserverUTXOVault(my_btc_vault, CHANNEL_BUFFER_SIZE)
@@ -366,17 +393,17 @@ func TestDeposit(t *testing.T) {
 
 	// Send the deposit p2 -> p3
 	// Create a sender (p2)
-	b_wallet, err := assembler.NewBasicSigner(p2_legacy_priv_key_str, assembler.GetRegtestParams())
+	user_btc_wallet, err := assembler.NewBasicSigner(p2_legacy_priv_key_str, assembler.GetRegtestParams())
 	if err != nil {
 		t.Fatalf("cannot create wallet from private key %s", p2_legacy_priv_key_str)
 	}
-	wallet, err := assembler.NewLegacySigner(*b_wallet)
+	wallet, err := assembler.NewLegacySigner(*user_btc_wallet)
 	if err != nil {
 		t.Fatalf("cannot create legacy wallet")
 	}
 
 	wallet_addr_str := wallet.P2PKH.EncodeAddress()
-	t.Logf("Deposit Sender: %s", wallet_addr_str)
+	t.Logf("BTC Deposit Sender: %s", wallet_addr_str)
 
 	// Query for UTXOs of (p2)
 	// p2 simulates a personal user's wallet.
@@ -423,14 +450,18 @@ func TestDeposit(t *testing.T) {
 	t.Logf("utxo selected: %d", len(selected_utxos))
 
 	// Craft the [Deposit Tx]
+	// on EVM side: the receiver is env.Chain.Accounts[1].From
+	eth_side_receiver := ethEnv.sim.Chain.Accounts[1].From.String()
+
+	t.Logf("EVM receiver: %s", eth_side_receiver)
 	tx, err := wallet.MakeBridgeDepositTx(
 		selected_utxos,
 		bridge_address,
 		deposit_amount,
 		fee_amount,
 		change_addr,
-		TEST_EVM_RECEIVER,
-		TEST_EVM_ID,
+		eth_side_receiver,
+		EVM_CHAIN_ID_INT64,
 	)
 	if err != nil {
 		t.Fatalf("cannot create Tx %v", err)
@@ -519,6 +550,63 @@ func TestDeposit(t *testing.T) {
 	// Move ethereum blockchain forward to contain the token mint Tx.
 	commit()
 	// At this step, user's twbtc token balance on eth-side is credited.
+
+	// *** Below begins the EVM -> BTC withdraw process ***
+
+	// Peak the balance of p2, the btc user's balance.
+	p2_addr, _ := assembler.DecodeAddress(p2_legacy_addr_str, assembler.GetRegtestParams())
+	p2_balance_before_withdraw, _ := r.GetBalance(p2_addr, 1)
+
+	t.Logf("User balance (satoshi): %d", p2_balance_before_withdraw)
+
+	// Approve Bridge can use twbtc from account[1]
+	ethEnv.sim.Approve(1, REDEEM_SATOSHI)
+	commit()
+
+	// User request a redeem (p3 bridge, to p2 user)
+	reqTxHash, _ := ethEnv.sim.Request2(ethEnv.sim.GetAuth(1), 1, REDEEM_SATOSHI, p2_legacy_addr_str)
+	t.Logf("Redeem requested, txHash: %s", reqTxHash.String())
+	commit()
+	// Give it some time to process the requested redeem
+	time.Sleep(1 * time.Second)
+
+	// Give it time to let ethtxmanager to prepare the redeem
+	commit()
+	time.Sleep(1 * time.Second)
+
+	// wait for state to get prepared redeems
+	// loop retry_times, each interval sleep 1 second
+	var redeems []*state.Redeem
+	for i := 0; i < RETRY_TIMES; i++ {
+		redeems, err = ethEnv.st.GetPreparedRedeems()
+		if err != nil {
+			t.Fatalf("error retrieving redeems: %v", err)
+		}
+		if len(redeems) > 0 {
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+
+	if len(redeems) > 0 {
+		t.Logf("Redeem (prepared) captured successfully")
+	} else {
+		t.Fatalf("Redeem (prepared) not captured")
+	}
+
+	// Move btc chain forward
+	r.GenerateBlocks(MAX_BLOCKS, p1_addr)
+
+	p2_balance_after_withdraw, _ := r.GetBalance(p2_addr, 1)
+	t.Logf("User balance (satoshi): %d", p2_balance_after_withdraw)
+
+	// bridge wallet balance (p3) shall decrease
+	p3_balance_3, _ := r.GetBalance(p3_addr, 1)
+	if p3_balance_3 < p3_balance_2 {
+		t.Logf("Transfer successful on bitcoin blockchain")
+	} else {
+		t.Fatalf("Transfer failed")
+	}
 
 	cancel()  // guess: cancel() ends sub go routines politely.
 	wg.Wait() // wait for all the routines to complete.

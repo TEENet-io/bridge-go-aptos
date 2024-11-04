@@ -387,6 +387,39 @@ func (env *SimEtherman) Request(auth *bind.TransactOpts, requesterIdx int, amoun
 	return tx.Hash(), params
 }
 
+// Craft a request for redeem on Ethereum.
+func (env *SimEtherman) Request2(auth *bind.TransactOpts, requesterIdx int, amount int, btcAddr string) (ethcommon.Hash, *RequestParams) {
+	// Check the allowance of TWBTC
+	allowed, err := env.Etherman.TWBTCAllowance(env.Chain.Accounts[requesterIdx].From)
+	if err != nil {
+		logger.Fatal(err)
+	}
+	if allowed.Uint64() < uint64(amount) {
+		logger.Fatal("insufficient allowance")
+	}
+
+	// Attention:
+	// Translate from ethereum idx to actual addresses.
+	// Translate from bitcoin idx to actual addresses.
+	params := env.GenRequestParams(&ParamConfig{
+		Requester:  requesterIdx,
+		Amount:     big.NewInt(int64(amount)),
+		BtcAddrIdx: 0,
+	})
+
+	// Set the btc receiver address to a real one.
+	params.Receiver = btcAddr
+
+	logger.Infof("request params: %+v", params)
+
+	tx, err := env.Etherman.RedeemRequest(auth, params)
+	if err != nil {
+		logger.Fatal(err)
+	}
+
+	return tx.Hash(), params
+}
+
 // !!! This is a convenient function.
 // It sends out a prepare of redeem on Ethereum (bridge action).
 // It selects a pre-stored eth account as the requester.

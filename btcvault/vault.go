@@ -5,6 +5,8 @@ import (
 	"sync"
 	"time"
 
+	"math/big"
+
 	"github.com/TEENet-io/bridge-go/state"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 )
@@ -150,10 +152,10 @@ func (tv *TreasureVault) GetUTXODetail(txID string, vout int32) (*VaultUTXO, err
 // to interact with ETH Tx Manager
 func (tv *TreasureVault) Request(
 	reqTxId ethcommon.Hash,
-	amount int64,
+	amount *big.Int,
 	ch chan<- []state.Outpoint,
 ) error {
-	utxos, err := tv.ChooseAndLock(amount)
+	utxos, err := tv.ChooseAndLock(amount.Int64())
 	if err != nil {
 		return err
 	}

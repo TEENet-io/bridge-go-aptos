@@ -81,6 +81,7 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 			num := new(big.Int).Add(s.lastFinalized, big.NewInt(1))
 			for num.Cmp(newFinalized) != 1 {
 				minted, requested, prepared, err := s.etherman.GetEventLogs(num)
+				logger.Infof("minted %d, requested %d, prepared %d", len(minted), len(requested), len(prepared))
 				if err != nil {
 					return err
 				}
@@ -96,14 +97,16 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 				}
 
 				for _, ev := range requested {
-					logger.Debugf("found event RedeemRequested: reqTx=0x%x, amount=%v", ev.TxHash, ev.Amount)
-					s.st.GetNewRedeemRequestedEventChannel() <- &RedeemRequestedEvent{
+					logger.Debugf("found event RedeemRequested: reqTx=0x%x, amount=%v, receiver(btc)=%s, sender(evm)=%s", ev.TxHash, ev.Amount, ev.Receiver, ev.Sender.String())
+					x := &RedeemRequestedEvent{
 						RequestTxHash:   ev.TxHash,
 						Requester:       ev.Sender,
 						Amount:          new(big.Int).Set(ev.Amount),
 						Receiver:        ev.Receiver,
 						IsValidReceiver: common.IsValidBtcAddress(ev.Receiver, s.cfg.BtcChainConfig),
 					}
+					logger.Debugf("requester(evm)=%s, receiver(btc)=%s, IsValidReceiver=%v", x.Requester.String(), x.Receiver, x.IsValidReceiver)
+					s.st.GetNewRedeemRequestedEventChannel() <- x
 				}
 
 				for _, ev := range prepared {
