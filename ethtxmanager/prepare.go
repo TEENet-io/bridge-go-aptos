@@ -60,7 +60,7 @@ func (txmgr *EthTxManager) prepareRedeem(ctx context.Context, redeem *state.Rede
 	if err != nil {
 		return err
 	}
-	newLogger.Debug("outpoints received")
+	newLogger.Debug("outpoints received: %d", len(outpoints))
 
 	// Compute the signing hash
 	redeem.Outpoints = append([]state.Outpoint{}, outpoints...)

@@ -12,6 +12,7 @@ package btctxmanager
 import (
 	"time"
 
+	"github.com/0xPolygonHermez/zkevm-node/log"
 	"github.com/TEENet-io/bridge-go/btcaction"
 	"github.com/TEENet-io/bridge-go/btcman/assembler"
 	"github.com/TEENet-io/bridge-go/btcman/rpc"
@@ -24,7 +25,7 @@ import (
 )
 
 const (
-	QUERY_DB_INTERVAL = 10 * time.Second
+	QUERY_DB_INTERVAL = 1 * time.Second
 	BTC_TX_FEE        = int64(0.001 * 1e8)
 )
 
@@ -34,6 +35,16 @@ type BtcTxManager struct {
 	myBtcClient   *rpc.RpcClient                // send/query btc blockchain.
 	sharedState   *state.State                  // fetch and update the shared state. (communicate with eth side)
 	mgrState      btcaction.RedeemActionStorage // tracker of redeems.
+}
+
+func NewBtcTxManager(treasureVault *btcvault.TreasureVault, legacySigner *assembler.LegacySigner, myBtcClient *rpc.RpcClient, sharedState *state.State, mgrState btcaction.RedeemActionStorage) *BtcTxManager {
+	return &BtcTxManager{
+		treasureVault: treasureVault,
+		legacySigner:  legacySigner,
+		myBtcClient:   myBtcClient,
+		sharedState:   sharedState,
+		mgrState:      mgrState,
+	}
 }
 
 // Find "prepared" redeems from local shared "state"
@@ -50,7 +61,7 @@ func (m *BtcTxManager) FindRedeems() ([]*state.Redeem, error) {
 func (m *BtcTxManager) FetchUTXOs(redeem *state.Redeem) ([]*btcvault.VaultUTXO, error) {
 	var utxos []*btcvault.VaultUTXO
 	for _, outpoint := range redeem.Outpoints {
-		clean_txid := outpoint.TxId.String()
+		clean_txid := utils.Remove0xPrefix(outpoint.TxId.String())
 		utxo, err := m.treasureVault.GetUTXODetail(clean_txid, int32(outpoint.Idx))
 		if err != nil {
 			return nil, err
@@ -136,10 +147,13 @@ func (m *BtcTxManager) WithdrawBTC(redeem *state.Redeem) (*chainhash.Hash, error
 func (m *BtcTxManager) WithdrawLoop() {
 	for {
 		redeems, err := m.FindRedeems()
+		// if len(redeems) > 0 {
+		// 	log.Infof("Found redeems: %d", len(redeems))
+		// }
 		if err != nil {
 			// Log the error and continue
 			// Assuming there's a logger in the actual implementation
-			// log.Errorf("Failed to find redeems: %v", err)
+			log.Errorf("Failed to find redeems: %v", err)
 			time.Sleep(QUERY_DB_INTERVAL)
 			continue
 		}
@@ -151,20 +165,22 @@ func (m *BtcTxManager) WithdrawLoop() {
 			exists, err := m.mgrState.HasRedeem(reqTxHash)
 			if err != nil {
 				// Log the error and continue with the next redeem
-				// log.Errorf("Failed to check redeem record for %v: %v", redeem.RequestTxId, err)
+				log.Errorf("Failed to check redeem record for %v: %v", reqTxHash, err)
 				continue
 			}
 
 			if exists {
 				// If a record of the redeem already exists, continue with the next redeem
+				log.Infof("BTC withdraw tracking in mgrState, reqTxHash(eth)=0x%v", reqTxHash)
 				continue
 			}
 
 			// New Redeem!
+			log.Infof("BTC withdraw on reqTxHash(eth)=0x%v", reqTxHash)
 			btcTxId, err := m.WithdrawBTC(redeem)
 			if err != nil {
 				// Log the error and continue with the next redeem
-				// log.Errorf("Failed to withdraw BTC for redeem %v: %v", redeem, err)
+				log.Errorf("Failed to withdraw BTC for redeem %v: %v", redeem, err)
 				continue
 			}
 

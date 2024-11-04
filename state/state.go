@@ -181,6 +181,7 @@ func (st *State) Start(ctx context.Context) error {
 
 				// Create a new redeem and save it to the database
 				redeem, err := createRedeemFromRequestedEvent(ev)
+				// newLogger.Debugf("redeem: %v", redeem)
 				if err != nil {
 					newLogger.Errorf("failed to create redeem from requested event: err=%v, ev=%v", err, ev)
 					return ErrRequestedEventInvalid
