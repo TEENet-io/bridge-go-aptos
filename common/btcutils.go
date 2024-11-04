@@ -34,7 +34,10 @@ func Sign(sk *btcec.PrivateKey, msg []byte) (*big.Int, *big.Int, error) {
 	return new(big.Int).SetBytes(bytes[:32]), new(big.Int).SetBytes(bytes[32:]), nil
 }
 
+// TODO: rx and s are both 32 bytes, or just pass in b as 64 bytes
 func Verify(pub, msg []byte, rx, s *big.Int) bool {
+	// fill (rx, s) => b
+	// [32]byte + [32]byte => [64]byte
 	b := []byte{}
 	RX := BigInt2Bytes32(rx)
 	S := BigInt2Bytes32(s)
@@ -47,6 +50,7 @@ func Verify(pub, msg []byte, rx, s *big.Int) bool {
 		return false
 	}
 
+	// b (64byte) => signature object
 	sig, err := schnorr.ParseSignature(b[:])
 	if err != nil {
 		return false
