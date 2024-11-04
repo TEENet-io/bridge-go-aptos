@@ -12,8 +12,8 @@ Components
 Live Components
 
 - [] main.go
-- [] BTC Deposit Sender.go
+- [x] BTC Deposit Sender.go
 - [x] BTC Live Node
-- [] TWBTC Redeem Sender.go
+- [x] TWBTC Redeem Sender.go
 - [x] ETH Live Node (use memory chain)
 - [] Logger
