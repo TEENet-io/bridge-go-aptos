@@ -209,9 +209,8 @@ func newTestEnv(t *testing.T, file string, btcChainConfig *chaincfg.Params) *tes
 		st,
 		&ethsync.Config{
 			FrequencyToCheckEthFinalizedBlock: frequencyToCheckEthFinalizedBlock,
-			// TODO, can be other network params.
-			BtcChainConfig: btcChainConfig,
-			EthChainID:     chainID,
+			BtcChainConfig:                    btcChainConfig,
+			EthChainID:                        chainID,
 		},
 	)
 	assert.NoError(t, err)
