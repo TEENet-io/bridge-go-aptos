@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
-	logger "github.com/0xPolygonHermez/zkevm-node/log"
 	"github.com/ethereum/go-ethereum"
+	logger "github.com/sirupsen/logrus"
 )
 
 var (
@@ -21,10 +21,10 @@ var (
 // 1. Check if the tx is mined, if mined, update its status to either "success" or "reverted"
 // 2. Check if the tx is timeout for monitoring, if yes, update its status to "timeout"
 func (txmgr *EthTxManager) monitorPendingTxs(ctx context.Context, mtx *MonitoredTx) error {
-	newLogger := logger.WithFields(
-		"txHash", mtx.TxHash.String(),
-		"Id", mtx.Id.String(),
-	)
+	newLogger := logger.WithFields(logger.Fields{
+		"txHash": mtx.TxHash.String(),
+		"Id":     mtx.Id.String(),
+	})
 
 	// get transaction receipt
 	receipt, err := txmgr.etherman.Client().TransactionReceipt(ctx, mtx.TxHash)
@@ -42,7 +42,7 @@ func (txmgr *EthTxManager) monitorPendingTxs(ctx context.Context, mtx *Monitored
 			newLogger.Error("tx mined but reverted")
 			status = Reverted
 		} else {
-			newLogger.Info("tx mined and successfully executed")
+			newLogger.Debug("tx mined and successfully executed")
 			status = Success
 		}
 		err := txmgr.mgrdb.UpdateMonitoredTxStatus(mtx.TxHash, status)

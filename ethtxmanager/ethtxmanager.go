@@ -6,11 +6,11 @@ import (
 	"sync"
 	"time"
 
-	logger "github.com/0xPolygonHermez/zkevm-node/log"
 	"github.com/TEENet-io/bridge-go/common"
 	"github.com/TEENet-io/bridge-go/etherman"
 	"github.com/TEENet-io/bridge-go/state"
 	ethcommon "github.com/ethereum/go-ethereum/common"
+	logger "github.com/sirupsen/logrus"
 )
 
 var (
@@ -63,8 +63,8 @@ func NewEthTxManager(
 }
 
 func (txmgr *EthTxManager) Start(ctx context.Context) error {
-	logger.Info("starting eth tx manager")
-	defer logger.Info("stopping eth tx manager")
+	logger.Debug("starting eth tx manager")
+	defer logger.Debug("stopping eth tx manager")
 
 	tickerToPrepare := time.NewTicker(txmgr.cfg.FrequencyToPrepareRedeem)
 	defer tickerToPrepare.Stop()

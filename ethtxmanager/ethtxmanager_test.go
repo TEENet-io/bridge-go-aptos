@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	logger "github.com/0xPolygonHermez/zkevm-node/log"
 	"github.com/TEENet-io/bridge-go/common"
 	"github.com/TEENet-io/bridge-go/etherman"
 	"github.com/TEENet-io/bridge-go/ethsync"
@@ -17,6 +16,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	_ "github.com/mattn/go-sqlite3"
+	logger "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -509,7 +509,7 @@ func TestMainRoutine(t *testing.T) {
 	wg.Wait() // wait for all the routines to complete.
 }
 
-func printCurrBlockNumber(env *testEnv, txt string) {
+func printCurrBlockNumber(env *testEnv, action string) {
 	blk, _ := env.sim.Chain.Backend.Client().BlockByNumber(context.Background(), nil)
-	logger.Debugf("%s at block=%v", txt, blk.Number())
+	logger.WithField("block", blk.Number()).Debug(action)
 }

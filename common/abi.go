@@ -6,9 +6,9 @@ import (
 	"math/big"
 	"strings"
 
-	logger "github.com/0xPolygonHermez/zkevm-node/log"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
+	logger "github.com/sirupsen/logrus"
 )
 
 func EncodePacked(values ...interface{}) []byte {

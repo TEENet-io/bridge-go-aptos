@@ -4,9 +4,9 @@ import (
 	"database/sql"
 	"math/big"
 
-	logger "github.com/0xPolygonHermez/zkevm-node/log"
 	"github.com/TEENet-io/bridge-go/common"
 	ethcommon "github.com/ethereum/go-ethereum/common"
+	logger "github.com/sirupsen/logrus"
 )
 
 func RandRedeem(status RedeemStatus) *Redeem {

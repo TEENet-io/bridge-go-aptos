@@ -5,10 +5,10 @@ import (
 	"math/big"
 	"testing"
 
-	logger "github.com/0xPolygonHermez/zkevm-node/log"
 	"github.com/TEENet-io/bridge-go/common"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
+	logger "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 
-	logger "github.com/0xPolygonHermez/zkevm-node/log"
 	"github.com/TEENet-io/bridge-go/common"
 	"github.com/TEENet-io/bridge-go/etherman"
 	"github.com/TEENet-io/bridge-go/state"
+	logger "github.com/sirupsen/logrus"
 )
 
 var (
@@ -21,7 +21,7 @@ func (txmgr *EthTxManager) mint(ctx context.Context, mint *state.Mint) error {
 	txmgr.mintLock.Store(mint.BtcTxId, true)
 	defer txmgr.mintLock.Delete(mint.BtcTxId)
 
-	newLogger := logger.WithFields("btcTxId", mint.BtcTxId.String())
+	newLogger := logger.WithField("btcTxId", mint.BtcTxId.String())
 
 	// Check the mint status on bridge contract.
 	ok, err := txmgr.etherman.IsMinted(mint.BtcTxId)
@@ -72,7 +72,7 @@ func (txmgr *EthTxManager) mint(ctx context.Context, mint *state.Mint) error {
 
 func (txmgr *EthTxManager) handleMintTx(
 	params *etherman.MintParams,
-	logger *logger.Logger,
+	logger *logger.Entry,
 ) error {
 	// Get the latest block
 	latest, err := txmgr.etherman.Client().HeaderByNumber(context.Background(), nil)
@@ -88,7 +88,7 @@ func (txmgr *EthTxManager) handleMintTx(
 		return ErrEthermanMint
 	}
 
-	newLogger := logger.WithFields("mintTx", tx.Hash().String())
+	newLogger := logger.WithField("mintTx", tx.Hash().String())
 	newLogger.Debugf("mint tx sent: tx=%s", tx.Hash().String())
 
 	// Save the monitored tx

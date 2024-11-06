@@ -2,13 +2,14 @@ package ethsync
 
 import (
 	"context"
+	"encoding/hex"
 	"math/big"
 	"time"
 
-	logger "github.com/0xPolygonHermez/zkevm-node/log"
 	"github.com/TEENet-io/bridge-go/common"
 	"github.com/TEENet-io/bridge-go/etherman"
 	ethcommon "github.com/ethereum/go-ethereum/common"
+	logger "github.com/sirupsen/logrus"
 )
 
 const MinTickerDuration = 100 * time.Millisecond
@@ -50,9 +51,9 @@ func New(
 }
 
 func (s *Synchronizer) Sync(ctx context.Context) error {
-	logger.Info("starting Eth synchronization")
+	logger.Debug("starting Eth synchronization")
 	defer func() {
-		logger.Info("stopping Eth synchronization")
+		logger.Debug("stopping Eth synchronization")
 	}()
 
 	ethTicker := time.NewTicker(s.cfg.FrequencyToCheckEthFinalizedBlock)
@@ -81,13 +82,21 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 			num := new(big.Int).Add(s.lastFinalized, big.NewInt(1))
 			for num.Cmp(newFinalized) != 1 {
 				minted, requested, prepared, err := s.etherman.GetEventLogs(num)
-				logger.Infof("minted %d, requested %d, prepared %d", len(minted), len(requested), len(prepared))
+				logger.WithFields(logger.Fields{
+					"minted":    len(minted),
+					"requested": len(requested),
+					"prepared":  len(prepared),
+				}).Debug("events")
 				if err != nil {
 					return err
 				}
 
 				for _, ev := range minted {
-					logger.Debugf("found event Minted: mintTx=0x%x, amount=%v, receiver=%s", ev.TxHash, ev.Amount, ev.Receiver)
+					logger.WithFields(logger.Fields{
+						"mintTx":        "0x" + hex.EncodeToString(ev.TxHash[:]),
+						"amount":        ev.Amount,
+						"receiver(btc)": ev.Receiver,
+					}).Debug("Minted event")
 					s.st.GetNewMintedEventChannel() <- &MintedEvent{
 						MintTxHash: ev.TxHash,
 						BtcTxId:    ev.BtcTxId,
@@ -97,7 +106,12 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 				}
 
 				for _, ev := range requested {
-					logger.Debugf("found event RedeemRequested: reqTx=0x%x, amount=%v, receiver(btc)=%s, sender(evm)=%s", ev.TxHash, ev.Amount, ev.Receiver, ev.Sender.String())
+					logger.WithFields(logger.Fields{
+						"reqTx":         "0x" + hex.EncodeToString(ev.TxHash[:]),
+						"amount":        ev.Amount,
+						"receiver(btc)": ev.Receiver,
+						"sender(evm)":   ev.Sender.String(),
+					}).Debug("RedeemRequested event")
 					x := &RedeemRequestedEvent{
 						RequestTxHash:   ev.TxHash,
 						Requester:       ev.Sender,
@@ -105,13 +119,20 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 						Receiver:        ev.Receiver,
 						IsValidReceiver: common.IsValidBtcAddress(ev.Receiver, s.cfg.BtcChainConfig),
 					}
-					logger.Debugf("requester(evm)=%s, receiver(btc)=%s, IsValidReceiver=%v", x.Requester.String(), x.Receiver, x.IsValidReceiver)
+					logger.WithFields(logger.Fields{
+						"requester(evm)":  x.Requester.String(),
+						"receiver(btc)":   x.Receiver,
+						"IsValidReceiver": x.IsValidReceiver,
+					}).Debug("RedeemRequested details")
 					s.st.GetNewRedeemRequestedEventChannel() <- x
 				}
 
 				for _, ev := range prepared {
-					logger.Debugf("found event RedeemPrepared: prepTx=0x%x, reqTx=0x%x, requester=%s",
-						ev.TxHash, ev.EthTxHash, ev.Requester)
+					logger.WithFields(logger.Fields{
+						"prepTx":         "0x" + hex.EncodeToString(ev.TxHash[:]),
+						"reqTx":          "0x" + hex.EncodeToString(ev.EthTxHash[:]),
+						"requester(evm)": ev.Requester.String(),
+					}).Debug("RedeemPrepared event")
 
 					outpointTxIds := []ethcommon.Hash{}
 					for _, txid := range ev.OutpointTxIds {

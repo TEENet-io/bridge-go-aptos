@@ -14,8 +14,9 @@ Once an interested action is found, the monitor will notify all the observers.
 
 import (
 	"fmt"
-	"log"
 	"time"
+
+	logger "github.com/sirupsen/logrus"
 
 	"github.com/TEENet-io/bridge-go/btcaction"
 	"github.com/TEENet-io/bridge-go/btcman/rpc"
@@ -109,11 +110,7 @@ func (m *BTCMonitor) Scan() error {
 					return fmt.Errorf("failed to craft deposit action: %v", err)
 					//TODO: shall add refund BTC logic here.
 				}
-				log.Printf("Deposit: %v", deposit.TxHash)
-				// log.Printf("Value: %v", deposit.DepositValue)
-				// log.Printf("Receiver: %v", deposit.DepositReceiver)
-				// log.Printf("EVM ID: %v", deposit.EvmID)
-				// log.Printf("EVM Addr: %v", deposit.EvmAddr)
+				logger.WithField("btcTxId", deposit.TxHash).Debug("Deposit")
 
 				observedUTXO := &ObservedUTXO{
 					BlockNumber: blockHeight,

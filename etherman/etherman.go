@@ -8,7 +8,6 @@ import (
 	"strings"
 	"sync"
 
-	logger "github.com/0xPolygonHermez/zkevm-node/log"
 	"github.com/TEENet-io/bridge-go/common"
 	bridge "github.com/TEENet-io/bridge-go/contracts/TEENetBtcBridge"
 	"github.com/TEENet-io/bridge-go/contracts/TWBTC"
@@ -19,6 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+	logger "github.com/sirupsen/logrus"
 )
 
 var (
@@ -59,7 +59,7 @@ type Etherman struct {
 func NewEtherman(cfg *Config, auth *bind.TransactOpts) (*Etherman, error) {
 	ethClient, err := ethclient.Dial(cfg.URL)
 	if err != nil {
-		logger.Errorf("failed to dial Ethereum node: url=%s, err=%v", cfg.URL, err)
+		logger.WithField("url", cfg.URL).Errorf("failed to dial Ethereum node: err=%v", err)
 		return nil, err
 	}
 
