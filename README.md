@@ -9,11 +9,19 @@ Components
 - [x] BTC Tx Manager (Redeem)
 - [x] BTC Synchronizer
 
+Test Components
+
+- [x] end-to-end test.go
+- [x] BTC Deposit Sender.go
+- [x] BTC reg-test Node
+- [x] TWBTC Redeem Sender.go
+- [x] ETH simulate Node (use memory chain)
+- [x] Logger
+
 Live Components
 
-- [] main.go
-- [x] BTC Deposit Sender.go
-- [x] BTC Live Node
-- [x] TWBTC Redeem Sender.go
-- [x] ETH Live Node (use memory chain)
-- [] Logger
+- [ ] BTC Testnet (connect to BTC Testnet)
+- [ ] ETH Hardhat / Testnet (connect to ETH Testnet)
+- [ ] bridge.go
+- [ ] btc-user.go
+- [ ] eth-user.go
