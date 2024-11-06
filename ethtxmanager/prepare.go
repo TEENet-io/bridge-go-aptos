@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 
-	logger "github.com/0xPolygonHermez/zkevm-node/log"
 	"github.com/TEENet-io/bridge-go/common"
 	"github.com/TEENet-io/bridge-go/etherman"
 	"github.com/TEENet-io/bridge-go/state"
 	ethcommon "github.com/ethereum/go-ethereum/common"
+	logger "github.com/sirupsen/logrus"
 )
 
 var (
@@ -30,7 +30,7 @@ func (txmgr *EthTxManager) prepareRedeem(ctx context.Context, redeem *state.Rede
 	txmgr.redeemLock.Store(redeem.RequestTxHash, true)
 	defer txmgr.redeemLock.Delete(redeem.RequestTxHash)
 
-	newLogger := logger.WithFields("requestTxHash", redeem.RequestTxHash.String())
+	newLogger := logger.WithField("requestTxHash", redeem.RequestTxHash.String())
 
 	// Check the redeem status on bridge contract. If false, either the redeem
 	// has been handled or there is a pending tx that tries to prepare the redeem.
@@ -136,7 +136,7 @@ func (txmgr *EthTxManager) waitForSignature(
 
 func (txmgr *EthTxManager) handleRedeemPrepareTx(
 	params *etherman.PrepareParams,
-	logger *logger.Logger,
+	logger *logger.Entry,
 ) error {
 	// Get the latest block
 	latest, err := txmgr.etherman.Client().HeaderByNumber(context.Background(), nil)
@@ -144,7 +144,7 @@ func (txmgr *EthTxManager) handleRedeemPrepareTx(
 		logger.Errorf("failed to get latest block: err=%v", err)
 		return ErrEthermanHeaderByNumber
 	}
-	logger.Debugf("got latest block: num=%d", latest.Number)
+	logger.WithField("latestBlockNumber", latest.Number).Debug("latest block")
 
 	// Send the tx to prepare the requested redeem
 	tx, err := txmgr.etherman.RedeemPrepare(params)
@@ -153,7 +153,7 @@ func (txmgr *EthTxManager) handleRedeemPrepareTx(
 		return ErrBridgeRedeemPrepare
 	}
 
-	newLogger := logger.WithFields("prepareTx", tx.Hash().String())
+	newLogger := logger.WithField("prepareTx", tx.Hash().String())
 	newLogger.Debug("tx sent to prepare redeem")
 
 	mt := &MonitoredTx{

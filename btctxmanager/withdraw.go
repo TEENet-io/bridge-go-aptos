@@ -12,7 +12,6 @@ package btctxmanager
 import (
 	"time"
 
-	"github.com/0xPolygonHermez/zkevm-node/log"
 	"github.com/TEENet-io/bridge-go/btcaction"
 	"github.com/TEENet-io/bridge-go/btcman/assembler"
 	"github.com/TEENet-io/bridge-go/btcman/rpc"
@@ -22,6 +21,7 @@ import (
 	"github.com/TEENet-io/bridge-go/state"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
+	logger "github.com/sirupsen/logrus"
 )
 
 const (
@@ -148,12 +148,12 @@ func (m *BtcTxManager) WithdrawLoop() {
 	for {
 		redeems, err := m.FindRedeems()
 		// if len(redeems) > 0 {
-		// 	log.Infof("Found redeems: %d", len(redeems))
+		// 	logger.Infof("Found redeems: %d", len(redeems))
 		// }
 		if err != nil {
 			// Log the error and continue
 			// Assuming there's a logger in the actual implementation
-			log.Errorf("Failed to find redeems: %v", err)
+			logger.Errorf("Failed to find redeems: %v", err)
 			time.Sleep(QUERY_DB_INTERVAL)
 			continue
 		}
@@ -165,22 +165,22 @@ func (m *BtcTxManager) WithdrawLoop() {
 			exists, err := m.mgrState.HasRedeem(reqTxHash)
 			if err != nil {
 				// Log the error and continue with the next redeem
-				log.Errorf("Failed to check redeem record for %v: %v", reqTxHash, err)
+				logger.WithField("reqTxHash", reqTxHash).Errorf("Failed to check redeem record: %v", err)
 				continue
 			}
 
 			if exists {
 				// If a record of the redeem already exists, continue with the next redeem
-				log.Infof("BTC withdraw tracking in mgrState, reqTxHash(eth)=0x%v", reqTxHash)
+				logger.WithField("reqTxHash", reqTxHash).Debug("BTC withdraw tracked")
 				continue
 			}
 
 			// New Redeem!
-			log.Infof("BTC withdraw on reqTxHash(eth)=0x%v", reqTxHash)
+			logger.WithField("reqTxHash", reqTxHash).Debug("New BTC withdraw")
 			btcTxId, err := m.WithdrawBTC(redeem)
 			if err != nil {
 				// Log the error and continue with the next redeem
-				log.Errorf("Failed to withdraw BTC for redeem %v: %v", redeem, err)
+				logger.Errorf("Failed to withdraw BTC for redeem %v: %v", redeem, err)
 				continue
 			}
 

@@ -3,8 +3,8 @@ package state
 import (
 	"math/big"
 
-	logger "github.com/0xPolygonHermez/zkevm-node/log"
 	"github.com/TEENet-io/bridge-go/common"
+	logger "github.com/sirupsen/logrus"
 )
 
 // Fetch ETH Finalized Block from the state db.
@@ -17,7 +17,7 @@ func (st *State) initEthFinalizedBlock() error {
 	}
 
 	if !ok {
-		logger.Warnf("no stored last finalized block number found, using the default value %v", common.EthStartingBlock)
+		logger.WithField("default", common.EthStartingBlock).Warn("Missing evm lastest block #")
 		// save the default value
 		err := st.statedb.SetKeyedValue(KeyEthFinalizedBlock, common.BigInt2Bytes32(common.EthStartingBlock))
 		if err != nil {
@@ -46,7 +46,7 @@ func (st *State) initEthChainID() error {
 	}
 
 	if !ok {
-		logger.Warnf("no stored chain id found, save the input value %v", st.cfg.EthChainId)
+		logger.WithField("chainId", st.cfg.EthChainId).Warn("missing evm chainId, use default")
 		// save the default value
 		err := st.statedb.SetKeyedValue(KeyEthChainId, common.BigInt2Bytes32(st.cfg.EthChainId))
 		if err != nil {

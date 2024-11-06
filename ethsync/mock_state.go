@@ -4,8 +4,8 @@ import (
 	"context"
 	"math/big"
 
-	logger "github.com/0xPolygonHermez/zkevm-node/log"
 	"github.com/TEENet-io/bridge-go/common"
+	logger "github.com/sirupsen/logrus"
 )
 
 const MaxEvNum = 32
@@ -65,24 +65,24 @@ func (st *MockState) GetEthFinalizedBlockNumber() (*big.Int, error) {
 }
 
 func (st *MockState) Start(ctx context.Context) error {
-	logger.Info("starting mock state")
-	defer logger.Info("stopping mock state")
+	logger.Debug("starting mock state")
+	defer logger.Debug("stopping mock state")
 
 	for {
 		select {
 		case <-ctx.Done():
 			return (ctx).Err()
 		case n := <-st.newEthFinalizedCh:
-			logger.Infof("new eth finalized block: %v", n)
+			logger.Debugf("new eth finalized block: %v", n)
 			st.lastEthFinalized = new(big.Int).Set(n)
 		case ev := <-st.mintedEvCh:
-			logger.Infof("new minted event: %v", ev)
+			logger.Debugf("new minted event: %v", ev)
 			st.mintedEv = append(st.mintedEv, ev)
 		case ev := <-st.requestedEvCh:
-			logger.Infof("new requested event: %v", ev)
+			logger.Debugf("new requested event: %v", ev)
 			st.requestedEv = append(st.requestedEv, ev)
 		case ev := <-st.preparedEvCh:
-			logger.Infof("new prepared event: %v", ev)
+			logger.Debugf("new prepared event: %v", ev)
 			st.preparedEv = append(st.preparedEv, ev)
 		}
 	}

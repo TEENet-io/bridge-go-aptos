@@ -18,6 +18,9 @@ import (
 
 	"math/big"
 
+	"github.com/TEENet-io/bridge-go/logconfig"
+	logger "github.com/sirupsen/logrus"
+
 	"github.com/TEENet-io/bridge-go/btcaction"
 	"github.com/TEENet-io/bridge-go/btcman/assembler"
 	"github.com/TEENet-io/bridge-go/btcman/rpc"
@@ -245,6 +248,8 @@ func (env *testEnv) close() {
 // *** End configuration of ETH side ***
 
 func TestDeposit(t *testing.T) {
+	logconfig.ConfigInfoLogger()
+
 	common.Debug = true
 	defer func() {
 		common.Debug = false
@@ -325,7 +330,7 @@ func TestDeposit(t *testing.T) {
 	}
 
 	bridge_wallet_addr_str := bridge_wallet.P2PKH.EncodeAddress()
-	t.Logf("Bridge btc address: %s", bridge_wallet_addr_str)
+	// logger.WithField("addr", bridge_wallet_addr_str).Info("Bridge BTC address")
 
 	btcTxMgr := btctxmanager.NewBtcTxManager(my_btc_vault, bridge_wallet, r, ethEnv.st, btc_mgr_st)
 
@@ -391,6 +396,8 @@ func TestDeposit(t *testing.T) {
 	// So it can publish events to observers
 	go monitor.ScanLoop()
 
+	logger.Info("* b2e deposit test *")
+
 	// Send the deposit p2 -> p3
 	// Create a sender (p2)
 	user_btc_wallet, err := assembler.NewBasicSigner(p2_legacy_priv_key_str, assembler.GetRegtestParams())
@@ -403,7 +410,7 @@ func TestDeposit(t *testing.T) {
 	}
 
 	wallet_addr_str := wallet.P2PKH.EncodeAddress()
-	t.Logf("BTC Deposit Sender: %s", wallet_addr_str)
+	logger.WithField("addr", wallet_addr_str).Info("User")
 
 	// Query for UTXOs of (p2)
 	// p2 simulates a personal user's wallet.
@@ -414,7 +421,7 @@ func TestDeposit(t *testing.T) {
 	if len(utxos) == 0 {
 		t.Fatalf("no utxos to spend, send some bitcoin to address %s first", wallet_addr_str)
 	}
-	t.Logf("utxo found: %d", len(utxos))
+	logger.WithField("count", len(utxos)).Info("User UTXO(s)")
 
 	// List is too long to print
 	// for idx, item := range utxos {
@@ -439,7 +446,10 @@ func TestDeposit(t *testing.T) {
 		t.Fatalf("cannot retrieve balance of receiver %s, error %v", p3_legacy_addr_str, err)
 	}
 
-	t.Logf("Bridge balance (satoshi): %d", p3_balance_1)
+	logger.WithFields(logger.Fields{
+		"addr":    bridge_wallet_addr_str,
+		"satoshi": p3_balance_1,
+	}).Info("Bridge")
 
 	// Select barely enough UTXO(s) to spend
 	selected_utxos, err := utxo.SelectUtxo(convertToPointerSlice(utxos), deposit_amount, fee_amount)
@@ -447,13 +457,18 @@ func TestDeposit(t *testing.T) {
 		t.Fatalf("cannot select enough utxos: %v", err)
 	}
 
-	t.Logf("utxo selected: %d", len(selected_utxos))
+	logger.WithField("count", len(selected_utxos)).Info("User UTXOs selected")
 
 	// Craft the [Deposit Tx]
 	// on EVM side: the receiver is env.Chain.Accounts[1].From
 	eth_side_receiver := ethEnv.sim.Chain.Accounts[1].From.String()
 
-	t.Logf("EVM receiver: %s", eth_side_receiver)
+	logger.WithFields(logger.Fields{
+		"amount":   deposit_amount,
+		"evm_addr": eth_side_receiver,
+		"evm_id":   EVM_CHAIN_ID_INT64,
+	}).Info("Deposit data")
+
 	tx, err := wallet.MakeBridgeDepositTx(
 		selected_utxos,
 		bridge_address,
@@ -467,8 +482,10 @@ func TestDeposit(t *testing.T) {
 		t.Fatalf("cannot create Tx %v", err)
 	}
 
-	t.Logf("tx.TxIn %d", len(tx.TxIn))
-	t.Logf("tx.TxOut %d", len(tx.TxOut))
+	logger.WithFields(logger.Fields{
+		"TxIn":  len(tx.TxIn),
+		"TxOut": len(tx.TxOut),
+	}).Info("Craft deposit Tx")
 
 	// Send [Deposit Tx] via RPC
 	depositBtcTxHash, err := r.SendRawTx(tx)
@@ -476,7 +493,7 @@ func TestDeposit(t *testing.T) {
 		t.Fatalf("send raw Tx error, %v", err)
 	}
 
-	t.Logf("transaction sent, txHash on bitcoin network is %s", depositBtcTxHash.String())
+	logger.WithField("txHash", depositBtcTxHash.String()).Info("Tx sent")
 
 	// Generate enough blocks on BTC blockchain to confirm the [Deposit Tx]
 	p1_addr, _ := assembler.DecodeAddress(p1_legacy_addr_str, assembler.GetRegtestParams())
@@ -488,13 +505,16 @@ func TestDeposit(t *testing.T) {
 		t.Fatalf("cannot retrieve balance of receiver %s, error %v", p3_legacy_addr_str, err)
 	}
 
-	t.Logf("Bridge balance (satoshi): %d", p3_balance_2)
+	logger.WithFields(logger.Fields{
+		"addr":    bridge_wallet_addr_str,
+		"satoshi": p3_balance_2,
+	}).Info("Bridge")
 
 	// If balance of p3 is increased, the transfer is successful on the blockchain.
 	if p3_balance_2 > p3_balance_1 {
-		t.Logf("Transfer successful on bitcoin blockchain")
+		logger.Info("Deposit mined")
 	} else {
-		t.Fatalf("Transfer failed")
+		t.Fatalf("Deposit failed")
 	}
 
 	// Check on btc monitor side if the deposit is captured
@@ -507,7 +527,13 @@ func TestDeposit(t *testing.T) {
 		}
 		if len(deposits) > 0 {
 			for _, deposit := range deposits {
-				t.Logf("Deposit: TxHash %s, Value %d, Receiver %s, EVM ID %d, EVM Addr %s", deposit.TxHash, deposit.DepositValue, deposit.DepositReceiver, deposit.EvmID, deposit.EvmAddr)
+				logger.WithFields(logger.Fields{
+					"tx_hash":  deposit.TxHash,
+					"amount":   deposit.DepositValue,
+					"receiver": deposit.DepositReceiver,
+					"evm_id":   deposit.EvmID,
+					"evm_addr": deposit.EvmAddr,
+				}).Info("Deposit")
 			}
 			break
 		}
@@ -515,7 +541,7 @@ func TestDeposit(t *testing.T) {
 	}
 
 	if len(deposits) > 0 {
-		t.Logf("Deposit captured successfully")
+		logger.Info("Deposit captured")
 	} else {
 		t.Fatalf("Deposit not captured")
 	}
@@ -529,7 +555,11 @@ func TestDeposit(t *testing.T) {
 		}
 		if len(utxosInVault) > 0 {
 			for _, utxo := range utxosInVault {
-				t.Logf("UTXO: TxID %s, Vout %d, Amount %d", utxo.TxID, utxo.Vout, utxo.Amount)
+				logger.WithFields(logger.Fields{
+					"tx_hash": utxo.TxID,
+					"vout":    utxo.Vout,
+					"amount":  utxo.Amount,
+				}).Info("UTXO")
 			}
 			break
 		}
@@ -537,7 +567,7 @@ func TestDeposit(t *testing.T) {
 	}
 
 	if len(utxosInVault) > 0 {
-		t.Logf("UTXO captured successfully")
+		logger.Info("UTXO captured")
 	} else {
 		t.Fatalf("UTXO not captured")
 	}
@@ -553,19 +583,29 @@ func TestDeposit(t *testing.T) {
 
 	// *** Below begins the EVM -> BTC withdraw process ***
 
+	logger.Info("* e2b withdraw test *")
+
 	// Peak the balance of p2, the btc user's balance.
 	p2_addr, _ := assembler.DecodeAddress(p2_legacy_addr_str, assembler.GetRegtestParams())
 	p2_balance_before_withdraw, _ := r.GetBalance(p2_addr, 1)
 
-	t.Logf("User balance (satoshi): %d", p2_balance_before_withdraw)
+	logger.WithFields(logger.Fields{
+		"balance": p2_balance_before_withdraw,
+		"addr":    p2_legacy_addr_str,
+	}).Info("User")
 
 	// Approve Bridge can use twbtc from account[1]
 	ethEnv.sim.Approve(1, REDEEM_SATOSHI)
 	commit()
 
 	// User request a redeem (p3 bridge, to p2 user)
+	logger.WithFields(logger.Fields{
+		"amount": int64(REDEEM_SATOSHI),
+		"addr":   p2_legacy_addr_str,
+	}).Info("Redeem to")
+
 	reqTxHash, _ := ethEnv.sim.Request2(ethEnv.sim.GetAuth(1), 1, REDEEM_SATOSHI, p2_legacy_addr_str)
-	t.Logf("Redeem requested, txHash: %s", reqTxHash.String())
+	logger.WithField("txHash", reqTxHash.String()).Info("RedeemRequested")
 	commit()
 	// Give it some time to process the requested redeem
 	time.Sleep(1 * time.Second)
@@ -589,23 +629,31 @@ func TestDeposit(t *testing.T) {
 	}
 
 	if len(redeems) > 0 {
-		t.Logf("Redeem (prepared) captured successfully")
+		for _, redeem := range redeems {
+			logger.WithFields(logger.Fields{
+				"reqTxHash": redeem.RequestTxHash.String(),
+				"preTxHash": redeem.PrepareTxHash.String(),
+			}).Info("RedeemPrepared")
+		}
 	} else {
-		t.Fatalf("Redeem (prepared) not captured")
+		t.Fatalf("RedeemPrepared not captured")
 	}
 
 	// Move btc chain forward
 	r.GenerateBlocks(MAX_BLOCKS, p1_addr)
 
 	p2_balance_after_withdraw, _ := r.GetBalance(p2_addr, 1)
-	t.Logf("User balance (satoshi): %d", p2_balance_after_withdraw)
+	logger.WithFields(logger.Fields{
+		"balance": p2_balance_after_withdraw,
+		"addr":    p2_legacy_addr_str,
+	}).Info("User")
 
 	// bridge wallet balance (p3) shall decrease
 	p3_balance_3, _ := r.GetBalance(p3_addr, 1)
 	if p3_balance_3 < p3_balance_2 {
-		t.Logf("Transfer successful on bitcoin blockchain")
+		logger.Info("Withdraw mined")
 	} else {
-		t.Fatalf("Transfer failed")
+		t.Fatalf("Withdraw failed")
 	}
 
 	cancel()  // guess: cancel() ends sub go routines politely.

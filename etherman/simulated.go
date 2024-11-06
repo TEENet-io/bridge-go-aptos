@@ -4,7 +4,6 @@ import (
 	"context"
 	"math/big"
 
-	logger "github.com/0xPolygonHermez/zkevm-node/log"
 	"github.com/TEENet-io/bridge-go/common"
 	bridge "github.com/TEENet-io/bridge-go/contracts/TEENetBtcBridge"
 	"github.com/btcsuite/btcd/btcec/v2"
@@ -14,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient/simulated"
+	logger "github.com/sirupsen/logrus"
 )
 
 const (
@@ -410,7 +410,7 @@ func (env *SimEtherman) Request2(auth *bind.TransactOpts, requesterIdx int, amou
 	// Set the btc receiver address to a real one.
 	params.Receiver = btcAddr
 
-	logger.Infof("request params: %+v", params)
+	// logger.Debugf("request params: %+v", params)
 
 	tx, err := env.Etherman.RedeemRequest(auth, params)
 	if err != nil {

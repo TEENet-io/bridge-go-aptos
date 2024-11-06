@@ -6,10 +6,10 @@ import (
 	"math/big"
 	"sync/atomic"
 
-	logger "github.com/0xPolygonHermez/zkevm-node/log"
 	"github.com/TEENet-io/bridge-go/common"
 	"github.com/TEENet-io/bridge-go/ethsync"
 	"github.com/ethereum/go-ethereum/crypto"
+	logger "github.com/sirupsen/logrus"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 )
@@ -84,8 +84,8 @@ func New(statedb *StateDB, cfg *Config) (*State, error) {
 }
 
 func (st *State) Start(ctx context.Context) error {
-	logger.Info("starting state")
-	defer logger.Info("stopping state")
+	logger.Debug("starting state")
+	defer logger.Debug("stopping state")
 
 	// TODO: error handling
 
@@ -113,7 +113,7 @@ func (st *State) Start(ctx context.Context) error {
 			}
 			return err
 		case blkNum := <-st.newEthFinalizedBlockCh:
-			newLogger := logger.WithFields("newFinalized", blkNum.String())
+			newLogger := logger.WithField("newFinalized", blkNum.String())
 
 			handleNewBlockNumber := func() error {
 				// Get the stored last finalized block number
@@ -138,10 +138,10 @@ func (st *State) Start(ctx context.Context) error {
 			}
 		// After receiving a new minted event, udpate statedb
 		case ev := <-st.newMintedEventCh:
-			newLogger := logger.WithFields(
-				"mintTx", ev.MintTxHash.String(),
-				"btcTxId", ev.BtcTxId.String(),
-			)
+			newLogger := logger.WithFields(logger.Fields{
+				"mintTx":  ev.MintTxHash.String(),
+				"btcTxId": ev.BtcTxId.String(),
+			})
 
 			handleEvent := func() error {
 				mint := createMintFromMintedEvent(ev)
@@ -163,7 +163,7 @@ func (st *State) Start(ctx context.Context) error {
 		// 2.	Skip if found
 		// 3.	Insert a new redeem record in state db
 		case ev := <-st.newRedeemRequestedEvCh:
-			newLogger := logger.WithFields(
+			newLogger := logger.WithField(
 				"reqTx", ev.RequestTxHash.String(),
 			)
 
@@ -207,10 +207,10 @@ func (st *State) Start(ctx context.Context) error {
 		// NOTE that it is possible that a prepared event arrives earlier than
 		// its corresponding requested event
 		case ev := <-st.newRedeemPreparedEvCh:
-			newLogger := logger.WithFields(
-				"reqTx", ev.RequestTxHash.String(),
-				"prepTx", ev.PrepareTxHash.String(),
-			)
+			newLogger := logger.WithFields(logger.Fields{
+				"reqTx":  ev.RequestTxHash.String(),
+				"prepTx": ev.PrepareTxHash.String(),
+			})
 
 			handleEvent := func() error {
 				ok, status, err := st.statedb.HasRedeem(ev.RequestTxHash)
