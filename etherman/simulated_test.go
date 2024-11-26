@@ -7,8 +7,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const ETH_ACCOUNTS = 10
+
 func TestNewSimulatedChain(t *testing.T) {
-	sim := NewSimulatedChain()
+	sim := NewSimulatedChain(GenPrivateKeys(ETH_ACCOUNTS))
 	assert.NotNil(t, sim)
 
 	balance, err := sim.Backend.Client().BalanceAt(context.Background(), sim.Accounts[0].From, nil)

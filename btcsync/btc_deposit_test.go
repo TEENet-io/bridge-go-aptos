@@ -79,11 +79,13 @@ const (
 	timeoutOnMonitoringPendingTxs = 10
 
 	// eth chain
+	EVM_TEST_ACCOUNTS  = 10
 	EVM_CHAIN_ID_INT64 = 1337 // Use 1337 as simulated chain id
 )
 
 // eth chain
 var SimulatedChainID = big.NewInt(EVM_CHAIN_ID_INT64)
+var SimulatedEthPrivateKeys = etherman.GenPrivateKeys(EVM_TEST_ACCOUNTS)
 
 // *** Begin configuration of BTC side ***
 
@@ -187,7 +189,7 @@ type testEnv struct {
 // Setup ETH side facilities
 func newTestEnv(t *testing.T, file string, btcChainConfig *chaincfg.Params, btcWallet ethtxmanager.BtcWallet) *testEnv {
 
-	sim, err := etherman.NewSimEtherman()
+	sim, err := etherman.NewSimEtherman(SimulatedEthPrivateKeys)
 	assert.NoError(t, err)
 
 	chainID, err := sim.Etherman.Client().ChainID(context.Background())

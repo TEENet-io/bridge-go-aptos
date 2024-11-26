@@ -4,6 +4,8 @@ import (
 	"context"
 	"math/big"
 
+	"crypto/ecdsa"
+
 	"github.com/TEENet-io/bridge-go/common"
 	bridge "github.com/TEENet-io/bridge-go/contracts/TEENetBtcBridge"
 	"github.com/btcsuite/btcd/btcec/v2"
@@ -17,8 +19,7 @@ import (
 )
 
 const (
-	NUMBER_OF_ACCOUNTS = 10   // Use 10 BTC ccounts for testing
-	CHAIN_ID_INT64     = 1337 // Use 1337 as simulated chain id
+	CHAIN_ID_INT64 = 1337 // Use 1337 as simulated chain id
 )
 
 var (
@@ -47,13 +48,37 @@ type SimulatedChain struct {
 	Accounts []*bind.TransactOpts
 }
 
-func NewSimulatedChain() *SimulatedChain {
+// Generate one ETH private key
+func GenPrivateKey() *ecdsa.PrivateKey {
+	sk, _ := crypto.GenerateKey()
+	return sk
+}
+
+// Generate several private keys
+func GenPrivateKeys(number int) []*ecdsa.PrivateKey {
+	privateKeys := make([]*ecdsa.PrivateKey, number)
+	for i := 0; i < number; i++ {
+		privateKeys[i] = GenPrivateKey()
+	}
+	return privateKeys
+}
+
+// From eth private keys to eth simulated accounts
+func GenSimulatedAccounts(privateKeys []*ecdsa.PrivateKey) []*bind.TransactOpts {
 	// create genesis accounts
-	nAccount := NUMBER_OF_ACCOUNTS
+	nAccount := len(privateKeys)
 	accounts := make([]*bind.TransactOpts, nAccount)
 	for i := 0; i < nAccount; i++ {
-		accounts[i] = newAuth()
+		accounts[i] = newAuth(privateKeys[i], SimulatedChainID)
 	}
+	return accounts
+}
+
+// Create a new simulated chain
+// with some filled genesis accounts
+func NewSimulatedChain(privateKeys []*ecdsa.PrivateKey) *SimulatedChain {
+	// genesis accounts
+	accounts := GenSimulatedAccounts(privateKeys)
 
 	// allocate funds to genesis accounts
 	genesisAlloc := map[ethcommon.Address]types.Account{}
@@ -73,11 +98,10 @@ func NewSimulatedChain() *SimulatedChain {
 	}
 }
 
-// Create a new auth object with a random private key.
+// Create a new auth object with a given private key.
 // The auth object is used to sign transactions
-func newAuth() *bind.TransactOpts {
-	sk, _ := crypto.GenerateKey()
-	auth, _ := bind.NewKeyedTransactorWithChainID(sk, SimulatedChainID)
+func newAuth(sk *ecdsa.PrivateKey, chainID *big.Int) *bind.TransactOpts {
+	auth, _ := bind.NewKeyedTransactorWithChainID(sk, chainID)
 	return auth
 }
 
@@ -107,8 +131,11 @@ type SimEtherman struct {
 	Etherman *Etherman
 }
 
-func NewSimEtherman() (*SimEtherman, error) {
-	chain := NewSimulatedChain()
+// 1. Create a simulated ETH chain, with some genesis acccounts filled with money
+// 2. Random a btc private-public key pair (simulate m-to-n schnorr).
+// 3. Deploy the bridge contract /twbtc contract with the btc public key.
+func NewSimEtherman(privateKeys []*ecdsa.PrivateKey) (*SimEtherman, error) {
+	chain := NewSimulatedChain(privateKeys)
 
 	// Random bitcoin private key.
 	// TODO: Change to a multi-party schnorr private key.
