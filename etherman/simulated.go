@@ -90,6 +90,7 @@ func NewSimulatedChain(privateKeys []*ecdsa.PrivateKey) *SimulatedChain {
 	}
 
 	// create simulated backend
+	// simulated backend ALWAYS uses chain id 1337
 	backend := simulated.NewBackend(genesisAlloc, simulated.WithBlockGasLimit(blockGasLimit))
 
 	return &SimulatedChain{
