@@ -49,7 +49,7 @@ type testEnv struct {
 
 func newTestEnv(t *testing.T, file string, btcChainConfig *chaincfg.Params) *testEnv {
 
-	sim, err := etherman.NewSimEtherman()
+	sim, err := etherman.NewSimEtherman(etherman.GenPrivateKeys(10))
 	assert.NoError(t, err)
 
 	chainID, err := sim.Etherman.Client().ChainID(context.Background())

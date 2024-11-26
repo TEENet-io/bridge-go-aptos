@@ -22,7 +22,7 @@ func TestSync(t *testing.T) {
 		common.Debug = false
 	}()
 
-	env, err := etherman.NewSimEtherman()
+	env, err := etherman.NewSimEtherman(etherman.GenPrivateKeys(10))
 	assert.NoError(t, err)
 
 	chainID, err := env.Etherman.Client().ChainID(context.Background())
