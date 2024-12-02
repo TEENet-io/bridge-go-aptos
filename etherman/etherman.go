@@ -53,6 +53,7 @@ type Etherman struct {
 	mu   sync.Mutex
 }
 
+// TODO: Un-tested
 // Create a new Etherman instance.
 // auth is used to sign bridge txs (mint, redeemRequest, redeemPrepare).
 // So auth should have some eth (as gas) within it.
