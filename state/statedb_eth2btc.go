@@ -8,10 +8,10 @@ import (
 
 // Insert after receiving a new redeem requested event (from user). Only fields
 // requestTxHash, requester, receiver, amount, and status are required.
-func (st *StateDB) InsertAfterRequested(redeem *Redeem) error {
+func (stdb *StateDB) InsertAfterRequested(redeem *Redeem) error {
 	query := `INSERT OR IGNORE INTO redeem (` + statusRequestedParamList + `) VALUES (?, ?, ?, ?, ?)`
 
-	stmt, err := st.stmtCache.Prepare(query)
+	stmt, err := stdb.stmtCache.Prepare(query)
 	if err != nil {
 		return err
 	}
@@ -38,10 +38,10 @@ func (st *StateDB) InsertAfterRequested(redeem *Redeem) error {
 // Update the db, after receiving a new "RedeemPrepared" event.
 // New fields to update to said (found) redeem are:
 // prepareTxHash, outpoints, and status.
-func (st *StateDB) UpdateAfterPrepared(redeem *Redeem) error {
+func (stdb *StateDB) UpdateAfterPrepared(redeem *Redeem) error {
 	var query string
 	// "ok" marks if the redeems is found in the database.
-	_, ok, err := st.GetRedeem(redeem.RequestTxHash)
+	_, ok, err := stdb.GetRedeem(redeem.RequestTxHash)
 	if err != nil {
 		return err
 	}
@@ -51,7 +51,7 @@ func (st *StateDB) UpdateAfterPrepared(redeem *Redeem) error {
 		query = `INSERT OR IGNORE INTO redeem (` + statusPreparedParamList + `) VALUES (?, ?, ?, ?, ?, ?, ?)`
 	}
 
-	stmt, err := st.stmtCache.Prepare(query)
+	stmt, err := stdb.stmtCache.Prepare(query)
 	if err != nil {
 		return err
 	}
@@ -87,10 +87,10 @@ func (st *StateDB) UpdateAfterPrepared(redeem *Redeem) error {
 // after a redeem is sent out on BTC side.
 // It uses requestTxHash (from redeem param) to look for a redeem record in the database.
 // Then writes in the btcTxId (from redeem param) and set status to completed on the database record.
-func (st *StateDB) UpdateAfterRedeemed(redeem *Redeem) error {
+func (stdb *StateDB) UpdateAfterRedeemed(redeem *Redeem) error {
 	query := `UPDATE redeem SET btcTxId = ?, status = ? WHERE requestTxHash = ?`
 
-	stmt, err := st.stmtCache.Prepare(query)
+	stmt, err := stdb.stmtCache.Prepare(query)
 	if err != nil {
 		return err
 	}
@@ -109,10 +109,10 @@ func (st *StateDB) UpdateAfterRedeemed(redeem *Redeem) error {
 }
 
 // Query Redeem from the database by "status".
-func (st *StateDB) GetRedeemsByStatus(status RedeemStatus) ([]*Redeem, error) {
+func (stdb *StateDB) GetRedeemsByStatus(status RedeemStatus) ([]*Redeem, error) {
 	query := `SELECT * FROM redeem WHERE status = ?`
 
-	stmt, err := st.stmtCache.Prepare(query)
+	stmt, err := stdb.stmtCache.Prepare(query)
 	if err != nil {
 		return []*Redeem{}, err
 	}
@@ -166,10 +166,10 @@ func (st *StateDB) GetRedeemsByStatus(status RedeemStatus) ([]*Redeem, error) {
 
 // Query Redeem from database via requestTxHash.
 // Return (*Redeem, bool: found/not found, error)
-func (st *StateDB) GetRedeem(requestTxHash ethcommon.Hash) (*Redeem, bool, error) {
+func (stdb *StateDB) GetRedeem(requestTxHash ethcommon.Hash) (*Redeem, bool, error) {
 	query := `SELECT * FROM redeem WHERE requestTxHash = ?;`
 
-	stmt, err := st.stmtCache.Prepare(query)
+	stmt, err := stdb.stmtCache.Prepare(query)
 	if err != nil {
 		return nil, false, err
 	}
@@ -214,9 +214,9 @@ func (st *StateDB) GetRedeem(requestTxHash ethcommon.Hash) (*Redeem, bool, error
 
 // Query if a redeem exists in the database via requestTxHash.
 // Return (bool: found/not found, RedeemStatus, error)
-func (st *StateDB) HasRedeem(requestTxHash ethcommon.Hash) (bool, RedeemStatus, error) {
+func (stdb *StateDB) HasRedeem(requestTxHash ethcommon.Hash) (bool, RedeemStatus, error) {
 	query := `SELECT status FROM redeem WHERE requestTxHash = ?`
-	stmt, err := st.stmtCache.Prepare(query)
+	stmt, err := stdb.stmtCache.Prepare(query)
 	if err != nil {
 		return false, "", err
 	}

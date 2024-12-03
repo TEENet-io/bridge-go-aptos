@@ -24,13 +24,13 @@ func NewStateDB(db *sql.DB) (*StateDB, error) {
 	}, nil
 }
 
-func (st *StateDB) Close() {
-	st.stmtCache.Clear()
+func (stdb *StateDB) Close() {
+	stdb.stmtCache.Clear()
 }
 
-func (st *StateDB) GetKeyedValue(key ethcommon.Hash) (ethcommon.Hash, bool, error) {
+func (stdb *StateDB) GetKeyedValue(key ethcommon.Hash) (ethcommon.Hash, bool, error) {
 	query := `SELECT value FROM kv WHERE key = ?`
-	stmt, err := st.stmtCache.Prepare(query)
+	stmt, err := stdb.stmtCache.Prepare(query)
 	if err != nil {
 		return ethcommon.Hash{}, false, err
 	}
@@ -47,9 +47,9 @@ func (st *StateDB) GetKeyedValue(key ethcommon.Hash) (ethcommon.Hash, bool, erro
 	return common.HexStrToBytes32(value), true, nil
 }
 
-func (st *StateDB) SetKeyedValue(key, value ethcommon.Hash) error {
+func (stdb *StateDB) SetKeyedValue(key, value ethcommon.Hash) error {
 	query := `INSERT OR REPLACE INTO kv (key, value) VALUES (?, ?)`
-	stmt, err := st.stmtCache.Prepare(query)
+	stmt, err := stdb.stmtCache.Prepare(query)
 	if err != nil {
 		return err
 	}
