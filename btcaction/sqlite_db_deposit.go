@@ -54,6 +54,7 @@ func (s *SQLiteDepositStorage) AddDeposit(deposit DepositAction) error {
 	return err
 }
 
+// Fetch a list of deposit actions by btc transaction hash.
 func (s *SQLiteDepositStorage) GetDepositByTxHash(txHash string) ([]DepositAction, error) {
 	query := `SELECT block_number, block_hash, tx_hash, deposit_value, deposit_receiver, evm_id, evm_addr FROM btc_action_deposit WHERE tx_hash = ?`
 	rows, err := s.db.Query(query, txHash)
@@ -74,6 +75,7 @@ func (s *SQLiteDepositStorage) GetDepositByTxHash(txHash string) ([]DepositActio
 	return deposits, nil
 }
 
+// Fetch a list of deposit actions by bridge address.
 func (s *SQLiteDepositStorage) GetDepositByReceiver(receiver string) ([]DepositAction, error) {
 	query := `SELECT block_number, block_hash, tx_hash, deposit_value, deposit_receiver, evm_id, evm_addr FROM btc_action_deposit WHERE deposit_receiver = ?`
 	rows, err := s.db.Query(query, receiver)
@@ -94,6 +96,7 @@ func (s *SQLiteDepositStorage) GetDepositByReceiver(receiver string) ([]DepositA
 	return deposits, nil
 }
 
+// Fetch a list of deposit actions by receiver EVM address and EVM ID.
 func (s *SQLiteDepositStorage) GetDepositByEVM(evmAddr string, evmID int32) ([]DepositAction, error) {
 	query := `SELECT block_number, block_hash, tx_hash, deposit_value, deposit_receiver, evm_id, evm_addr FROM btc_action_deposit WHERE evm_addr = ? AND evm_id = ?`
 	rows, err := s.db.Query(query, evmAddr, evmID)
