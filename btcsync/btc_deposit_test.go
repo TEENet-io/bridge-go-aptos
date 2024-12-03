@@ -12,6 +12,7 @@ import (
 	"context"
 	"database/sql"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -19,6 +20,7 @@ import (
 	"math/big"
 
 	"github.com/TEENet-io/bridge-go/logconfig"
+	"github.com/TEENet-io/bridge-go/reporter"
 	logger "github.com/sirupsen/logrus"
 
 	"github.com/TEENet-io/bridge-go/btcaction"
@@ -398,6 +400,32 @@ func TestDeposit(t *testing.T) {
 	// So it can publish events to observers
 	go monitor.ScanLoop()
 
+	// *** Setup a http server to report status ***
+	logger.Info("Setup http server to report status")
+
+	http_server := reporter.NewHttpReporter("0.0.0.0", "8080", depo_st, ethEnv.statedb)
+	go http_server.Run()
+	// Give it some time to start the http server
+	time.Sleep(1 * time.Second)
+
+	// *** End the setup of http server ***
+
+	// *** Setup a http reader to debug ***
+
+	http_reader := reporter.NewHttpReader("0.0.0.0", "8080")
+	message, err := http_reader.GetHello()
+	if err != nil {
+		t.Fatalf("cannot get hello from http server %s", err)
+	}
+
+	t.Logf("http reader: %s", message)
+
+	if !strings.Contains(message, "world") {
+		t.Fatalf("message does not contain 'world'")
+	}
+
+	// *** End the setup of http reader ***
+
 	logger.Info("* b2e deposit test *")
 
 	// Send the deposit p2 -> p3
@@ -546,6 +574,16 @@ func TestDeposit(t *testing.T) {
 		logger.Info("Deposit captured")
 	} else {
 		t.Fatalf("Deposit not captured")
+	}
+
+	// Check on http server that deposit is captured.
+	resp_deposits, err := http_reader.GetDepositStatus(depositBtcTxHash.String())
+	if err != nil {
+		t.Fatalf("cannot get deposit status from http server %s", err)
+	}
+
+	if len(resp_deposits) > 0 {
+		logger.WithFields(logger.Fields{"json": string(resp_deposits)}).Info("http deposit")
 	}
 
 	// 2) Check if the UTXO is stored in the UTXO Treasure Vault

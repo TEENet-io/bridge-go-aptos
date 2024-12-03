@@ -7,6 +7,8 @@ import (
 	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
+// Insert a Mint into DB
+// mintTxHash is optional (evm side)
 func (stdb *StateDB) InsertMint(m *Mint) error {
 	query := `INSERT INTO mint (BtcTxId, mintTxHash, receiver, amount) VALUES (?, ?, ?, ?)`
 	stmt, err := stdb.stmtCache.Prepare(query)
@@ -32,6 +34,7 @@ func (stdb *StateDB) InsertMint(m *Mint) error {
 	return err
 }
 
+// Fetch a list of mints that have not been minted on EVM yet
 func (stdb *StateDB) GetUnMinted() ([]*Mint, error) {
 	query := `SELECT BtcTxId, receiver, amount FROM mint WHERE mintTxHash IS NULL`
 	stmt, err := stdb.stmtCache.Prepare(query)
@@ -63,6 +66,7 @@ func (stdb *StateDB) GetUnMinted() ([]*Mint, error) {
 	return mints, nil
 }
 
+// Fetch a mint by BtcTxId (can be unminted on evm)
 func (stdb *StateDB) GetMint(BtcTxId ethcommon.Hash) (*Mint, bool, error) {
 	query := `SELECT BtcTxId, mintTxHash, receiver, amount FROM mint WHERE BtcTxId = ?`
 	stmt, err := stdb.stmtCache.Prepare(query)
