@@ -55,3 +55,21 @@ func (hr *HttpReader) GetDepositStatus(btcTxID string) (string, error) {
 	// Convert the body to a string
 	return string(body), nil
 }
+
+func (hr *HttpReader) GetDepositStatusByReceiver(receiver string) (string, error) {
+	url := "http://" + hr.serverIP + ":" + hr.serverPort + ROUTE_DEPOSIT + "?evm_receiver=" + receiver
+	resp, err := http.Get(url)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	// Read the response body
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	// Convert the body to a string
+	return string(body), nil
+}
