@@ -639,6 +639,15 @@ func TestDeposit(t *testing.T) {
 		logger.WithFields(logger.Fields{"json": string(resp_deposits)}).Info("http deposit")
 	}
 
+	resp_deposits, err = http_reader.GetDepositStatusByReceiver(eth_side_receiver)
+	if err != nil {
+		t.Fatalf("cannot get deposit status from http server %s", err)
+	}
+
+	if len(resp_deposits) > 0 {
+		logger.WithFields(logger.Fields{"json": string(resp_deposits)}).Info("http deposit")
+	}
+
 	logger.Info("* e2b withdraw test *")
 
 	// Peak the balance of p2, the btc user's balance.
