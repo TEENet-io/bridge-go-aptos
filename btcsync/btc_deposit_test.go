@@ -623,6 +623,22 @@ func TestDeposit(t *testing.T) {
 
 	// *** Below begins the EVM -> BTC withdraw process ***
 
+	time.Sleep(1 * time.Second)
+
+	logger.Info("Check if the mint is found on evm")
+
+	commit()
+
+	// Check on http server that deposit status is changed.
+	resp_deposits, err = http_reader.GetDepositStatus(depositBtcTxHash.String())
+	if err != nil {
+		t.Fatalf("cannot get deposit status from http server %s", err)
+	}
+
+	if len(resp_deposits) > 0 {
+		logger.WithFields(logger.Fields{"json": string(resp_deposits)}).Info("http deposit")
+	}
+
 	logger.Info("* e2b withdraw test *")
 
 	// Peak the balance of p2, the btc user's balance.
