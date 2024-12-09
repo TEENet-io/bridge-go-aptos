@@ -14,8 +14,8 @@ type Basic struct {
 type DepositAction struct {
 	Basic
 	DepositValue    int64
-	DepositReceiver string // on btc (our wallet address)
-	EvmID           int32
+	DepositReceiver string // of btc (our bridge wallet address)
+	EvmID           int32  // EVM Chain ID
 	EvmAddr         string // No 0x prefix
 }
 
@@ -32,6 +32,8 @@ type DepositStorage interface {
 
 	// GetDepositByEVM queries DepositAction by EvmAddr and EvmID.
 	GetDepositByEVM(evmAddr string, evmID int32) ([]DepositAction, error)
+
+	GetDepositByEVMAddr(evmAddr string) ([]DepositAction, error)
 }
 
 // RedeemAction is a management action.
