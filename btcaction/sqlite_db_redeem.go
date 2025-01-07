@@ -59,20 +59,37 @@ func (s *SQLiteRedeemStorage) HasRedeem(ethRequestTxID string) (bool, error) {
 	return count > 0, nil
 }
 
+func (s *SQLiteRedeemStorage) QueryByEthRequestTxId(ethRequestTxID string) (*RedeemAction, error) {
+	query := `SELECT BtcHash, Sent, Mined FROM btc_action_redeem WHERE EthRequestTxID = ?`
+	var btcHash string
+	var sent, mined bool
+	err := s.db.QueryRow(query, ethRequestTxID).Scan(&btcHash, &sent, &mined)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return &RedeemAction{
+		EthRequestTxID: ethRequestTxID,
+		BtcHash:        btcHash,
+		Sent:           sent,
+		Mined:          mined,
+	}, err
+}
+
 func (s *SQLiteRedeemStorage) InsertRedeem(redeem *RedeemAction) error {
 	query := `INSERT INTO btc_action_redeem (EthRequestTxID, BtcHash, Sent) VALUES (?, ?, ?)`
 	_, err := s.db.Exec(query, redeem.EthRequestTxID, redeem.BtcHash, true)
 	return err
 }
 
-func (s *SQLiteRedeemStorage) QueryByBtcTxId(btcTxID string) (string, error) {
-	query := `SELECT EthRequestTxID FROM btc_action_redeem WHERE BtcHash = ?`
-	var ethRequestTxID string // zero value of a string is ""
-	err := s.db.QueryRow(query, btcTxID).Scan(&ethRequestTxID)
+func (s *SQLiteRedeemStorage) QueryByBtcTxId(btcTxID string) (*RedeemAction, error) {
+	query := `SELECT EthRequestTxID, Sent, Mined FROM btc_action_redeem WHERE BtcHash = ?`
+	redeem := &RedeemAction{}
+	err := s.db.QueryRow(query, btcTxID).Scan(&redeem.EthRequestTxID, &redeem.Sent, &redeem.Mined)
 	if err == sql.ErrNoRows {
-		return "", nil
+		return nil, nil
 	}
-	return ethRequestTxID, err
+	redeem.BtcHash = btcTxID
+	return redeem, err
 }
 
 func (s *SQLiteRedeemStorage) IfNotMined(ethRequestTxID string) (bool, error) {

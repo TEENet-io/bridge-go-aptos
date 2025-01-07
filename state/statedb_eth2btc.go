@@ -212,6 +212,67 @@ func (stdb *StateDB) GetRedeem(requestTxHash ethcommon.Hash) (*Redeem, bool, err
 	return redeem, true, nil
 }
 
+func (stdb *StateDB) GetRedeemsByRequester(requester ethcommon.Address) ([]*Redeem, error) {
+	query := `SELECT * FROM redeem WHERE LOWER(requester) = LOWER(?)`
+
+	stmt, err := stdb.stmtCache.Prepare(query)
+	if err != nil {
+		return nil, err
+	}
+
+	// Strip "0x" prefix off the string.
+	requesterStr := requester.String()
+	if len(requesterStr) >= 2 && requesterStr[:2] == "0x" {
+		requesterStr = requesterStr[2:]
+	}
+
+	rows, err := stmt.Query(requesterStr)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	defer rows.Close()
+
+	var (
+		prepareTxHash, btcTxId sql.NullString
+		redeems                []*Redeem
+	)
+
+	for rows.Next() {
+		var r sqlRedeem
+		if err := rows.Scan(
+			&r.RequestTxHash,
+			&prepareTxHash, // temp fill, fill later.
+			&btcTxId,       // temp fill, fill later
+			&r.Requester,
+			&r.Receiver,
+			&r.Amount,
+			&r.Outpoints,
+			&r.Status,
+		); err != nil {
+			return nil, err
+		}
+
+		if prepareTxHash.Valid {
+			r.PrepareTxHash = prepareTxHash.String
+		}
+
+		if btcTxId.Valid {
+			r.BtcTxId = btcTxId.String
+		}
+
+		redeem, err := r.decode()
+		if err != nil {
+			return nil, err
+		}
+		redeems = append(redeems, redeem)
+	}
+
+	return redeems, nil
+}
+
 // Query if a redeem exists in the database via requestTxHash.
 // Return (bool: found/not found, RedeemStatus, error)
 func (stdb *StateDB) HasRedeem(requestTxHash ethcommon.Hash) (bool, RedeemStatus, error) {

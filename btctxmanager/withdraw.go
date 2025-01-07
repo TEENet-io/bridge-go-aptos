@@ -142,7 +142,7 @@ func (m *BtcTxManager) WithdrawBTC(redeem *state.Redeem) (*chainhash.Hash, error
 	return txHash, nil
 }
 
-// WithdrawLoop continuously finds redeems and processes them.
+// WithdrawLoop continuously finds outgoing redeems (from shared state) and processes them.
 // Call it in a separate go routine.
 func (m *BtcTxManager) WithdrawLoop() {
 	for {
@@ -161,7 +161,7 @@ func (m *BtcTxManager) WithdrawLoop() {
 		for _, redeem := range redeems {
 
 			// Check if the redeem requestTxId already exists in mgrState
-			reqTxHash := utils.Remove0xPrefix(redeem.PrepareTxHash.String())
+			reqTxHash := utils.Remove0xPrefix(redeem.RequestTxHash.String())
 			exists, err := m.mgrState.HasRedeem(reqTxHash)
 			if err != nil {
 				// Log the error and continue with the next redeem
@@ -171,18 +171,21 @@ func (m *BtcTxManager) WithdrawLoop() {
 
 			if exists {
 				// If a record of the redeem already exists, continue with the next redeem
-				logger.WithField("reqTxHash", reqTxHash).Debug("BTC withdraw tracked")
+				logger.WithField("reqTxHash", reqTxHash).Debug("BTC withdraw already tracked in db")
 				continue
 			}
 
 			// New Redeem!
-			logger.WithField("reqTxHash", reqTxHash).Debug("New BTC withdraw")
 			btcTxId, err := m.WithdrawBTC(redeem)
 			if err != nil {
 				// Log the error and continue with the next redeem
 				logger.Errorf("Failed to withdraw BTC for redeem %v: %v", redeem, err)
 				continue
 			}
+			logger.WithFields(logger.Fields{
+				"reqTxHash": reqTxHash,
+				"btcTxId":   btcTxId.String(),
+			}).Debug("New BTC withdraw sent")
 
 			// Insert the redeem record in mgrState (wait for future update)
 			err = m.mgrState.InsertRedeem(&btcaction.RedeemAction{

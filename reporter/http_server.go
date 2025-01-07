@@ -10,7 +10,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	logger "github.com/sirupsen/logrus"
+
 	"github.com/TEENet-io/bridge-go/btcaction"
+	"github.com/TEENet-io/bridge-go/btcman/utils"
 	"github.com/TEENet-io/bridge-go/common"
 	"github.com/TEENet-io/bridge-go/state"
 	ethcommon "github.com/ethereum/go-ethereum/common"
@@ -19,6 +22,7 @@ import (
 const (
 	ROUTE_HELLO   = "/hello"
 	ROUTE_DEPOSIT = "/deposit"
+	ROUTE_REDEEM  = "/redeem"
 )
 
 type HttpReporter struct {
@@ -26,15 +30,21 @@ type HttpReporter struct {
 	serverPort string // listen port
 
 	// upstream data sources
-	depositdb btcaction.DepositStorage // this is an interface
-	statedb   *state.StateDB
+
+	// BTC side.
+	depositdb btcaction.DepositStorage      // this is an interface
+	redeemdb  btcaction.RedeemActionStorage // this is an interface
+
+	// ETH side.
+	statedb *state.StateDB
 }
 
-func NewHttpReporter(serverIP string, serverPort string, depositdb btcaction.DepositStorage, statedb *state.StateDB) *HttpReporter {
+func NewHttpReporter(serverIP string, serverPort string, depositdb btcaction.DepositStorage, redeemdb btcaction.RedeemActionStorage, statedb *state.StateDB) *HttpReporter {
 	return &HttpReporter{
 		serverIP:   serverIP,
 		serverPort: serverPort,
 		depositdb:  depositdb,
+		redeemdb:   redeemdb,
 		statedb:    statedb,
 	}
 }
@@ -46,6 +56,7 @@ func (h *HttpReporter) SetupRouter() *gin.Engine {
 	// Define routes & handlers
 	router.GET(ROUTE_HELLO, Hello)
 	router.GET(ROUTE_DEPOSIT, h.Deposit)
+	router.GET(ROUTE_REDEEM, h.Redeem)
 
 	return router
 }
@@ -172,6 +183,99 @@ func (h *HttpReporter) Deposit(c *gin.Context) {
 
 		c.JSON(http.StatusOK, gin.H{"data": resp})
 	}
+}
+
+type RedeemResponse struct {
+	EvmRequester     string `json:"evm_requester"`      // evm requester
+	EvmRequestTxId   string `json:"evm_request_tx_id"`  // evm request transaction id
+	EvmRequestAmount string `json:"evm_request_amount"` // evm request amount in Wei, int64 => string
+
+	EvmPrepareTxId string `json:"evm_prepare_tx_id"` // evm prepare transaction id
+
+	BtcRedeemReceiver string `json:"btc_redeem_receiver"` // btc receiver address
+	BtcRedeemTxId     string `json:"btc_redeem_tx_id"`    // btc redeem transaction id
+	BtcRedeemAmount   string `json:"btc_redeem_amount"`   // btc redeem amount in Satoshi, int64 => string
+	BtcRedeemStatus   string `json:"btc_redeem_status"`   // btc redeem status, one of "sent", "mined"
+
+	Status string `json:"status"` // overall status, one of "requested/prepared/completed/invalid"
+}
+
+// Fetch data from redeemdb + statedb,
+// assemble response and return.
+func (h *HttpReporter) Redeem(c *gin.Context) {
+	evmRequester := c.Query("evm_requester") // evm requester
+
+	if evmRequester == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "evm_requester must be provided"})
+		return
+	}
+
+	logger.WithField("evmRequester", evmRequester).Info("Redeem Route")
+
+	// Fetch redeems by evm requester
+	redeems, err := h.statedb.GetRedeemsByRequester(ethcommon.HexToAddress(evmRequester))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	logger.WithField("len(redeems)", len(redeems)).Info("Redeems Route")
+
+	var response []RedeemResponse
+	for _, redeem := range redeems {
+		// phase one: requested
+		_resp := RedeemResponse{
+			EvmRequester:     redeem.Requester.String(),
+			EvmRequestTxId:   redeem.RequestTxHash.String(),
+			EvmRequestAmount: redeem.Amount.Text(10),
+			Status:           "requested",
+		}
+		// phase two: prepared
+		if redeem.PrepareTxHash != common.EmptyHash {
+			_resp.EvmPrepareTxId = redeem.PrepareTxHash.String()
+			_resp.Status = "prepared"
+		}
+
+		// phase three: unsent, send, mined
+		if redeem.Receiver != "" {
+			_resp.BtcRedeemReceiver = redeem.Receiver
+			_resp.BtcRedeemAmount = redeem.Amount.Text(10)
+		}
+
+		// If redeem is executed & found on BTC side.
+		_requestTxHash := utils.Remove0xPrefix(redeem.RequestTxHash.String())
+		hasIt, err := h.redeemdb.HasRedeem(_requestTxHash)
+
+		logger.WithField("hasIt", hasIt).Info("Redeem Route")
+
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		if !hasIt { // BTC side hasn't prepare or execute the redeem.
+			response = append(response, _resp)
+			continue // shortcut
+		}
+
+		_redeemAction, err := h.redeemdb.QueryByEthRequestTxId(_requestTxHash)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		_resp.BtcRedeemTxId = _redeemAction.BtcHash
+
+		if _redeemAction.Sent {
+			_resp.BtcRedeemStatus = "sent"
+		}
+		if _redeemAction.Mined {
+			_resp.BtcRedeemStatus = "mined"
+			_resp.Status = "completed"
+		}
+
+		response = append(response, _resp)
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": response})
 }
 
 // func main() {
