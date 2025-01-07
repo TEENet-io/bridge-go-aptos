@@ -46,3 +46,24 @@ func TestDepositData(t *testing.T) {
 		t.Fatalf("RLP encoded result is not %d bytes", 27)
 	}
 }
+
+func TestDecodeDeposit(t *testing.T) {
+	_hex_data := "da8400aa36a79434c7dfb77d536e9698b8d6be86c339e460026827"
+	_byte_data, _ := hex.DecodeString(_hex_data)
+
+	var dd DepositData
+	err := rlp.DecodeBytes(_byte_data, &dd)
+	if err != nil {
+		t.Fatalf("RLP decode failed %v", err)
+	}
+
+	_suppose_addr := "0x34c7dFB77D536e9698b8d6BE86c339e460026827"
+	if _suppose_addr != ByteArrayToHexString(dd.EVM_ADDR) {
+		t.Fatalf("Decoded address not match, expected %s, got %s", _suppose_addr, ByteArrayToHexString(dd.EVM_ADDR))
+	}
+
+	_suppose_chain_id := 11155111
+	if _suppose_chain_id != ByteArrayToInt(dd.EVM_CHAIN_ID) {
+		t.Fatalf("Decoded chain_id not match, expected %d, got %d", _suppose_chain_id, ByteArrayToInt(dd.EVM_CHAIN_ID))
+	}
+}

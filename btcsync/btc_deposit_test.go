@@ -252,7 +252,7 @@ func (env *testEnv) close() {
 // *** End configuration of ETH side ***
 
 func TestDeposit(t *testing.T) {
-	logconfig.ConfigInfoLogger()
+	logconfig.ConfigDebugLogger()
 
 	common.Debug = true
 	defer func() {
@@ -403,7 +403,7 @@ func TestDeposit(t *testing.T) {
 	// *** Setup a http server to report status ***
 	logger.Info("Setup http server to report status")
 
-	http_server := reporter.NewHttpReporter("0.0.0.0", "8080", depo_st, ethEnv.statedb)
+	http_server := reporter.NewHttpReporter("0.0.0.0", "8080", depo_st, btc_mgr_st, ethEnv.statedb)
 	go http_server.Run()
 	// Give it some time to start the http server
 	time.Sleep(1 * time.Second)
@@ -704,7 +704,17 @@ func TestDeposit(t *testing.T) {
 		t.Fatalf("RedeemPrepared not captured")
 	}
 
-	// Move btc chain forward
+	// check on http server that redeem is requested.
+	_requester := eth_side_receiver
+	resp_redeems, err := http_reader.GetRedeemsByRequester(_requester)
+	if err != nil {
+		t.Fatalf("cannot get redeems from http server %s", err)
+	}
+	if len(resp_redeems) > 0 {
+		logger.WithFields(logger.Fields{"json": string(resp_redeems)}).Info("http redeems")
+	}
+
+	// Move btc chain forward, to mine the redeem tx
 	r.GenerateBlocks(MAX_BLOCKS, p1_addr)
 
 	p2_balance_after_withdraw, _ := r.GetBalance(p2_addr, 1)
@@ -719,6 +729,19 @@ func TestDeposit(t *testing.T) {
 		logger.Info("Withdraw mined")
 	} else {
 		t.Fatalf("Withdraw failed")
+	}
+
+	// Allowe some time for the http server to update the status
+	r.GenerateBlocks(1, p1_addr)
+	time.Sleep(3 * time.Second)
+
+	// check on the http server again, about the btc redeem Tx.
+	resp_redeems, err = http_reader.GetRedeemsByRequester(_requester)
+	if err != nil {
+		t.Fatalf("cannot get redeems from http server %s", err)
+	}
+	if len(resp_redeems) > 0 {
+		logger.WithFields(logger.Fields{"json": string(resp_redeems)}).Info("http redeems")
 	}
 
 	cancel()  // guess: cancel() ends sub go routines politely.

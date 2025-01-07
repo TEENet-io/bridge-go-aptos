@@ -41,7 +41,7 @@ type DepositStorage interface {
 // After the redeem btc is mined, we mark Mined, and Basic
 type RedeemAction struct {
 	EthRequestTxID string // fill this after <sent>. 64 hex (32 byte), no "0x" prefix.
-	BtcHash        string // fill this after <sent>. no "0x" prefix.
+	BtcHash        string // BTC TxID. fill this after <sent>. no "0x" prefix.
 	Sent           bool   // mark this after <sent>.
 	Mined          bool   // mark this after <mined>.
 }
@@ -50,17 +50,23 @@ type RedeemActionStorage interface {
 	// Check if the redeem exists via ethRequestTxId ?
 	HasRedeem(ethRequestTxID string) (bool, error)
 
-	// Check the corresponding ethRequestTxId via btcTxID
-	QueryByBtcTxId(btcTxID string) (string, error)
+	// Query a redeem by ethRequestTxId
+	QueryByEthRequestTxId(ethRequestTxID string) (*RedeemAction, error)
 
-	// Insert a new redeem (sent but not mined)
+	// Check via btcTxID
+	QueryByBtcTxId(btcTxID string) (*RedeemAction, error)
+
+	// Insert a new BTC redeem (sent to BTC blockchain but not mined yet)
 	InsertRedeem(r *RedeemAction) error
 
-	// Check if the redeem exists but not been mined
+	// Check if the redeem exists but not been mined on Bitcoin blockchain
 	IfNotMined(ethRequestTxID string) (bool, error)
 
 	// Complete (finish) the redeem
 	CompleteRedeem(ethRequestTxID string) error
+
+	// Complete (finish) the redeem by btcTxID
+	// CompletedByBtcTxID(btcTxID string) error
 }
 
 // OtherTransferAction is a struct that represents an unknown transfer

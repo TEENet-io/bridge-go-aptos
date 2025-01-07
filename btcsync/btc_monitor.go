@@ -47,8 +47,14 @@ type BTCMonitor struct {
 
 // Given a BTC transaction ID, finds a record in the database
 func (m *BTCMonitor) QueryRedeemTx(btcTxID string) bool {
-	reqTxHash, err := m.mgrState.QueryByBtcTxId(btcTxID)
-	if len(reqTxHash) == 0 || err != nil {
+	record, err := m.mgrState.QueryByBtcTxId(btcTxID)
+	if err != nil {
+		return false
+	}
+	if record == nil {
+		return false
+	}
+	if len(record.EthRequestTxID) == 0 {
 		return false
 	}
 	return true
@@ -56,9 +62,14 @@ func (m *BTCMonitor) QueryRedeemTx(btcTxID string) bool {
 
 // FinishRedeem marks a redeem as completed in the database
 func (m *BTCMonitor) FinishRedeem(btcTxID string) string {
-	reqTxHash, _ := m.mgrState.QueryByBtcTxId(btcTxID)
-	_ = m.mgrState.CompleteRedeem(reqTxHash)
-	return reqTxHash
+	record, _ := m.mgrState.QueryByBtcTxId(btcTxID)
+	logger.WithField("reqTxHash", record.EthRequestTxID).Debug("Complete Redeem Action Triggered")
+	_ = m.mgrState.CompleteRedeem(record.EthRequestTxID)
+
+	record, _ = m.mgrState.QueryByEthRequestTxId(record.EthRequestTxID)
+	logger.WithField("record", record).Debug("Redeem Action Record")
+
+	return record.EthRequestTxID
 }
 
 func NewBTCMonitor(addressStr string, chainConfig *chaincfg.Params, rpcClient *rpc.RpcClient, startBlock int64, mgrState btcaction.RedeemActionStorage) (*BTCMonitor, error) {
@@ -133,6 +144,9 @@ func (m *BTCMonitor) Scan() error {
 			// notify observers to set the state on core shared state.
 			_btc_txid := tx.TxHash().String()
 			if m.QueryRedeemTx(_btc_txid) {
+
+				logger.WithField("btcTxId", _btc_txid).Debug("Redeem Found on blockchain")
+
 				reqTxHash := m.FinishRedeem(_btc_txid)
 
 				// Notify Observers
