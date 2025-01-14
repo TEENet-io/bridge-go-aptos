@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"testing"
+
+	"github.com/TEENet-io/bridge-go/common"
 )
 
 var testConfig = ConnectorConfig{
@@ -66,4 +68,46 @@ func TestGetSignature(t *testing.T) {
 		t.Fatalf("Invalid signature length: %d, should be 64 bytes", len(result))
 	}
 	fmt.Printf("Signature: %x\n", result)
+}
+
+func TestSignAndVerify(t *testing.T) {
+
+	// message to be signed.
+	message := []byte("hello1")
+
+	c, err := setup()
+	if err != nil {
+		t.Fatalf("Error setting up connector: %v", err)
+	}
+	defer c.Close()
+
+	pubkey, err := c.GetPubKey()
+	if err != nil {
+		t.Fatalf("Error getting public key: %v", err)
+	}
+
+	if len(pubkey) != 64 {
+		t.Fatalf("Invalid public key length: %d, should be 64 bytes", len(pubkey))
+	}
+	fmt.Printf("Group Public Key: %x\n", pubkey)
+
+	sig, err := c.GetSignature(message)
+	if err != nil {
+		t.Fatalf("Error getting signature: %v", err)
+	}
+	if len(sig) != 64 {
+		t.Fatalf("Invalid signature length: %d, should be 64 bytes", len(sig))
+	}
+	fmt.Printf("Signature: %x\n", sig)
+
+	// Verify the signature, message, pubkey
+	success := common.Verify(
+		pubkey[:32], // only the X-coordinate of the public key
+		message,
+		BytesToBigInt(sig[:32]),
+		BytesToBigInt(sig[32:]))
+
+	if !success {
+		t.Fatalf("Error verifying signature")
+	}
 }

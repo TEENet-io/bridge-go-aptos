@@ -6,17 +6,17 @@ import (
 )
 
 // Define
-type RemoteSchnorrWallet struct {
+type RemoteSchnorrSigner struct {
 	connector *Connector
 }
 
 // Creation via a provided connector
-func NewRemoteSchnorrWallet(connector *Connector) *RemoteSchnorrWallet {
-	return &RemoteSchnorrWallet{connector: connector}
+func NewRemoteSchnorrSigner(connector *Connector) *RemoteSchnorrSigner {
+	return &RemoteSchnorrSigner{connector: connector}
 }
 
 // Sign
-func (rsw *RemoteSchnorrWallet) Sign(message []byte) (*big.Int, *big.Int, error) {
+func (rsw *RemoteSchnorrSigner) Sign(message []byte) (*big.Int, *big.Int, error) {
 	content, err := rsw.connector.GetSignature(message)
 	if err != nil {
 		return nil, nil, err
@@ -27,13 +27,13 @@ func (rsw *RemoteSchnorrWallet) Sign(message []byte) (*big.Int, *big.Int, error)
 // Pub
 // Return the public key of the wallet.
 // (X, Y)
-func (rsw *RemoteSchnorrWallet) Pub() (*big.Int, *big.Int, error) {
+func (rsw *RemoteSchnorrSigner) Pub() (*big.Int, *big.Int, error) {
 	content, err := rsw.connector.GetPubKey()
 	if err != nil {
 		return nil, nil, err
 	}
 	if len(content) != 64 {
-		return nil, nil, errors.New("invalid content length from server, expected 64 bytes, got " + string(len(content)))
+		return nil, nil, errors.New("invalid content length from server, expected 64 bytes")
 	}
 	return BytesToBigInt(content[:32]), BytesToBigInt(content[32:]), nil
 }

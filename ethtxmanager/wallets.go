@@ -25,7 +25,7 @@ type MockedSchnorrThresholdWallet struct {
 
 // Create a random mocked local schnorr threshold wallet
 func NewRandomMockedSchnorrThresholdWallet() (*MockedSchnorrThresholdWallet, error) {
-	ss, err := m.NewRandomLocalSchnorrWallet()
+	ss, err := m.NewRandomLocalSchnorrSigner()
 	if err != nil {
 		return nil, err
 	}

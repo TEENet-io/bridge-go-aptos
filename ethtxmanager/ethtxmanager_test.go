@@ -50,7 +50,7 @@ type testEnv struct {
 
 func newTestEnv(t *testing.T, file string, btcChainConfig *chaincfg.Params) *testEnv {
 
-	ss, err := multisig.NewRandomLocalSchnorrWallet()
+	ss, err := multisig.NewRandomLocalSchnorrSigner()
 	if err != nil {
 		t.Fatalf("failed to create schnorr wallet: %v", err)
 	}
@@ -100,8 +100,8 @@ func newTestEnv(t *testing.T, file string, btcChainConfig *chaincfg.Params) *tes
 	}
 	// TODO use our btc wallet instead
 	btcWallet := &MockBtcWallet{}
-	// TODO change to network based schnorr wallet
-	schnorrWallet := &MockSchnorrThresholdWallet{sim}
+
+	schnorrWallet, _ := NewRandomMockedSchnorrThresholdWallet()
 	mgr, err := NewEthTxManager(cfg, sim.Etherman, statedb, mgrdb, schnorrWallet, btcWallet)
 	assert.NoError(t, err)
 
