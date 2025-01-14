@@ -37,6 +37,20 @@ func (rsw *RemoteSchnorrWallet) Sign(request *mgr.SignatureRequest, ch chan<- *m
 	return nil
 }
 
+// Pub
+// Return the public key of the wallet.
+// Should be 65 bytes uncompressed [0x04 + x (32byte) + y (32byte)].
+func (rsw *RemoteSchnorrWallet) Pub() ([]byte, error) {
+	content, err := rsw.connector.GetPubKey()
+	if err != nil {
+		return nil, err
+	}
+	if len(content) != 64 {
+		return nil, errors.New("invalid content length from server, expected 64 bytes, got " + string(len(content)))
+	}
+	return append([]byte{0x04}, content...), nil
+}
+
 // Helper function.
 // Remote signature is of 64 bytes (128 characters in hex)
 // We separate the signature into (rx, s) two parts.
