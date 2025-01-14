@@ -1,0 +1,12 @@
+{
+    "name": "node0",
+    "rpcAddress": "localhost:6001",
+    "cert": "config/data/node0.crt",
+    "key": "config/data/node0.key",
+    "caCert": "config/data/node0-ca.crt",
+    "coordinatorAddress": "localhost:4001",
+    "coordinatorCaCert": "config/data/coordinator-ca.crt",
+    "clientsCaCert": [
+        "config/data/client0-ca.crt"
+    ]
+}
