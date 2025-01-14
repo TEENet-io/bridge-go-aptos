@@ -38,6 +38,8 @@ func TestGetPubKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error setting up connector: %v", err)
 	}
+	defer c.Close()
+
 	result, err := c.GetPubKey()
 	if err != nil {
 		t.Fatalf("Error getting public key: %v", err)
@@ -54,6 +56,8 @@ func TestGetSignature(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error setting up connector: %v", err)
 	}
+	defer c.Close()
+
 	result, err := c.GetSignature([]byte("hello1"))
 	if err != nil {
 		t.Fatalf("Error getting signature: %v", err)

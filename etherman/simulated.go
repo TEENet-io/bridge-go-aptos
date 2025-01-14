@@ -2,20 +2,19 @@ package etherman
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"math/big"
 
-	"crypto/ecdsa"
-
-	"github.com/TEENet-io/bridge-go/common"
-	bridge "github.com/TEENet-io/bridge-go/contracts/TEENetBtcBridge"
-	"github.com/btcsuite/btcd/btcec/v2"
-	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient/simulated"
 	logger "github.com/sirupsen/logrus"
+
+	"github.com/TEENet-io/bridge-go/common"
+	bridge "github.com/TEENet-io/bridge-go/contracts/TEENetBtcBridge"
+	"github.com/TEENet-io/bridge-go/multisig"
 )
 
 const (
@@ -128,26 +127,21 @@ type ParamConfig struct {
 
 type SimEtherman struct {
 	Chain    *SimulatedChain
-	Sk       *btcec.PrivateKey // Private key for schnorr signature (simulation of multi-party)
 	Etherman *Etherman
+	// Sk          *btcec.PrivateKey // Private key for schnorr signature (simulation of multi-party)
+	MultiSigner multisig.SchnorrSigner
 }
 
 // 1. Create a simulated ETH chain, with some genesis acccounts filled with money
 // 2. Random a btc private-public key pair (simulate m-to-n schnorr).
 // 3. Deploy the bridge contract /twbtc contract with the btc public key.
-func NewSimEtherman(privateKeys []*ecdsa.PrivateKey) (*SimEtherman, error) {
+func NewSimEtherman(privateKeys []*ecdsa.PrivateKey, schnorrSigner multisig.SchnorrSigner) (*SimEtherman, error) {
 	chain := NewSimulatedChain(privateKeys)
 
-	// Random bitcoin private key.
-	// TODO: Change to a multi-party schnorr private key.
-	sk, err := btcec.NewPrivateKey()
+	pk_x, _, err := schnorrSigner.Pub()
 	if err != nil {
 		return nil, err
 	}
-
-	// X of the pubkey (this is actually a simulation of a multi-party schnorr pubkey)
-	// TODO: Change to a multi-party schnorr pubkey aggregation.
-	pk := sk.PubKey().X()
 
 	// Deploy the bridge contract.
 	// Pubkey is embedded in the bridge contract.
@@ -155,7 +149,7 @@ func NewSimEtherman(privateKeys []*ecdsa.PrivateKey) (*SimEtherman, error) {
 	bridgeAddress, _, contract, err := bridge.DeployTEENetBtcBridge(
 		chain.Accounts[0],
 		chain.Backend.Client(),
-		pk)
+		pk_x)
 	if err != nil {
 		return nil, err
 	}
@@ -179,7 +173,7 @@ func NewSimEtherman(privateKeys []*ecdsa.PrivateKey) (*SimEtherman, error) {
 	if err != nil {
 		return nil, err
 	}
-	if pk.Cmp(_pk) != 0 {
+	if pk_x.Cmp(_pk) != 0 {
 		return nil, err
 	}
 
@@ -196,8 +190,9 @@ func NewSimEtherman(privateKeys []*ecdsa.PrivateKey) (*SimEtherman, error) {
 
 	return &SimEtherman{
 		Etherman: etherman,
-		Sk:       sk,
-		Chain:    chain,
+		// Sk:       sk,
+		Chain:       chain,
+		MultiSigner: schnorrSigner,
 	}, nil
 }
 
@@ -205,7 +200,6 @@ func NewSimEtherman(privateKeys []*ecdsa.PrivateKey) (*SimEtherman, error) {
 // Translate cfg.Receiver (idx) to a pre-stored ethereum receiver address
 func (env *SimEtherman) GenMintParams(cfg *ParamConfig, btcTxId [32]byte) *MintParams {
 	chain := env.Chain
-	sk := env.Sk
 
 	idx := cfg.Receiver
 	if idx < 0 {
@@ -218,7 +212,7 @@ func (env *SimEtherman) GenMintParams(cfg *ParamConfig, btcTxId [32]byte) *MintP
 
 	// Create (rx, s) schnorr signature of (btctxid, ethaddr, amount)
 	content := crypto.Keccak256Hash(common.EncodePacked(btcTxId, receiver.String(), cfg.Amount)).Bytes()
-	rx, s, err := Sign(sk, content[:])
+	rx, s, err := env.MultiSigner.Sign(content[:])
 	if err != nil {
 		return nil
 	}
@@ -310,7 +304,7 @@ func (env *SimEtherman) GenPrepareParams(cfg *ParamConfig) (p *PrepareParams) {
 	// create the hash
 	msg := p.SigningHash()
 	// sign the hash
-	rx, s, err := Sign(env.Sk, msg[:])
+	rx, s, err := env.MultiSigner.Sign(msg[:])
 	if err != nil {
 		return nil
 	}
@@ -329,13 +323,7 @@ func (env *SimEtherman) Sign(content []byte) (*big.Int, *big.Int, error) {
 	// with a signle private key = (rx, s)
 	// the signature can be combined with other signatures in real production.
 	// Now is only a simulation. So only a single schnorr signature.
-	sig, err := schnorr.Sign(env.Sk, content)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	bytes := sig.Serialize()
-	return new(big.Int).SetBytes(bytes[:32]), new(big.Int).SetBytes(bytes[32:]), nil
+	return env.MultiSigner.Sign(content)
 }
 
 // !!! This is a convenient function.
