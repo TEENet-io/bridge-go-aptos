@@ -9,11 +9,15 @@ Multi-sign schnorr wallet is a multi-party wallet that can perform like a single
 
 # Types
 
-- LocalWallet: A wallet that can sign messages but is localled hosted.
-- RemoteWallet: A wallet that can sign messages but is remotely hosted on server.
-- SimulatedWallet: A wallet that is backed by only a single private key and hosted locally.
+- LocalWallet: Locally hosted wallet. Backed by only a single private key.
+- RemoteWallet: A wallet that is M-N, an sign messages, and is remotely hosted on server.
 
 # Files
 
-`net.go` - Operator to communicate with remote server. Do `Sign()` and `GetPubKey()` requests.
+`interface.go` - Interface for wallet.
+`net.go` - Operator to communicate with remote server. Do `Sign()` and `GetPubKey()` network requests.
+
 `remote.go` - Remote wallet implementation. Based on `net.go`.
+`local.go` - Local wallet implementation.
+
+`utils.go` - Converters of primitive data types.

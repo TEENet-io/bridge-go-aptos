@@ -37,7 +37,7 @@ type MockSchnorrThresholdWallet struct {
 }
 
 // Signature request & response via channel
-func (w *MockSchnorrThresholdWallet) Sign(
+func (w *MockSchnorrThresholdWallet) SignAsync(
 	request *SignatureRequest,
 	ch chan<- *SignatureRequest,
 ) error {

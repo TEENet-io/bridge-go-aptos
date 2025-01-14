@@ -44,7 +44,7 @@ func (txmgr *EthTxManager) mint(ctx context.Context, mint *state.Mint) error {
 
 	// request signature
 	chForSignature := make(chan *SignatureRequest, 1)
-	err = txmgr.schnorrWallet.Sign(
+	err = txmgr.schnorrWallet.SignAsync(
 		&SignatureRequest{
 			Id:          mint.BtcTxId,
 			SigningHash: signingHash,

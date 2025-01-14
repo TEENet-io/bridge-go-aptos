@@ -12,6 +12,7 @@ import (
 	"github.com/TEENet-io/bridge-go/common"
 	"github.com/TEENet-io/bridge-go/etherman"
 	"github.com/TEENet-io/bridge-go/ethsync"
+	"github.com/TEENet-io/bridge-go/multisig"
 	"github.com/TEENet-io/bridge-go/state"
 	"github.com/btcsuite/btcd/chaincfg"
 	ethcommon "github.com/ethereum/go-ethereum/common"
@@ -49,7 +50,11 @@ type testEnv struct {
 
 func newTestEnv(t *testing.T, file string, btcChainConfig *chaincfg.Params) *testEnv {
 
-	sim, err := etherman.NewSimEtherman(etherman.GenPrivateKeys(10))
+	ss, err := multisig.NewRandomLocalSchnorrWallet()
+	if err != nil {
+		t.Fatalf("failed to create schnorr wallet: %v", err)
+	}
+	sim, err := etherman.NewSimEtherman(etherman.GenPrivateKeys(10), ss)
 	assert.NoError(t, err)
 
 	chainID, err := sim.Etherman.Client().ChainID(context.Background())

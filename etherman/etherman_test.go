@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/TEENet-io/bridge-go/common"
+	"github.com/TEENet-io/bridge-go/multisig"
+
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	logger "github.com/sirupsen/logrus"
@@ -13,9 +15,10 @@ import (
 )
 
 var TEST_ETH_ACCOUNTS = GenPrivateKeys(ETH_ACCOUNTS)
+var ss, _ = multisig.NewRandomLocalSchnorrWallet()
 
 func TestNonce(t *testing.T) {
-	env, err := NewSimEtherman(TEST_ETH_ACCOUNTS)
+	env, err := NewSimEtherman(TEST_ETH_ACCOUNTS, ss)
 	assert.NoError(t, err)
 
 	env.Mint(common.RandBytes32(), 1, 100)
@@ -30,7 +33,7 @@ func TestNonce(t *testing.T) {
 }
 
 func TestIsPrepared(t *testing.T) {
-	env, err := NewSimEtherman(TEST_ETH_ACCOUNTS)
+	env, err := NewSimEtherman(TEST_ETH_ACCOUNTS, ss)
 	assert.NoError(t, err)
 	etherman := env.Etherman
 	commit := env.Chain.Backend.Commit
@@ -48,7 +51,7 @@ func TestIsPrepared(t *testing.T) {
 }
 
 func TestIsMinted(t *testing.T) {
-	env, err := NewSimEtherman(TEST_ETH_ACCOUNTS)
+	env, err := NewSimEtherman(TEST_ETH_ACCOUNTS, ss)
 	assert.NoError(t, err)
 	etherman := env.Etherman
 	commit := env.Chain.Backend.Commit
@@ -68,7 +71,7 @@ func TestIsMinted(t *testing.T) {
 }
 
 func TestGetEventLogs(t *testing.T) {
-	env, err := NewSimEtherman(TEST_ETH_ACCOUNTS)
+	env, err := NewSimEtherman(TEST_ETH_ACCOUNTS, ss)
 	assert.NoError(t, err)
 
 	commit := env.Chain.Backend.Commit
@@ -109,7 +112,7 @@ func TestGetEventLogs(t *testing.T) {
 }
 
 func TestRedeemPrepare(t *testing.T) {
-	env, err := NewSimEtherman(TEST_ETH_ACCOUNTS)
+	env, err := NewSimEtherman(TEST_ETH_ACCOUNTS, ss)
 	assert.NoError(t, err)
 	etherman := env.Etherman
 	commit := env.Chain.Backend.Commit
@@ -122,7 +125,7 @@ func TestRedeemPrepare(t *testing.T) {
 }
 
 func TestRedeemRequest(t *testing.T) {
-	env, err := NewSimEtherman(TEST_ETH_ACCOUNTS)
+	env, err := NewSimEtherman(TEST_ETH_ACCOUNTS, ss)
 	assert.NoError(t, err)
 	etherman := env.Etherman
 	commit := env.Chain.Backend.Commit
@@ -155,7 +158,7 @@ func TestRedeemRequest(t *testing.T) {
 }
 
 func TestMint(t *testing.T) {
-	env, err := NewSimEtherman(TEST_ETH_ACCOUNTS)
+	env, err := NewSimEtherman(TEST_ETH_ACCOUNTS, ss)
 	assert.NoError(t, err)
 	etherman := env.Etherman
 	commit := env.Chain.Backend.Commit
@@ -187,7 +190,7 @@ func TestGetLatestFinalizedBlockNumber(t *testing.T) {
 }
 
 func TestDebugGetLatestFinalizedBlockNumber(t *testing.T) {
-	env, err := NewSimEtherman(TEST_ETH_ACCOUNTS)
+	env, err := NewSimEtherman(TEST_ETH_ACCOUNTS, ss)
 	assert.NoError(t, err)
 	etherman := env.Etherman
 

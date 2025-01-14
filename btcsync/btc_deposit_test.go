@@ -34,6 +34,7 @@ import (
 	"github.com/TEENet-io/bridge-go/etherman"
 	"github.com/TEENet-io/bridge-go/ethsync"
 	"github.com/TEENet-io/bridge-go/ethtxmanager"
+	"github.com/TEENet-io/bridge-go/multisig"
 	"github.com/TEENet-io/bridge-go/state"
 	"github.com/btcsuite/btcd/chaincfg"
 	ethcommon "github.com/ethereum/go-ethereum/common"
@@ -88,6 +89,34 @@ const (
 // eth chain
 var SimulatedChainID = big.NewInt(EVM_CHAIN_ID_INT64)
 var SimulatedEthPrivateKeys = etherman.GenPrivateKeys(EVM_TEST_ACCOUNTS)
+
+// Multisign configuration
+var testConfig = multisig.ConnectorConfig{
+	UserID:        0,
+	Name:          "client0",
+	Cert:          "../multisig/config/data/client0.crt",
+	Key:           "../multisig/config/data/client0.key",
+	CaCert:        "../multisig/config/data/client0-ca.crt",
+	ServerAddress: "20.205.130.99:6001",
+	ServerCACert:  "../multisig/config/data/node0-ca.crt",
+}
+
+func setupConnector(connConfig multisig.ConnectorConfig) (*multisig.Connector, error) {
+	if _, err := os.Stat(connConfig.Cert); os.IsNotExist(err) {
+		return nil, err
+	}
+	if _, err := os.Stat(connConfig.Key); os.IsNotExist(err) {
+		return nil, err
+	}
+	if _, err := os.Stat(connConfig.CaCert); os.IsNotExist(err) {
+		return nil, err
+	}
+	if _, err := os.Stat(connConfig.ServerCACert); os.IsNotExist(err) {
+		return nil, err
+	}
+	c, err := multisig.NewConnector(&connConfig)
+	return c, err
+}
 
 // *** Begin configuration of BTC side ***
 
@@ -191,7 +220,20 @@ type testEnv struct {
 // Setup ETH side facilities
 func newTestEnv(t *testing.T, file string, btcChainConfig *chaincfg.Params, btcWallet ethtxmanager.BtcWallet) *testEnv {
 
-	sim, err := etherman.NewSimEtherman(SimulatedEthPrivateKeys)
+	// local schnorr wallet
+	// ss, err := multisig.NewRandomLocalSchnorrWallet()
+	// if err != nil {
+	// 	t.Fatalf("failed to create schnorr wallet: %v", err)
+	// }
+
+	// remote schnorr wallet
+	connector, err := setupConnector(testConfig)
+	if err != nil {
+		t.Fatalf("failed to create grpc connector: %v", err)
+	}
+	ss := multisig.NewRemoteSchnorrWallet(connector)
+
+	sim, err := etherman.NewSimEtherman(SimulatedEthPrivateKeys, ss)
 	assert.NoError(t, err)
 
 	chainID, err := sim.Etherman.Client().ChainID(context.Background())

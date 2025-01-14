@@ -69,7 +69,7 @@ func (txmgr *EthTxManager) prepareRedeem(ctx context.Context, redeem *state.Rede
 
 	// request signature
 	chForSignature := make(chan *SignatureRequest, 1)
-	err = txmgr.schnorrWallet.Sign(
+	err = txmgr.schnorrWallet.SignAsync(
 		&SignatureRequest{
 			Id:          redeem.RequestTxHash,
 			SigningHash: signingHash,
