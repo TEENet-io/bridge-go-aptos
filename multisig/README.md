@@ -16,3 +16,4 @@ Multi-sign schnorr wallet is a multi-party wallet that can perform like a single
 # Files
 
 `net.go` - Operator to communicate with remote server. Do `Sign()` and `GetPubKey()` requests.
+`remote.go` - Remote wallet implementation. Based on `net.go`.

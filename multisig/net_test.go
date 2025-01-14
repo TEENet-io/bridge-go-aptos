@@ -42,6 +42,10 @@ func TestGetPubKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error getting public key: %v", err)
 	}
+
+	if len(result) != 64 {
+		t.Fatalf("Invalid public key length: %d, should be 64 bytes", len(result))
+	}
 	fmt.Printf("Group Public Key: %x\n", result)
 }
 
@@ -53,6 +57,9 @@ func TestGetSignature(t *testing.T) {
 	result, err := c.GetSignature([]byte("hello1"))
 	if err != nil {
 		t.Fatalf("Error getting signature: %v", err)
+	}
+	if len(result) != 64 {
+		t.Fatalf("Invalid signature length: %d, should be 64 bytes", len(result))
 	}
 	fmt.Printf("Signature: %x\n", result)
 }
