@@ -4,7 +4,6 @@ import (
 	"math/big"
 
 	"github.com/TEENet-io/bridge-go/common"
-	"github.com/TEENet-io/bridge-go/etherman"
 	"github.com/TEENet-io/bridge-go/state"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 )
@@ -25,36 +24,6 @@ func (w *MockBtcWallet) Request(
 	}
 
 	ch <- outpoints
-
-	return nil
-}
-
-// Mock schnorr threshold wallet
-// uses the sign in sim to emulate a sign.
-// it is actually a single-key schnorr.
-type MockSchnorrThresholdWallet struct {
-	Sim *etherman.SimEtherman
-}
-
-// Signature request & response via channel
-func (w *MockSchnorrThresholdWallet) SignAsync(
-	request *SignatureRequest,
-	ch chan<- *SignatureRequest,
-) error {
-	rx, s, err := w.Sim.Sign(request.SigningHash[:])
-
-	// if failed to sign, do nothing to allow the routine
-	// that waits for the signature to timeout
-	if err != nil {
-		return err
-	}
-
-	ch <- &SignatureRequest{
-		Id:          request.Id,
-		SigningHash: request.SigningHash,
-		Rx:          rx,
-		S:           s,
-	}
 
 	return nil
 }

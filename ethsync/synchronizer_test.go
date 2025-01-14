@@ -23,7 +23,7 @@ func TestSync(t *testing.T) {
 		common.Debug = false
 	}()
 
-	ss, err := multisig.NewRandomLocalSchnorrWallet()
+	ss, err := multisig.NewRandomLocalSchnorrSigner()
 	if err != nil {
 		t.Fatalf("failed to create schnorr wallet: %v", err)
 	}

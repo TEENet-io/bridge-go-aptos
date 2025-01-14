@@ -66,7 +66,7 @@ func (txmgr *EthTxManager) monitorPendingTxs(ctx context.Context, mtx *Monitored
 
 	diff := latest.Number.Uint64() - sentAfter.Number.Uint64()
 	if diff > txmgr.cfg.TimeoutOnMonitoringPendingTxs {
-		newLogger.Debug("tx has not been mined for %d blocks", txmgr.cfg.TimeoutOnMonitoringPendingTxs)
+		newLogger.Debugf("tx has not been mined for %d blocks", txmgr.cfg.TimeoutOnMonitoringPendingTxs)
 		err := txmgr.mgrdb.UpdateMonitoredTxStatus(mtx.TxHash, Timeout)
 		if err != nil {
 			newLogger.Errorf("failed to update monitored tx status: err=%v", err)

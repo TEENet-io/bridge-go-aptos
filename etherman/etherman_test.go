@@ -15,7 +15,7 @@ import (
 )
 
 var TEST_ETH_ACCOUNTS = GenPrivateKeys(ETH_ACCOUNTS)
-var ss, _ = multisig.NewRandomLocalSchnorrWallet()
+var ss, _ = multisig.NewRandomLocalSchnorrSigner()
 
 func TestNonce(t *testing.T) {
 	env, err := NewSimEtherman(TEST_ETH_ACCOUNTS, ss)

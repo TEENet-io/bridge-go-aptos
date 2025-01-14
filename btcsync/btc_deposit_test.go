@@ -220,18 +220,18 @@ type testEnv struct {
 // Setup ETH side facilities
 func newTestEnv(t *testing.T, file string, btcChainConfig *chaincfg.Params, btcWallet ethtxmanager.BtcWallet) *testEnv {
 
-	// local schnorr wallet
-	// ss, err := multisig.NewRandomLocalSchnorrWallet()
+	// local schnorr Signer
+	// ss, err := multisig.NewRandomLocalSchnorrSigner()
 	// if err != nil {
 	// 	t.Fatalf("failed to create schnorr wallet: %v", err)
 	// }
 
-	// remote schnorr wallet
+	// remote schnorr Signer
 	connector, err := setupConnector(testConfig)
 	if err != nil {
 		t.Fatalf("failed to create grpc connector: %v", err)
 	}
-	ss := multisig.NewRemoteSchnorrWallet(connector)
+	ss := multisig.NewRemoteSchnorrSigner(connector)
 
 	sim, err := etherman.NewSimEtherman(SimulatedEthPrivateKeys, ss)
 	assert.NoError(t, err)
@@ -277,7 +277,9 @@ func newTestEnv(t *testing.T, file string, btcChainConfig *chaincfg.Params, btcW
 		TimeoutOnMonitoringPendingTxs: timeoutOnMonitoringPendingTxs,
 	}
 	// TODO change to network-based, multi-party schnorr wallet
-	schnorrWallet := &ethtxmanager.MockSchnorrThresholdWallet{Sim: sim}
+	// schnorrWallet := &ethtxmanager.MockSchnorrThresholdWallet{Sim: sim}
+	schnorrWallet := ethtxmanager.NewMockedSchnorrThresholdWallet(ss)
+
 	mgr, err := ethtxmanager.NewEthTxManager(cfg, sim.Etherman, statedb, mgrdb, schnorrWallet, btcWallet)
 	assert.NoError(t, err)
 
