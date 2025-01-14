@@ -152,7 +152,10 @@ func NewSimEtherman(privateKeys []*ecdsa.PrivateKey) (*SimEtherman, error) {
 	// Deploy the bridge contract.
 	// Pubkey is embedded in the bridge contract.
 	// Later the smart contract use this pubkey to verify the validity of signature (Rx, s) of every request.
-	bridgeAddress, _, contract, err := bridge.DeployTEENetBtcBridge(chain.Accounts[0], chain.Backend.Client(), pk)
+	bridgeAddress, _, contract, err := bridge.DeployTEENetBtcBridge(
+		chain.Accounts[0],
+		chain.Backend.Client(),
+		pk)
 	if err != nil {
 		return nil, err
 	}
