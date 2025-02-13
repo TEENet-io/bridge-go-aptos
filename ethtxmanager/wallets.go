@@ -9,36 +9,37 @@ import (
 )
 
 // This interface is used by eth tx manager
-// to interact with the schnorr wallet for signing
-// then reply in the channel with result.
-// It can use an underlying ACTUAL signer to do the job.
-type SchnorrThresholdWallet interface {
+// to interact with the schnorr wallet for signing.
+// It uses a channel to perform async signing operation.
+// It uses an underlying ACTUAL signer to do the job.
+type SchnorrAsyncWallet interface {
 	// Sign sends a request to the wallet to sign on the signing hash
 	// and return the signature via the provided channel
 	SignAsync(request *SignatureRequest, ch chan<- *SignatureRequest) error
 }
 
 // Implementation: Local single key schnorr wallet
-type MockedSchnorrThresholdWallet struct {
+type MockedSchnorrAsyncWallet struct {
 	ss m.SchnorrSigner
 }
 
-// Create a random mocked local schnorr threshold wallet
-func NewRandomMockedSchnorrThresholdWallet() (*MockedSchnorrThresholdWallet, error) {
+// Create a random mocked local schnorr async wallet
+func NewRandomMockedSchnorrAsyncWallet() (*MockedSchnorrAsyncWallet, error) {
 	ss, err := m.NewRandomLocalSchnorrSigner()
 	if err != nil {
 		return nil, err
 	}
-	return &MockedSchnorrThresholdWallet{ss: ss}, nil
+	return &MockedSchnorrAsyncWallet{ss: ss}, nil
 }
 
-// Create a mocked local schnorr threshold wallet from a designated SchnorrSigner
-func NewMockedSchnorrThresholdWallet(ss m.SchnorrSigner) *MockedSchnorrThresholdWallet {
-	return &MockedSchnorrThresholdWallet{ss: ss}
+// Create a mocked local schnorr async wallet from a choosen SchnorrSigner
+// This signer can be local or remote signer.
+func NewMockedSchnorrAsyncWallet(ss m.SchnorrSigner) *MockedSchnorrAsyncWallet {
+	return &MockedSchnorrAsyncWallet{ss: ss}
 }
 
-// Implementation. Perform Async Signing.
-func (mstw *MockedSchnorrThresholdWallet) SignAsync(
+// Implementation: Perform Async Signing.
+func (mstw *MockedSchnorrAsyncWallet) SignAsync(
 	request *SignatureRequest,
 	ch chan<- *SignatureRequest,
 ) error {
@@ -59,17 +60,17 @@ func (mstw *MockedSchnorrThresholdWallet) SignAsync(
 }
 
 // Implementation: Remote schnorr wallet
-type RemoteSchnorrThresholdWallet struct {
+type RemoteSchnorrAsyncWallet struct {
 	ss m.SchnorrSigner
 }
 
 // Create a remote schnorr threshold wallet from a designated SchnorrSigner
-func NewRemoteSchnorrThresholdWallet(ss m.SchnorrSigner) *RemoteSchnorrThresholdWallet {
-	return &RemoteSchnorrThresholdWallet{ss: ss}
+func NewRemoteSchnorrAsyncWallet(ss m.SchnorrSigner) *RemoteSchnorrAsyncWallet {
+	return &RemoteSchnorrAsyncWallet{ss: ss}
 }
 
 // Implementation: Perform Async Signing.
-func (rstw *RemoteSchnorrThresholdWallet) SignAsync(
+func (rstw *RemoteSchnorrAsyncWallet) SignAsync(
 	request *SignatureRequest,
 	ch chan<- *SignatureRequest,
 ) error {

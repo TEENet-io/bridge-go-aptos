@@ -15,7 +15,7 @@ import (
 const MinTickerDuration = 100 * time.Millisecond
 
 type Synchronizer struct {
-	cfg           *Config
+	cfg           *EthSyncConfig
 	etherman      *etherman.Etherman
 	st            State
 	lastFinalized *big.Int
@@ -24,7 +24,7 @@ type Synchronizer struct {
 func New(
 	etherman *etherman.Etherman,
 	st State,
-	cfg *Config,
+	cfg *EthSyncConfig,
 ) (*Synchronizer, error) {
 	chainID, err := etherman.Client().ChainID(context.Background())
 	if err != nil {

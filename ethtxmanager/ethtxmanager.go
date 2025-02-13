@@ -20,11 +20,11 @@ var (
 )
 
 type EthTxManager struct {
-	cfg           *Config
+	cfg           *EthTxMgrConfig
 	etherman      *etherman.Etherman
 	statedb       *state.StateDB
 	mgrdb         *EthTxManagerDB
-	schnorrWallet SchnorrThresholdWallet
+	schnorrWallet SchnorrAsyncWallet
 	btcWallet     BtcWallet
 
 	// public key of the schnorr threshold signature
@@ -35,11 +35,11 @@ type EthTxManager struct {
 }
 
 func NewEthTxManager(
-	cfg *Config,
+	cfg *EthTxMgrConfig,
 	etherman *etherman.Etherman,
 	statedb *state.StateDB,
 	mgrdb *EthTxManagerDB,
-	schnorrWallet SchnorrThresholdWallet,
+	schnorrWallet SchnorrAsyncWallet,
 	btcWallet BtcWallet,
 ) (*EthTxManager, error) {
 	// Get the public key of the schnorr threshold signature

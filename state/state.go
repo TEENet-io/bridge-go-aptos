@@ -43,7 +43,7 @@ var (
 
 type State struct {
 	statedb *StateDB
-	cfg     *Config
+	cfg     *StateConfig
 
 	newEthFinalizedBlockCh chan *big.Int
 	newBtcFinalizedBlockCh chan *big.Int
@@ -59,7 +59,7 @@ type State struct {
 	}
 }
 
-func New(statedb *StateDB, cfg *Config) (*State, error) {
+func New(statedb *StateDB, cfg *StateConfig) (*State, error) {
 	st := &State{
 		cfg:                    cfg,
 		statedb:                statedb,
