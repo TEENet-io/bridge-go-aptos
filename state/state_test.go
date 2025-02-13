@@ -22,7 +22,7 @@ func newTestStateEnv(t *testing.T) (
 	statedb, err := NewStateDB(sqlDB)
 	assert.NoError(t, err)
 
-	st, err = New(statedb, &Config{ChannelSize: 1, EthChainId: big.NewInt(1337)})
+	st, err = New(statedb, &StateConfig{ChannelSize: 1, EthChainId: big.NewInt(1337)})
 	assert.NoError(t, err)
 
 	ctx, cancel = context.WithCancel(context.Background())
@@ -59,7 +59,7 @@ func TestUnmatchedChainId(t *testing.T) {
 	err = statedb.SetKeyedValue(KeyEthChainId, common.BigInt2Bytes32(big.NewInt(1338)))
 	assert.NoError(t, err)
 
-	st, err := New(statedb, &Config{ChannelSize: 1, EthChainId: big.NewInt(1337)})
+	st, err := New(statedb, &StateConfig{ChannelSize: 1, EthChainId: big.NewInt(1337)})
 	assert.Equal(t, err, ErrEthChainIdUnmatchedStored)
 	assert.Nil(t, st)
 }
@@ -74,7 +74,7 @@ func TestNewStateWithoutStored(t *testing.T) {
 	assert.NoError(t, err)
 	assert.False(t, ok)
 
-	st, err := New(statedb, &Config{ChannelSize: 1})
+	st, err := New(statedb, &StateConfig{ChannelSize: 1})
 	assert.NoError(t, err)
 
 	finalized, err := st.GetEthFinalizedBlockNumber()
@@ -93,7 +93,7 @@ func TestErrStoredEthFinalizedBlockNumberInvalid(t *testing.T) {
 	err := statedb.SetKeyedValue(KeyEthFinalizedBlock, common.BigInt2Bytes32(stored))
 	assert.NoError(t, err)
 
-	_, err = New(statedb, &Config{ChannelSize: 1})
+	_, err = New(statedb, &StateConfig{ChannelSize: 1})
 	assert.Equal(t, err, ErrStoredEthFinalizedBlockNumberInvalid)
 }
 

@@ -2,7 +2,7 @@ package state
 
 import "math/big"
 
-type Config struct {
+type StateConfig struct {
 	ChannelSize int
 	EthChainId  *big.Int
 }

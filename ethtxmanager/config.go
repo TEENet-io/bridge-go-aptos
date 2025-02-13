@@ -2,7 +2,7 @@ package ethtxmanager
 
 import "time"
 
-type Config struct {
+type EthTxMgrConfig struct {
 	// Frequency to get all the requested redeems that have not been prepared
 	FrequencyToPrepareRedeem time.Duration
 

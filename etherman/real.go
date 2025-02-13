@@ -29,6 +29,9 @@ type RealEthChain struct {
 	TwbtcContractAddress  common.Address         // created during New process
 }
 
+// rpc_url: the ethereum json rpc to connect to.
+// priv_key: the private key of the bridge controlled account.
+// schnorrSigner: the schnorr signer to be used in the bridge contract.
 func NewRealEthChain(rpc_url string, priv_key *ecdsa.PrivateKey, schnorrSigner multisig.SchnorrSigner) (*RealEthChain, error) {
 	client, err := ethclient.Dial(rpc_url)
 	if err != nil {

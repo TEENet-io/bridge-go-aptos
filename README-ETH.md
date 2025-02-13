@@ -95,21 +95,22 @@ Before launch:
 
 Launch:
 
-- Create an "Etherman" instance (Ethereum RPC client + one Ethereum account controlled by bridge + bridge smart contract address + TWBTC contract address).
-- state_db (file)
-- state (controls state_db)
-- eth_tx_manager_db (file)
-- eth_synchronizer (Etherman instance + state)
-- eth_tx_manager (Etherman instance + state_db + eth_tx_manager_db + Schnorr signer + BTC wallet)
+- [x] Create an "Etherman" instance (Ethereum RPC client + one Ethereum account controlled by bridge + bridge smart contract address + TWBTC contract address).
+- [x] state_db (file)
+- [x] state (controls state_db)
+- [x] eth_tx_manager_db (file)
+- [x] eth_synchronizer (Etherman instance + state)
+- [x] eth_tx_manager (Etherman instance + state_db + eth_tx_manager_db + Schnorr signer + BTC wallet)
+- [] Start all these components!
 
 Roles (separate entities):
 
 Bridge = 
-- One ETH account
-- Etherman
-- eth_synchrorizer
-- eth_tx_manager
-- db + state
+- [x] One ETH account
+- [x] Etherman
+- [x] eth_synchrorizer
+- [x] eth_tx_manager
+- [x] state_db + state
 
 + BTC_SIDE components.
 + REPORTER (HTTP server + API)

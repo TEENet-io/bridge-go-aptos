@@ -7,8 +7,8 @@ import (
 	"github.com/btcsuite/btcd/chaincfg"
 )
 
-type Config struct {
+type EthSyncConfig struct {
 	FrequencyToCheckEthFinalizedBlock time.Duration
-	BtcChainConfig                    *chaincfg.Params
+	BtcChainConfig                    *chaincfg.Params // used for verify btc address correctness (in RedeemRequest)
 	EthChainID                        *big.Int
 }

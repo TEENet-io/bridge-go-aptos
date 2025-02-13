@@ -253,7 +253,7 @@ func newTestEnv(t *testing.T, file string, btcChainConfig *chaincfg.Params, btcW
 	assert.NoError(t, err)
 
 	// create a eth2btc state from the eth2btc statedb
-	st, err := state.New(statedb, &state.Config{ChannelSize: 1, EthChainId: SimulatedChainID})
+	st, err := state.New(statedb, &state.StateConfig{ChannelSize: 1, EthChainId: SimulatedChainID})
 	assert.NoError(t, err)
 
 	// create a eth tx manager db
@@ -264,7 +264,7 @@ func newTestEnv(t *testing.T, file string, btcChainConfig *chaincfg.Params, btcW
 	sync, err := ethsync.New(
 		sim.Etherman,
 		st,
-		&ethsync.Config{
+		&ethsync.EthSyncConfig{
 			FrequencyToCheckEthFinalizedBlock: frequencyToCheckEthFinalizedBlock,
 			BtcChainConfig:                    btcChainConfig,
 			EthChainID:                        chainID,
@@ -273,7 +273,7 @@ func newTestEnv(t *testing.T, file string, btcChainConfig *chaincfg.Params, btcW
 	assert.NoError(t, err)
 
 	// create a eth tx manager
-	cfg := &ethtxmanager.Config{
+	cfg := &ethtxmanager.EthTxMgrConfig{
 		FrequencyToPrepareRedeem:      frequencyToPrepareRedeem,
 		FrequencyToMint:               frequencyToMint,
 		FrequencyToMonitorPendingTxs:  frequencyToMonitorPendingTxs,
@@ -283,7 +283,7 @@ func newTestEnv(t *testing.T, file string, btcChainConfig *chaincfg.Params, btcW
 	}
 	// TODO change to network-based, multi-party schnorr wallet
 	// schnorrWallet := &ethtxmanager.MockSchnorrThresholdWallet{Sim: sim}
-	schnorrWallet := ethtxmanager.NewMockedSchnorrThresholdWallet(ss)
+	schnorrWallet := ethtxmanager.NewMockedSchnorrAsyncWallet(ss)
 
 	mgr, err := ethtxmanager.NewEthTxManager(cfg, sim.Etherman, statedb, mgrdb, schnorrWallet, btcWallet)
 	assert.NoError(t, err)

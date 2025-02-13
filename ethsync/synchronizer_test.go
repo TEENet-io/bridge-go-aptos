@@ -37,7 +37,7 @@ func TestSync(t *testing.T) {
 
 	st := NewMockState()
 
-	cfg := &Config{
+	cfg := &EthSyncConfig{
 		FrequencyToCheckEthFinalizedBlock: 500 * time.Millisecond,
 		BtcChainConfig:                    common.MainNetParams(),
 		EthChainID:                        chainID,
