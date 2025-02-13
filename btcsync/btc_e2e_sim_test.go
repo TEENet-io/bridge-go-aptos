@@ -1,5 +1,9 @@
 package btcsync
 
+// Notice:
+// This test uses a local bitcoin two-node network v0.21.
+// And a Ethereum simulation network.
+
 // Test BTC deposit (then mint on eth side)
 // 1. Send the deposit
 // 2. Monitor captures the deposit
@@ -90,33 +94,34 @@ const (
 var SimulatedChainID = big.NewInt(EVM_CHAIN_ID_INT64)
 var SimulatedEthPrivateKeys = etherman.GenPrivateKeys(EVM_TEST_ACCOUNTS)
 
-// Multisign configuration
-var testConfig = multisig.ConnectorConfig{
-	UserID:        0,
-	Name:          "client0",
-	Cert:          "../multisig/config/data/client0.crt",
-	Key:           "../multisig/config/data/client0.key",
-	CaCert:        "../multisig/config/data/client0-ca.crt",
-	ServerAddress: "20.205.130.99:6001",
-	ServerCACert:  "../multisig/config/data/node0-ca.crt",
-}
+// Multisign configuration (remote signer)
+// var remoteSignerConfig = multisig.ConnectorConfig{
+// 	UserID:        0,
+// 	Name:          "client0",
+// 	Cert:          "../multisig/config/data/client0.crt",
+// 	Key:           "../multisig/config/data/client0.key",
+// 	CaCert:        "../multisig/config/data/client0-ca.crt",
+// 	ServerAddress: "20.205.130.99:6001",
+// 	ServerCACert:  "../multisig/config/data/node0-ca.crt",
+// }
 
-func setupConnector(connConfig multisig.ConnectorConfig) (*multisig.Connector, error) {
-	if _, err := os.Stat(connConfig.Cert); os.IsNotExist(err) {
-		return nil, err
-	}
-	if _, err := os.Stat(connConfig.Key); os.IsNotExist(err) {
-		return nil, err
-	}
-	if _, err := os.Stat(connConfig.CaCert); os.IsNotExist(err) {
-		return nil, err
-	}
-	if _, err := os.Stat(connConfig.ServerCACert); os.IsNotExist(err) {
-		return nil, err
-	}
-	c, err := multisig.NewConnector(&connConfig)
-	return c, err
-}
+// Mutisign (remote signer connector)
+// func setupConnector(connConfig multisig.ConnectorConfig) (*multisig.Connector, error) {
+// 	if _, err := os.Stat(connConfig.Cert); os.IsNotExist(err) {
+// 		return nil, err
+// 	}
+// 	if _, err := os.Stat(connConfig.Key); os.IsNotExist(err) {
+// 		return nil, err
+// 	}
+// 	if _, err := os.Stat(connConfig.CaCert); os.IsNotExist(err) {
+// 		return nil, err
+// 	}
+// 	if _, err := os.Stat(connConfig.ServerCACert); os.IsNotExist(err) {
+// 		return nil, err
+// 	}
+// 	c, err := multisig.NewConnector(&connConfig)
+// 	return c, err
+// }
 
 // *** Begin configuration of BTC side ***
 
@@ -221,19 +226,19 @@ type testEnv struct {
 func newTestEnv(t *testing.T, file string, btcChainConfig *chaincfg.Params, btcWallet ethtxmanager.BtcWallet) *testEnv {
 
 	// local schnorr Signer
-	// ss, err := multisig.NewRandomLocalSchnorrSigner()
-	// if err != nil {
-	// 	t.Fatalf("failed to create schnorr wallet: %v", err)
-	// }
-
-	// remote schnorr Signer
-	connector, err := setupConnector(testConfig)
+	ss, err := multisig.NewRandomLocalSchnorrSigner()
 	if err != nil {
-		t.Fatalf("failed to create grpc connector: %v", err)
+		t.Fatalf("failed to create schnorr wallet: %v", err)
 	}
-	ss := multisig.NewRemoteSchnorrSigner(connector)
 
-	sim, err := etherman.NewSimEtherman(SimulatedEthPrivateKeys, ss)
+	// or remote schnorr Signer?
+	// connector, err := setupConnector(remoteSignerConfig)
+	// if err != nil {
+	// 	t.Fatalf("failed to create grpc connector: %v", err)
+	// }
+	// ss := multisig.NewRemoteSchnorrSigner(connector)
+
+	sim, err := etherman.NewSimEtherman(SimulatedEthPrivateKeys, ss, etherman.SimulatedChainID)
 	assert.NoError(t, err)
 
 	chainID, err := sim.Etherman.Client().ChainID(context.Background())

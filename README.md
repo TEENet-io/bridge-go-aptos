@@ -22,9 +22,9 @@ Live Components
 
 - [ ] BTC Testnet (connect to BTC Testnet)
 - [ ] ETH Hardhat / Testnet (connect to ETH Testnet)
-- [ ] bridge.go
-- [ ] btc-user.go
-- [ ] eth-user.go
+- [ ] server.go
+- [ ] btc_user.go
+- [ ] eth_user.go
 
 Test Accounts
 

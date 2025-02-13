@@ -47,7 +47,7 @@ type ethereumClient interface {
 type Etherman struct {
 	ethClient ethereumClient
 
-	cfg *Config
+	cfg *EthermanConfig
 
 	auth *bind.TransactOpts // ethereum account controlled by bridge.
 	mu   sync.Mutex
@@ -57,7 +57,7 @@ type Etherman struct {
 // Create a new Etherman instance.
 // auth is used to sign bridge txs (mint, redeemRequest, redeemPrepare).
 // So auth should have some eth (as gas) within it.
-func NewEtherman(cfg *Config, auth *bind.TransactOpts) (*Etherman, error) {
+func NewEtherman(cfg *EthermanConfig, auth *bind.TransactOpts) (*Etherman, error) {
 	ethClient, err := ethclient.Dial(cfg.URL)
 	if err != nil {
 		logger.WithField("url", cfg.URL).Errorf("failed to dial Ethereum node: err=%v", err)

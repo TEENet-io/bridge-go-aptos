@@ -28,7 +28,7 @@ func TestSync(t *testing.T) {
 		t.Fatalf("failed to create schnorr wallet: %v", err)
 	}
 
-	env, err := etherman.NewSimEtherman(etherman.GenPrivateKeys(10), ss)
+	env, err := etherman.NewSimEtherman(etherman.GenPrivateKeys(10), ss, big.NewInt(1337))
 	assert.NoError(t, err)
 
 	chainID, err := env.Etherman.Client().ChainID(context.Background())
