@@ -54,7 +54,7 @@ func newTestEnv(t *testing.T, file string, btcChainConfig *chaincfg.Params) *tes
 	if err != nil {
 		t.Fatalf("failed to create schnorr wallet: %v", err)
 	}
-	sim, err := etherman.NewSimEtherman(etherman.GenPrivateKeys(10), ss)
+	sim, err := etherman.NewSimEtherman(etherman.GenPrivateKeys(10), ss, big.NewInt(1337))
 	assert.NoError(t, err)
 
 	chainID, err := sim.Etherman.Client().ChainID(context.Background())

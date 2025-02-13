@@ -1,1 +1,0 @@
-Mint = `Bitcoin (user deposit) => Etherum (auto mint TWBTC)`

@@ -47,37 +47,11 @@ type SimulatedChain struct {
 	Accounts []*bind.TransactOpts
 }
 
-// Generate one ETH private key
-func GenPrivateKey() *ecdsa.PrivateKey {
-	sk, _ := crypto.GenerateKey()
-	return sk
-}
-
-// Generate several private keys
-func GenPrivateKeys(number int) []*ecdsa.PrivateKey {
-	privateKeys := make([]*ecdsa.PrivateKey, number)
-	for i := 0; i < number; i++ {
-		privateKeys[i] = GenPrivateKey()
-	}
-	return privateKeys
-}
-
-// From eth private keys to eth simulated accounts
-func GenSimulatedAccounts(privateKeys []*ecdsa.PrivateKey) []*bind.TransactOpts {
-	// create genesis accounts
-	nAccount := len(privateKeys)
-	accounts := make([]*bind.TransactOpts, nAccount)
-	for i := 0; i < nAccount; i++ {
-		accounts[i] = newAuth(privateKeys[i], SimulatedChainID)
-	}
-	return accounts
-}
-
 // Create a new simulated chain
-// with some filled genesis accounts
-func NewSimulatedChain(privateKeys []*ecdsa.PrivateKey) *SimulatedChain {
+// with some pre-filled genesis accounts
+func NewSimulatedChain(privateKeys []*ecdsa.PrivateKey, chainId *big.Int) *SimulatedChain {
 	// genesis accounts
-	accounts := GenSimulatedAccounts(privateKeys)
+	accounts := NewAuthAccounts(privateKeys, chainId)
 
 	// allocate funds to genesis accounts
 	genesisAlloc := map[ethcommon.Address]types.Account{}
@@ -96,13 +70,6 @@ func NewSimulatedChain(privateKeys []*ecdsa.PrivateKey) *SimulatedChain {
 		Backend:  backend,
 		Accounts: accounts,
 	}
-}
-
-// Create a new auth object with a given private key.
-// The auth object is used to sign transactions
-func newAuth(sk *ecdsa.PrivateKey, chainID *big.Int) *bind.TransactOpts {
-	auth, _ := bind.NewKeyedTransactorWithChainID(sk, chainID)
-	return auth
 }
 
 type ParamConfig struct {
@@ -135,8 +102,8 @@ type SimEtherman struct {
 // 1. Create a simulated ETH chain, with some genesis acccounts filled with money
 // 2. Random a btc private-public key pair (simulate m-to-n schnorr).
 // 3. Deploy the bridge contract /twbtc contract with the btc public key.
-func NewSimEtherman(privateKeys []*ecdsa.PrivateKey, schnorrSigner multisig.SchnorrSigner) (*SimEtherman, error) {
-	chain := NewSimulatedChain(privateKeys)
+func NewSimEtherman(privateKeys []*ecdsa.PrivateKey, schnorrSigner multisig.SchnorrSigner, chainId *big.Int) (*SimEtherman, error) {
+	chain := NewSimulatedChain(privateKeys, chainId)
 
 	pk_x, _, err := schnorrSigner.Pub()
 	if err != nil {
@@ -177,7 +144,7 @@ func NewSimEtherman(privateKeys []*ecdsa.PrivateKey, schnorrSigner multisig.Schn
 		return nil, err
 	}
 
-	cfg := &Config{
+	cfg := &EthermanConfig{
 		BridgeContractAddress: bridgeAddress,
 		TWBTCContractAddress:  twbtcAddress,
 	}

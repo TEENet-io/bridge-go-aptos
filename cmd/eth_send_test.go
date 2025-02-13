@@ -2,15 +2,15 @@
 // It tests:
 // 1. The connection to the a local Ethereum node.
 // 2. The Ether transfer transaction creation.
-// 3. The mining of the transaction.
+// 3. The mining of the transaction on ETH network.
 // 4. The balance of two accounts after the transaction.
 
-package main
+package cmd_test
 
 import (
 	"context"
-	"log"
 	"math/big"
+	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -27,17 +27,17 @@ const (
 	RECEIVER_ADDR        = "0xdab133353Cff0773BAcb51d46195f01bD3D03940"
 )
 
-func main() {
+func TestSend(t *testing.T) {
 	// Connect to the local Ethereum node
 	client, err := ethclient.Dial("http://" + SERVER + ":" + PORT)
 	if err != nil {
-		log.Fatalf("Failed to connect to the Ethereum client: %v", err)
+		t.Fatalf("Failed to connect to the Ethereum client: %v", err)
 	}
 
 	// Sender private key
 	senderPrivateKey, err := crypto.HexToECDSA(SENDER_PRIVATE_KEY)
 	if err != nil {
-		log.Fatalf("Failed to load sender private key: %v", err)
+		t.Fatalf("Failed to load sender private key: %v", err)
 	}
 
 	// Receiver address
@@ -47,13 +47,13 @@ func main() {
 	senderAddress := crypto.PubkeyToAddress(senderPrivateKey.PublicKey)
 	nonce, err := client.PendingNonceAt(context.Background(), senderAddress)
 	if err != nil {
-		log.Fatalf("Failed to get nonce: %v", err)
+		t.Fatalf("Failed to get nonce: %v", err)
 	}
 
 	// Set the gas price
 	gasPrice, err := client.SuggestGasPrice(context.Background())
 	if err != nil {
-		log.Fatalf("Failed to suggest gas price: %v", err)
+		t.Fatalf("Failed to suggest gas price: %v", err)
 	}
 
 	// Set the amount to send (in Wei)
@@ -65,18 +65,28 @@ func main() {
 	// Sign the transaction
 	chainID, err := client.NetworkID(context.Background())
 	if err != nil {
-		log.Fatalf("Failed to get network ID: %v", err)
+		t.Fatalf("Failed to get network ID: %v", err)
 	}
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), senderPrivateKey)
 	if err != nil {
-		log.Fatalf("Failed to sign transaction: %v", err)
+		t.Fatalf("Failed to sign transaction: %v", err)
 	}
 
 	// Send the transaction
 	err = client.SendTransaction(context.Background(), signedTx)
 	if err != nil {
-		log.Fatalf("Failed to send transaction: %v", err)
+		t.Fatalf("Failed to send transaction: %v", err)
 	}
 
-	log.Printf("Transaction sent: %s", signedTx.Hash().Hex())
+	t.Logf("Transaction sent: %s", signedTx.Hash().Hex())
+
+	// Wait for the transaction to be mined
+	receipt, err := client.TransactionReceipt(context.Background(), signedTx.Hash())
+	if err != nil {
+		t.Fatalf("Failed to get transaction receipt: %v", err)
+	}
+
+	if receipt.Status != 1 {
+		t.Fatalf("Transaction failed: %v", receipt)
+	}
 }
