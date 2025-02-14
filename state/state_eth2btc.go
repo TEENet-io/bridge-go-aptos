@@ -17,7 +17,7 @@ func (st *State) initEthFinalizedBlock() error {
 	}
 
 	if !ok {
-		logger.WithField("default", common.EthStartingBlock).Warn("Missing evm lastest block #")
+		logger.WithField("default", common.EthStartingBlock).Warn("State: Missing evm lastest block #")
 		// save the default value
 		err := st.statedb.SetKeyedValue(KeyEthFinalizedBlock, common.BigInt2Bytes32(common.EthStartingBlock))
 		if err != nil {
@@ -26,7 +26,7 @@ func (st *State) initEthFinalizedBlock() error {
 		st.cache.lastEthFinalized.Store(common.EthStartingBlock.Bytes())
 	} else {
 		stored := new(big.Int).SetBytes(storedBytes32[:])
-
+		logger.WithField("evm_last_block", stored.Int64()).Info("State: Loaded evm last block from db #")
 		// stored value must not be less than the starting block number
 		if stored.Cmp(common.EthStartingBlock) == -1 {
 			logger.Errorf("stored last finalized block number is invalid: %v", stored)
@@ -46,7 +46,7 @@ func (st *State) initEthChainID() error {
 	}
 
 	if !ok {
-		logger.WithField("chainId", st.cfg.EthChainId).Warn("missing evm chainId, use default")
+		logger.WithField("chainId", st.cfg.EthChainId).Warn("state: Missing evm chainId, use default")
 		// save the default value
 		err := st.statedb.SetKeyedValue(KeyEthChainId, common.BigInt2Bytes32(st.cfg.EthChainId))
 		if err != nil {
@@ -55,6 +55,7 @@ func (st *State) initEthChainID() error {
 		st.cache.ethChainId.Store(st.cfg.EthChainId.Bytes())
 	} else {
 		stored := new(big.Int).SetBytes(storedBytes32[:])
+		logger.WithField("evm_chainId", stored.Int64()).Info("State: Load evm chainId from db #")
 
 		if stored.Cmp(st.cfg.EthChainId) != 0 {
 			logger.Errorf("current chain id does not match the stored: curr=%v, stored=%v", st.cfg.EthChainId, stored)

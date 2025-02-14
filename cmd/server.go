@@ -2,6 +2,7 @@
 // All components are configured via envionment variables (strings!).
 // Problems:
 // 1) BTC lastblock height is not fetched in db, but using the "latest" height.
+// 2) BTC side components doesn't use ctx as stop signal, better use.
 
 package cmd
 
@@ -57,7 +58,7 @@ type BridgeServerConfig struct {
 	// eth side
 	EthRpcUrl          string                 // json rpc url
 	EthCoreAccountPriv string                 // private key of the bridge controlled account
-	schnorrSigner      multisig.SchnorrSigner // remote or local both okay. as long as it can sign() and pub()
+	MSchnorrSigner     multisig.SchnorrSigner // remote or local both okay. as long as it can sign() and pub()
 	// state side
 	DbFilePath string // db file path
 	// btc side
@@ -122,7 +123,9 @@ func NewBridgeServer(bsc *BridgeServerConfig, ctx context.Context, wg *sync.Wait
 		logger.Fatalf("failed to create core eth account controlled by bridge: %v", err)
 		return nil, err
 	}
-	realEth, err := etherman.NewRealEthChain(bsc.EthRpcUrl, eth_core_account, bsc.schnorrSigner)
+	realEth, err := etherman.NewRealEthChain(bsc.EthRpcUrl, eth_core_account, bsc.MSchnorrSigner)
+	logger.WithField("BridgeContractAddress", realEth.BridgeContractAddress.Hex()).Info("Bridge contract address")
+	logger.WithField("TwbtcContractAddress", realEth.TwbtcContractAddress.Hex()).Info("TWBTC contract address")
 	if err != nil {
 		return nil, err
 	}
@@ -194,7 +197,7 @@ func NewBridgeServer(bsc *BridgeServerConfig, ctx context.Context, wg *sync.Wait
 
 	// well, eth tx mgr doesn't recognize signer.
 	// wrap the signer into "async schnorr wallet".
-	_schnorrAsyncWallet := ethtxmanager.NewMockedSchnorrAsyncWallet(bsc.schnorrSigner)
+	_schnorrAsyncWallet := ethtxmanager.NewMockedSchnorrAsyncWallet(bsc.MSchnorrSigner)
 
 	myEthTxMgr, err := ethtxmanager.NewEthTxManager(
 		_eth_tx_mgr_cfg,
