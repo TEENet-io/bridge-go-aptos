@@ -17,24 +17,31 @@ const (
 	MAX_CONFIRM  = 9999999
 )
 
+type RpcClientConfig struct {
+	ServerAddr string // ip address of server
+	Port       string // port of server
+	Username   string
+	Pwd        string
+}
+
 // Wrapper of btc rpc client.
 type RpcClient struct {
 	ServerAddr string // ip address of server
 	Port       string // port of server
-	User       string
-	Pass       string
+	Username   string
+	Pwd        string
 	client     *rpcclient.Client
 }
 
 // Create a new RPC client which
 // contains several useful functions
 // to interact with bitcoin node.
-func NewRpcClient(server string, port string, username string, password string) (*RpcClient, error) {
+func NewRpcClient(rcc *RpcClientConfig) (*RpcClient, error) {
 	// Connect to local Bitcoin mining node using HTTP
 	client, err := rpcclient.New(&rpcclient.ConnConfig{
-		Host:         server + ":" + port,
-		User:         username,
-		Pass:         password,
+		Host:         rcc.ServerAddr + ":" + rcc.Port,
+		User:         rcc.Username,
+		Pass:         rcc.Pwd,
 		HTTPPostMode: true, // original bitcoin only supports HTTP POST mode
 		DisableTLS:   true, // original bitcoin does not support TLS
 	}, nil)
@@ -43,7 +50,7 @@ func NewRpcClient(server string, port string, username string, password string) 
 		return nil, err
 	}
 
-	return &RpcClient{server, port, username, password, client}, nil
+	return &RpcClient{rcc.ServerAddr, rcc.Port, rcc.Username, rcc.Pwd, client}, nil
 }
 
 // Close the rpc client

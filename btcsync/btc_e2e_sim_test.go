@@ -161,7 +161,13 @@ func setupClient(t *testing.T) (*rpc.RpcClient, error) {
 		t.Fatal("export env variables first: SERVER, PORT, USER, PASS before running the tests")
 	}
 
-	r, err := rpc.NewRpcClient(server, port, username, password)
+	_config := rpc.RpcClientConfig{
+		ServerAddr: server,
+		Port:       port,
+		Username:   username,
+		Pwd:        password,
+	}
+	r, err := rpc.NewRpcClient(&_config)
 	if err != nil {
 		t.Fatal("cannot create PpcClient with given credentials")
 	}
