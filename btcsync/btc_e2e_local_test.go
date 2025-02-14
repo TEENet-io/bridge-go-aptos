@@ -158,12 +158,17 @@ func setup() bool {
 }
 
 // Setup of BTC RPC client
-func setupClient(t *testing.T) (*rpc.RpcClient, error) {
+func setupBtcClient(t *testing.T) (*rpc.RpcClient, error) {
 	if !setup() {
 		t.Fatal("export env variables first: SERVER, PORT, USER, PASS before running the tests")
 	}
-
-	r, err := rpc.NewRpcClient(server, port, username, password)
+	_config := rpc.RpcClientConfig{
+		ServerAddr: server,
+		Port:       port,
+		Username:   username,
+		Pwd:        password,
+	}
+	r, err := rpc.NewRpcClient(&_config)
 	if err != nil {
 		t.Fatal("cannot create PpcClient with given credentials")
 	}
@@ -361,7 +366,7 @@ func TestDeposit(t *testing.T) {
 
 	// Setup the btc rpc client
 	// this rpc instance is shared by btc monitor and btc user (deposit sender)
-	r, err := setupClient(t)
+	r, err := setupBtcClient(t)
 	if err != nil {
 		t.Fatal("cannot create rpc client")
 	}
@@ -795,6 +800,6 @@ func TestDeposit(t *testing.T) {
 		logger.WithFields(logger.Fields{"json": string(resp_redeems)}).Info("http redeems")
 	}
 
-	cancel()  // guess: cancel() ends sub go routines politely.
-	wg.Wait() // wait for all the routines to complete.
+	cancel()  // cancel() signals ctx.Done(), so ends sub go routines politely.
+	wg.Wait() // wait for all the routines to be completed then stop the main go routine.
 }

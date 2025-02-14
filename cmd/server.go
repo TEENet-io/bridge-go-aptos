@@ -1,38 +1,58 @@
 // Server = eth_side components + btc_side components + db/state + http reporter.
-// All components are configured via envionment variables.
+// All components are configured via envionment variables (strings!).
+// Problems:
+// 1) BTC lastblock height is not fetched in db, but using the "latest" height.
 
 package cmd
 
 import (
+	"context"
 	"database/sql"
+	"fmt"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
 	"time"
 
 	"github.com/btcsuite/btcd/chaincfg"
 	logger "github.com/sirupsen/logrus"
 
+	"github.com/TEENet-io/bridge-go/btcaction"
+	"github.com/TEENet-io/bridge-go/btcman/assembler"
+	btcrpc "github.com/TEENet-io/bridge-go/btcman/rpc"
+	"github.com/TEENet-io/bridge-go/btcsync"
+	"github.com/TEENet-io/bridge-go/btctxmanager"
 	"github.com/TEENet-io/bridge-go/btcvault"
 	"github.com/TEENet-io/bridge-go/etherman"
 	"github.com/TEENet-io/bridge-go/ethsync"
 	"github.com/TEENet-io/bridge-go/ethtxmanager"
 	"github.com/TEENet-io/bridge-go/multisig"
+	"github.com/TEENet-io/bridge-go/reporter"
 	"github.com/TEENet-io/bridge-go/state"
 )
 
 // Default params for server.
+// More often we don't recommend users to tweak those.
+// So we list them here.
 const (
-	// eth synchronizer
+	// eth synchronizer config
 	frequencyToCheckEthFinalizedBlock = 100 * time.Millisecond
 
 	// eth tx manager config
-	frequencyToPrepareRedeem      = 500 * time.Millisecond
-	frequencyToMint               = 500 * time.Millisecond // 0.5 second
+	frequencyToPrepareRedeem      = 500 * time.Millisecond // 0.5 second
+	frequencyToMint               = 500 * time.Millisecond
 	frequencyToMonitorPendingTxs  = 500 * time.Millisecond
-	timeoutOnWaitingForSignature  = 1 * time.Second
+	timeoutOnWaitingForSignature  = 2 * time.Second
 	timtoutOnWaitingForOutpoints  = 1 * time.Second
 	timeoutOnMonitoringPendingTxs = 10 // blocks
+
+	// btc publisher-observer config
+	CHANNEL_BUFFER_SIZE = 10
 )
 
 // Keep the configuration's fields as "text" as possible.
+// Its easier to load it from env vars or a config file.
 type BridgeServerConfig struct {
 	// eth side
 	EthRpcUrl          string                 // json rpc url
@@ -41,8 +61,17 @@ type BridgeServerConfig struct {
 	// state side
 	DbFilePath string // db file path
 	// btc side
-	BtcCoreAccountAddr string           // btc core account address (who receives deposit) to be monitored.
+	BtcRpcServer       string           // btc rpc server info
+	BtcRpcPort         string           // btc rpc server info
+	BtcRpcUsername     string           // btc rpc server info
+	BtcRpcPwd          string           // btc rpc server info
 	BtcChainConfig     *chaincfg.Params // regtest, testnet, mainnet? see btcman/assembler/common.go
+	BtcCoreAccountPriv string           // btc core account private key (who sends btc)
+	BtcCoreAccountAddr string           // btc core account address (who receives deposit) to be monitored.
+
+	// Http side
+	HttpIp   string // eg. 0.0.0.0
+	HttpPort string // eg. 8080
 }
 
 type BridgeServer struct {
@@ -55,20 +84,37 @@ type BridgeServer struct {
 	MyEthMgrDb *ethtxmanager.EthTxManagerDB
 	MyEthTxMgr *ethtxmanager.EthTxManager
 	MyEthSync  *ethsync.Synchronizer
+
+	// Btc side
+	BtcRpcClient *btcrpc.RpcClient
+	// Btc side: generated objects
+	MyBtcVault   *btcvault.TreasureVault
+	MyBtcMgr     *btctxmanager.BtcTxManager
+	MyBtcMonitor *btcsync.BTCMonitor
 }
 
-func NewBridgeServer(bsc *BridgeServerConfig) (*BridgeServer, error) {
+func NewBridgeServer(bsc *BridgeServerConfig, ctx context.Context, wg *sync.WaitGroup) (*BridgeServer, error) {
 	// BTC side config
+
+	// 0) connect to btc network
+	myBtcRpcClient, err := setupBtcRpc(bsc.BtcRpcServer, bsc.BtcRpcPort, bsc.BtcRpcUsername, bsc.BtcRpcPwd)
+	if err != nil {
+		logger.Fatalf("cannot connect to btc rpc server with %s:%s, %s:%s %v", bsc.BtcRpcServer, bsc.BtcRpcPort, bsc.BtcRpcUsername, bsc.BtcRpcPwd, err)
+		return nil, err
+	}
+
 	// 1) Create a <UTXO vault storage>
-	vault_st, err := btcvault.NewSQLiteStorage(bsc.DbFilePath, bsc.BtcCoreAccountAddr)
+	vaultStorage, err := btcvault.NewSQLiteStorage(bsc.DbFilePath, bsc.BtcCoreAccountAddr)
 	if err != nil {
 		logger.Fatalf("cannot create vault storage %v", err)
 		return nil, err
 	}
 
 	// 2) Create a <UTXO vault> over the storage to track a specific btc address
-	// This is shared between btc monitor AND eth tx manager.
-	my_btc_vault := btcvault.NewTreasureVault(bsc.BtcCoreAccountAddr, vault_st)
+	// This is SHARED between btc monitor and eth tx manager.
+	myBtcVault := btcvault.NewTreasureVault(bsc.BtcCoreAccountAddr, vaultStorage)
+
+	// ETH side config
 
 	// 1) Create the real ethereum chain that is terraformed.
 	eth_core_account, err := etherman.StringToPrivateKey(bsc.EthCoreAccountPriv)
@@ -156,20 +202,223 @@ func NewBridgeServer(bsc *BridgeServerConfig) (*BridgeServer, error) {
 		myStateDb,
 		myEthTxMgrDb,
 		_schnorrAsyncWallet,
-		my_btc_vault,
+		myBtcVault,
 	)
 	if err != nil {
 		logger.Fatalf("failed to create eth tx manager: %v", err)
 		return nil, err
 	}
 
+	// Important: Turn on eth-side components!
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		myState.Start(ctx) // state
+	}()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		myEthTxMgr.Start(ctx) // eth-side tx manager
+	}()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		myEthSynchronizer.Sync(ctx) // eth-side synchronizer
+	}()
+	// Don't forget to call wg.Wait() in the main routine.
+
+	// Go back to btc side config:
+	// 3) Create <Btc Tx Manager Storage> (for redeem purpose, useless in deposit)
+	btcMgrStorage, err := btcaction.NewSQLiteRedeemStorage(bsc.DbFilePath)
+	if err != nil {
+		logger.Fatalf("cannot create backend storage %v", err)
+		return nil, err
+	}
+
+	// *** Create <btc tx manager> ***
+	bridgeBtcCoreAccount, err := assembler.NewBasicSigner(bsc.BtcCoreAccountPriv, bsc.BtcChainConfig)
+	if err != nil {
+		logger.Fatalf("cannot create wallet from private key %s", bsc.BtcCoreAccountPriv)
+		return nil, err
+	}
+	bridgeBtcSigner, err := assembler.NewLegacySigner(*bridgeBtcCoreAccount)
+	if err != nil {
+		logger.Fatalf("cannot create legacy wallet")
+		return nil, err
+	}
+	bridgeBtcAddrstr := bridgeBtcSigner.P2PKH.EncodeAddress()
+	if bridgeBtcAddrstr != bsc.BtcCoreAccountAddr {
+		logger.Fatalf("btc core address mismatch: %s != %s", bridgeBtcAddrstr, bsc.BtcCoreAccountAddr)
+	}
+
+	myBtcTxMgr := btctxmanager.NewBtcTxManager(
+		myBtcVault,
+		bridgeBtcSigner,
+		myBtcRpcClient,
+		myState,
+		btcMgrStorage,
+	)
+
+	// Turn on evm2btc withdraw loop
+	go myBtcTxMgr.WithdrawLoop()
+
+	// *** Create <btc monitor> for btc2evm deposits ***
+	_latest_height, _ := myBtcRpcClient.GetLatestBlockHeight()
+
+	// Attention: we start from the latest block height on BTC for clean slate.
+	myBtcMonitor, err := setupBtcMonitor(myBtcRpcClient, bsc.BtcCoreAccountAddr, btcMgrStorage, int(_latest_height))
+	if err != nil {
+		logger.Fatalf("cannot create monitor, %v", err)
+		return nil, err
+	}
+	// Can't turn on the monitor loop yet, need to register observers to the monitor loop first.
+
+	// Setup the observers on btc-side
+
+	// *** Deposit observer ***
+	// 1) Create <deposit storage>
+	depoStorage, err := btcaction.NewSQLiteDepositStorage(bsc.DbFilePath)
+	if err != nil {
+		logger.Fatalf("cannot create deposit storage %v", err)
+		return nil, err
+	}
+	// 2) Create <deposit observer> over the storage.
+	depositObserver, err := setupObserverDeposit(depoStorage)
+	if err != nil {
+		logger.Fatalf("cannot create deposit observer, %v", err)
+		return nil, err
+	}
+	// 3) Deposit Observer start listening to the channel
+	go depositObserver.GetNotifiedDeposit()
+
+	// 4) Register Deposit Observer to publisher
+	myBtcMonitor.Publisher.RegisterDepositObserver(depositObserver.Ch)
+
+	// *** Mint observer ***
+	// once a btc deposit occurs, it triggers a twbtc mint on eth side.
+	// so mint observer is also interested in deposit events.
+	// However we don't store mint, it is handled on the eth-side directly.
+	// so no storage is allocated for mint observer.
+
+	// 1) Create mint observer
+	mintObserver := btcsync.NewBTC2EVMObserver(myState, CHANNEL_BUFFER_SIZE)
+
+	// 2) Mint Observer start listening to the channel
+	go mintObserver.GetNotifiedDeposit()
+
+	// 3) Register Mint Observer to publisher
+	myBtcMonitor.Publisher.RegisterDepositObserver(mintObserver.Ch)
+
+	// *** UTXO Observer ***
+	// Setup: UTXO Storage -> UTXO Vault -> UTXO Observer
+
+	// 3) Create a UTXO observer
+	// It will stuff the UTXO vault with UTXO(s) once it gets notified
+	utxo_observer := btcsync.NewObserverUTXOVault(myBtcVault, CHANNEL_BUFFER_SIZE)
+
+	// 4) UTXO Observer starts listening to the channel
+	go utxo_observer.GetNotifiedUtxo()
+
+	// 5) Register UTXO Observer to publisher
+	myBtcMonitor.Publisher.RegisterUTXOObserver(utxo_observer.Ch)
+
+	// Turn on the btc monitor scan loop
+	// So it can publish events to observers
+	go myBtcMonitor.ScanLoop()
+
+	// *** Setup a http server to report status ***
+	// logger.Info("Setup http server to report status")
+	http_server := reporter.NewHttpReporter(
+		bsc.HttpIp,
+		bsc.HttpPort,
+		depoStorage,
+		btcMgrStorage,
+		myStateDb,
+	)
+	// Turn on the http server
+	go http_server.Run()
+
+	// Give it some time to start the http server
+	time.Sleep(1 * time.Second)
+	// *** End the setup of http server ***
+
 	return &BridgeServer{
-		EthEnv:     realEth,
-		MyEtherman: myEtherman,
-		MyState:    myState,
-		MyStateDb:  myStateDb,
-		MyEthMgrDb: myEthTxMgrDb,
-		MyEthTxMgr: myEthTxMgr,
-		MyEthSync:  myEthSynchronizer,
+		EthEnv:       realEth,
+		MyEtherman:   myEtherman,
+		MyState:      myState,
+		MyStateDb:    myStateDb,
+		MyEthMgrDb:   myEthTxMgrDb,
+		MyEthTxMgr:   myEthTxMgr,
+		MyEthSync:    myEthSynchronizer,
+		BtcRpcClient: myBtcRpcClient,
+		MyBtcVault:   myBtcVault,
+		MyBtcMgr:     myBtcTxMgr,
+		MyBtcMonitor: myBtcMonitor,
 	}, nil
+}
+
+// Start the bridge server and wait.
+// Press Ctrl-C to stop the server.
+func StartBridgeServerAndWait(bsc *BridgeServerConfig) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel() // defense programing
+
+	// Set up a signal channel to listen for Ctrl‑C (SIGINT) or SIGTERM
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+
+	// Launch a new goroutine to handle the signal
+	go func() {
+		sig := <-sigCh
+		fmt.Printf("Received signal: %v, cancelling context...\n", sig)
+		cancel()
+	}()
+
+	var wg sync.WaitGroup
+
+	_, err := NewBridgeServer(bsc, ctx, &wg)
+	if err != nil {
+		logger.Fatalf("failed to create bridge server: %v", err)
+		return
+	}
+
+	// wait for all routines to finish (which is forever)
+	wg.Wait()
+}
+
+// Helper function. Create a btc rpc client.
+func setupBtcRpc(server string, port string, username string, password string) (*btcrpc.RpcClient, error) {
+	_config := btcrpc.RpcClientConfig{
+		ServerAddr: server,
+		Port:       port,
+		Username:   username,
+		Pwd:        password,
+	}
+	r, err := btcrpc.NewRpcClient(&_config)
+	if err != nil {
+		logger.Fatalf("failed to create btc rpc client: %v", err)
+		return nil, err
+	}
+	return r, nil
+}
+
+// Helper function. Set up the BTC Monitor, create a new monitor instance
+func setupBtcMonitor(r *btcrpc.RpcClient, btcCoreAccountAddr string, st btcaction.RedeemActionStorage, startBlock int) (*btcsync.BTCMonitor, error) {
+	monitor, err := btcsync.NewBTCMonitor(
+		btcCoreAccountAddr,
+		assembler.GetRegtestParams(),
+		r,
+		int64(startBlock),
+		st,
+	)
+	if err != nil {
+		logger.Fatalf("cannot create monitor %v", err)
+	}
+
+	return monitor, nil
+}
+
+// TODO: remove this helper function.
+func setupObserverDeposit(st btcaction.DepositStorage) (*btcsync.ObserverDepositAction, error) {
+	return btcsync.NewObserverDepositAction(st, CHANNEL_BUFFER_SIZE), nil
 }
