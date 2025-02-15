@@ -35,27 +35,31 @@ func (txmgr *EthTxManager) monitorPendingTxs(ctx context.Context, mtx *Monitored
 
 	// if the tx is mined, remove it from db
 	if receipt != nil && receipt.BlockNumber != nil {
-		newLogger.Debug("tx has been mined")
+		newLogger.Debug("evm tx has been mined")
 
 		var status MonitoredTxStatus
 		if receipt.Status == 0 {
-			newLogger.Error("tx mined but reverted")
+			newLogger.Error("evm tx mined but reverted")
 			status = Reverted
 		} else {
-			newLogger.Debug("tx mined and successfully executed")
+			newLogger.Debug("evm tx mined and successfully executed")
 			status = Success
 		}
 		err := txmgr.mgrdb.UpdateMonitoredTxStatus(mtx.TxHash, status)
 		if err != nil {
-			newLogger.Errorf("failed to update monitored tx status: err=%v", err)
+			newLogger.Errorf("failed to update monitored evm tx status: err=%v", err)
 			return ErrDBOpUpdateMonitoredTxStatus
 		}
 	}
 
 	// check timeout for monitoring the tx
+	newLogger.Debugf("monitored evm tx, field SentAfter %v", mtx.SentAfter)
+	newLogger.Debugf("monitored evm tx, field SentAfter.Hex() %s", mtx.SentAfter.Hex())
+
 	sentAfter, err := txmgr.etherman.Client().HeaderByHash(ctx, mtx.SentAfter)
+	newLogger.Debugf("sentAfter: %v", sentAfter)
 	if err != nil {
-		newLogger.Errorf("failed to get sentAfter block: err=%v", err)
+		newLogger.Errorf("failed to get 'sentAfter' evm block: err=%v", err)
 		return ErrEthermanHeaderByHash
 	}
 	latest, err := txmgr.etherman.Client().HeaderByNumber(ctx, nil)

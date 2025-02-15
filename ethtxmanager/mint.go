@@ -61,7 +61,7 @@ func (txmgr *EthTxManager) mint(ctx context.Context, mint *state.Mint) error {
 	if err != nil {
 		return err
 	}
-	newLogger.Debug("schnorr signature received")
+	newLogger.Debug("schnorr signature requested & received")
 
 	// set outpoints before saving
 	params.Rx = common.BigIntClone(req.Rx)
@@ -74,13 +74,25 @@ func (txmgr *EthTxManager) handleMintTx(
 	params *etherman.MintParams,
 	logger *logger.Entry,
 ) error {
-	// Get the latest block
-	latest, err := txmgr.etherman.Client().HeaderByNumber(context.Background(), nil)
+	// Get the latest_header block
+	latest_header, err := txmgr.etherman.Client().HeaderByNumber(context.Background(), nil)
+	if err != nil {
+		logger.Errorf("failed to get latest block header: err=%v", err)
+		return ErrEthermanHeaderByNumber
+	}
+
+	latest_block, err := txmgr.etherman.Client().BlockByNumber(context.Background(), nil)
 	if err != nil {
 		logger.Errorf("failed to get latest block: err=%v", err)
 		return ErrEthermanHeaderByNumber
 	}
-	logger.Debugf("got latest block: num=%d", latest.Number)
+
+	if latest_header.Hash() != latest_block.Hash() {
+		logger.Errorf("latest header hash and block hash are not the same: header=%s, block=%s", latest_header.Hash().String(), latest_block.Hash().String())
+	} else {
+		logger.Infof("latest header hash and block hash are the same: header=%s, block=%s", latest_header.Hash().String(), latest_block.Hash().String())
+	}
+	logger.Debugf("got latest eth block: num=%d", latest_header.Number)
 
 	tx, err := txmgr.etherman.Mint(params)
 	if err != nil {
@@ -89,20 +101,21 @@ func (txmgr *EthTxManager) handleMintTx(
 	}
 
 	newLogger := logger.WithField("mintTx", tx.Hash().String())
-	newLogger.Debugf("mint tx sent: tx=%s", tx.Hash().String())
+	newLogger.Debugf("mint tx sent: eth_tx_id=%s", tx.Hash().String())
 
 	// Save the monitored tx
 	mt := &MonitoredTx{
 		TxHash:    tx.Hash(),
 		Id:        params.BtcTxId,
-		SentAfter: latest.Hash(),
+		SentAfter: latest_header.Hash(), // interesting, using block hash as sendAfter not block number.
 	}
+	newLogger.Debugf("latest block hash: 0x%x, block number: %d", latest_header.Hash(), latest_header.Number)
 	err = txmgr.mgrdb.InsertPendingMonitoredTx(mt)
 	if err != nil {
 		logger.Errorf("failed to insert pending monitored tx: err=%v", err)
 		return ErrDBOpInsertMonitoredTx
 	}
-	newLogger.Debugf("inserted monitored tx: sentAfter=0x%x", mt.SentAfter)
+	newLogger.Debugf("inserted monitored tx: sentAfter(last eth block hash)=0x%x", mt.SentAfter)
 
 	return nil
 }
