@@ -65,3 +65,11 @@ cQthTMaKUU9f6br1hMXdGFXHwGaAfFFerNkn632BpGE6KXhTMmGY
 mvqq54khZQta7zDqFGoyN7BVK7Li4Xwnih
 cUWcwxzt2LiTxQCkQ8FKw67gd2NuuZ182LpX9uazB93JLZmwakBP
 ```
+
+## Problems:
+
+1) BTC lastblock height is not fetched in db, but using the "latest" height.
+2) BTC side components doesn't use ctx as stop signal, better use.
+3) Many unused code in project. Use tool (staticcheck or golangci-lint) to find and remove them, or remove them manually.
+4) Monitor.go, `Id` field of type `MonitoredTx` is used of different purposes, shall separate. not RE-USED.
+5) MonitoredTx, the last block hash is stored. However, in real life (not sim), the blck hash is not search-able. So better using last block height (int64) instead of hash. This now breaks the logic of finding expired Txs.

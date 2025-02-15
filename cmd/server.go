@@ -1,8 +1,5 @@
 // Server = eth_side components + btc_side components + db/state + http reporter.
 // All components are configured via envionment variables (strings!).
-// Problems:
-// 1) BTC lastblock height is not fetched in db, but using the "latest" height.
-// 2) BTC side components doesn't use ctx as stop signal, better use.
 
 package cmd
 
@@ -75,6 +72,7 @@ type BridgeServerConfig struct {
 	HttpPort string // eg. 8080
 }
 
+// BridgeServer holds the objects that consists of the bridge server.
 type BridgeServer struct {
 	// Eth side
 	EthEnv *etherman.RealEthChain
@@ -89,11 +87,16 @@ type BridgeServer struct {
 	// Btc side
 	BtcRpcClient *btcrpc.RpcClient
 	// Btc side: generated objects
-	MyBtcVault   *btcvault.TreasureVault
-	MyBtcMgr     *btctxmanager.BtcTxManager
-	MyBtcMonitor *btcsync.BTCMonitor
+	MyDepositStorage btcaction.DepositStorage
+	MyVaultStorage   btcvault.VaultUTXOStorage
+	MyBtcVault       *btcvault.TreasureVault
+	MyBtcMgr         *btctxmanager.BtcTxManager
+	MyBtcMonitor     *btcsync.BTCMonitor
 }
 
+// NewBridgeServer creates a new bridge server.
+// ctx is used for parental context to cancel the operation of bridge server.
+// wg is used to wait for all the goroutines inside the server (monitor, sychronizer, tx manager) to finish.
 func NewBridgeServer(bsc *BridgeServerConfig, ctx context.Context, wg *sync.WaitGroup) (*BridgeServer, error) {
 	// BTC side config
 
@@ -280,13 +283,13 @@ func NewBridgeServer(bsc *BridgeServerConfig, ctx context.Context, wg *sync.Wait
 
 	// *** Deposit observer ***
 	// 1) Create <deposit storage>
-	depoStorage, err := btcaction.NewSQLiteDepositStorage(bsc.DbFilePath)
+	depositStorage, err := btcaction.NewSQLiteDepositStorage(bsc.DbFilePath)
 	if err != nil {
 		logger.Fatalf("cannot create deposit storage %v", err)
 		return nil, err
 	}
 	// 2) Create <deposit observer> over the storage.
-	depositObserver, err := setupObserverDeposit(depoStorage)
+	depositObserver, err := setupObserverDeposit(depositStorage)
 	if err != nil {
 		logger.Fatalf("cannot create deposit observer, %v", err)
 		return nil, err
@@ -334,7 +337,7 @@ func NewBridgeServer(bsc *BridgeServerConfig, ctx context.Context, wg *sync.Wait
 	http_server := reporter.NewHttpReporter(
 		bsc.HttpIp,
 		bsc.HttpPort,
-		depoStorage,
+		depositStorage,
 		btcMgrStorage,
 		myStateDb,
 	)
@@ -346,22 +349,25 @@ func NewBridgeServer(bsc *BridgeServerConfig, ctx context.Context, wg *sync.Wait
 	// *** End the setup of http server ***
 
 	return &BridgeServer{
-		EthEnv:       realEth,
-		MyEtherman:   myEtherman,
-		MyState:      myState,
-		MyStateDb:    myStateDb,
-		MyEthMgrDb:   myEthTxMgrDb,
-		MyEthTxMgr:   myEthTxMgr,
-		MyEthSync:    myEthSynchronizer,
-		BtcRpcClient: myBtcRpcClient,
-		MyBtcVault:   myBtcVault,
-		MyBtcMgr:     myBtcTxMgr,
-		MyBtcMonitor: myBtcMonitor,
+		EthEnv:           realEth,
+		MyEtherman:       myEtherman,
+		MyState:          myState,
+		MyStateDb:        myStateDb,
+		MyEthMgrDb:       myEthTxMgrDb,
+		MyEthTxMgr:       myEthTxMgr,
+		MyEthSync:        myEthSynchronizer,
+		BtcRpcClient:     myBtcRpcClient,
+		MyDepositStorage: depositStorage,
+		MyVaultStorage:   vaultStorage,
+		MyBtcVault:       myBtcVault,
+		MyBtcMgr:         myBtcTxMgr,
+		MyBtcMonitor:     myBtcMonitor,
 	}, nil
 }
 
-// Start the bridge server and wait.
-// Press Ctrl-C to stop the server.
+// Create, then start the bridge server and wait.
+// It contains a prepared bridge server and context + waitgroup.
+// Press Ctrl-C to kill the server.
 func StartBridgeServerAndWait(bsc *BridgeServerConfig) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel() // defense programing

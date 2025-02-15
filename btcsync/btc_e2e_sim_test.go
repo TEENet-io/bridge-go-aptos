@@ -33,7 +33,6 @@ import (
 	"github.com/TEENet-io/bridge-go/btcman/utxo"
 	"github.com/TEENet-io/bridge-go/btctxmanager"
 	"github.com/TEENet-io/bridge-go/btcvault"
-	"github.com/TEENet-io/bridge-go/common"
 	sharedcommon "github.com/TEENet-io/bridge-go/common"
 	"github.com/TEENet-io/bridge-go/etherman"
 	"github.com/TEENet-io/bridge-go/ethsync"
@@ -309,9 +308,9 @@ func (env *testEnv) close() {
 func TestDeposit(t *testing.T) {
 	logconfig.ConfigDebugLogger()
 
-	common.Debug = true
+	sharedcommon.Debug = true
 	defer func() {
-		common.Debug = false
+		sharedcommon.Debug = false
 	}()
 
 	// Setup the db file name,
