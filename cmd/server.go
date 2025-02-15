@@ -101,7 +101,7 @@ func NewBridgeServer(bsc *BridgeServerConfig, ctx context.Context, wg *sync.Wait
 	// BTC side config
 
 	// 0) connect to btc network
-	myBtcRpcClient, err := setupBtcRpc(bsc.BtcRpcServer, bsc.BtcRpcPort, bsc.BtcRpcUsername, bsc.BtcRpcPwd)
+	myBtcRpcClient, err := SetupBtcRpc(bsc.BtcRpcServer, bsc.BtcRpcPort, bsc.BtcRpcUsername, bsc.BtcRpcPwd)
 	if err != nil {
 		logger.Fatalf("cannot connect to btc rpc server with %s:%s, %s:%s %v", bsc.BtcRpcServer, bsc.BtcRpcPort, bsc.BtcRpcUsername, bsc.BtcRpcPwd, err)
 		return nil, err
@@ -393,22 +393,6 @@ func StartBridgeServerAndWait(bsc *BridgeServerConfig) {
 
 	// wait for all routines to finish (which is forever)
 	wg.Wait()
-}
-
-// Helper function. Create a btc rpc client.
-func setupBtcRpc(server string, port string, username string, password string) (*btcrpc.RpcClient, error) {
-	_config := btcrpc.RpcClientConfig{
-		ServerAddr: server,
-		Port:       port,
-		Username:   username,
-		Pwd:        password,
-	}
-	r, err := btcrpc.NewRpcClient(&_config)
-	if err != nil {
-		logger.Fatalf("failed to create btc rpc client: %v", err)
-		return nil, err
-	}
-	return r, nil
 }
 
 // Helper function. Set up the BTC Monitor, create a new monitor instance

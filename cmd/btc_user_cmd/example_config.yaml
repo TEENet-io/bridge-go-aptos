@@ -1,0 +1,10 @@
+# BTC
+BTC_RPC_SERVER: "127.0.0.1"
+BTC_RPC_PORT: "19001"
+BTC_RPC_USERNAME: "admin1"
+BTC_RPC_PWD: "123"
+BTC_CHAIN_CONFIG: "regtest" # mainnet, testnet
+BTC_CORE_ACCOUNT_PRIV: "cQthTMaKUU9f6br1hMXdGFXHwGaAfFFerNkn632BpGE6KXhTMmGY" # user's private key
+BTC_CORE_ACCOUNT_ADDR: "moHYHpgk4YgTCeLBmDE2teQ3qVLUtM95Fn" # user's address
+
+REGISTER_USER_ON_CHAIN: true # if local testing setup, true; if public btc node setup, false

@@ -203,9 +203,20 @@ func (r *RpcClient) ImportPrivateKey(wif *btcutil.WIF, label string) error {
 	return nil
 }
 
+// Tell the btc node to track txs about a specific address.
+// You can leave the lable empty string if just tracking.
+func (r *RpcClient) ImportAddress(address string, label string) error {
+	err := r.client.ImportAddressRescan(address, label, true)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // Generate a given number of blocks.
-// This function is useful for testing purposes.
-// Unfortunately, the original r.client.Generate() is deprecated in the library.
+// This function is useful in testing environment.
+// Note: the original r.client.Generate() is deprecated in the library.
+// Return value is a list of block hashes generated.
 func (r *RpcClient) GenerateBlocks(numBlocks int64, coinbase btcutil.Address) ([]*chainhash.Hash, error) {
 	blockHashes, err := r.client.GenerateToAddress(numBlocks, coinbase, nil)
 	if err != nil {
