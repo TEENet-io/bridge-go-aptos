@@ -19,8 +19,8 @@ import (
 )
 
 const (
-	SERVER               = "localhost"
-	PORT                 = "8545"
+	RPCURL = "http://localhost:8545"
+	// RPCURL               = "https://eth-sepolia.public.blastapi.io"
 	SENDER_PRIVATE_KEY   = "dbcec79f3490a6d5d162ca2064661b85c40c93672968bfbd906b952e38c3e8de"
 	SENDER_ADDR          = "0x85b427C84731bC077BA5A365771D2b64c5250Ac8"
 	RECEIVER_PRIVATE_KEY = "e751da9079ca6b4e40e03322b32180e661f1f586ca1914391c56d665ffc8ec74"
@@ -29,7 +29,7 @@ const (
 
 func TestSend(t *testing.T) {
 	// Connect to the local Ethereum node
-	client, err := ethclient.Dial("http://" + SERVER + ":" + PORT)
+	client, err := ethclient.Dial(RPCURL)
 	if err != nil {
 		t.Fatalf("Failed to connect to the Ethereum client: %v", err)
 	}
@@ -57,7 +57,7 @@ func TestSend(t *testing.T) {
 	}
 
 	// Set the amount to send (in Wei)
-	amount := big.NewInt(1000000000000000000) // 1 ETH
+	amount := big.NewInt(1000000000000000000 / 1000) // 0.001 ETH
 
 	// Create the transaction
 	tx := types.NewTransaction(nonce, receiverAddress, amount, uint64(21000), gasPrice, nil)
@@ -81,6 +81,7 @@ func TestSend(t *testing.T) {
 	t.Logf("Transaction sent: %s", signedTx.Hash().Hex())
 
 	// Wait for the transaction to be mined
+	// TODO: shall use a for{} loop and err != NOTFOUND to wait for the mining process.
 	receipt, err := client.TransactionReceipt(context.Background(), signedTx.Hash())
 	if err != nil {
 		t.Fatalf("Failed to get transaction receipt: %v", err)

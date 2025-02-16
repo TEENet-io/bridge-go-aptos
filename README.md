@@ -76,3 +76,4 @@ cUWcwxzt2LiTxQCkQ8FKw67gd2NuuZ182LpX9uazB93JLZmwakBP
 - [ ] Automatic `ImportPrivateKeyRescan` and `ImportAddressRescan` on BTC node to tell BTC node to track on specific address. Otherwise the BTC RPC node will not track the address (so our rpc query will return empty).
 - [x] Need more config fileds in YAML of on server config to prevent new-deploy of smart contracts, use the existing smart contracts.
 - [ ] Move Btc Regtest mining function to automatic step, no need for users to mine manually.
+- [ ] View Balance of btc/eth user shall contain address.

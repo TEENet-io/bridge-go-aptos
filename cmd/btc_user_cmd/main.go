@@ -108,6 +108,7 @@ func main() {
 			if err != nil {
 				fmt.Printf("Error getting balance: %s\n", err)
 			} else {
+				fmt.Printf("Your BTC address: %s\n", bu.MyUserConfig.BtcCoreAccountAddr)
 				fmt.Printf("Your balance: %d\n", _balance)
 			}
 		case "2":
