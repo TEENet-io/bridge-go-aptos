@@ -3,6 +3,7 @@ package etherman
 import (
 	"context"
 	"crypto/ecdsa"
+	"fmt"
 	"math/big"
 
 	mybridge "github.com/TEENet-io/bridge-go/contracts/TEENetBtcBridge"
@@ -68,6 +69,17 @@ func NewRealEthChain(
 	// Deploy bridge smart contracts (if pre-deployed then simply bind to them).
 	if predefinedBridgeAddress != "" && predefinedTwbtcAddress != "" {
 		bridgeAddress = common.HexToAddress(predefinedBridgeAddress)
+		// check the exist of smart contract on this address
+		code, err := client.CodeAt(context.Background(), bridgeAddress, nil)
+		if err != nil {
+			logger.Fatalf("[evm] Failed to get code at address: %s %v", predefinedBridgeAddress, err)
+			return nil, err
+		}
+
+		if len(code) == 0 {
+			logger.Errorf("[evm] No smart contract is deployed at this address. %s", predefinedBridgeAddress)
+			return nil, fmt.Errorf("[evm] address %s doesn't contain smart contract", predefinedBridgeAddress)
+		}
 	} else {
 		pk_x, _, err := schnorrSigner.Pub()
 		if err != nil {

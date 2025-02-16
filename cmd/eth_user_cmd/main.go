@@ -105,6 +105,7 @@ func main() {
 			if err1 != nil || err2 != nil {
 				fmt.Printf("Error getting balance: %s, %s\n", err1, err2)
 			} else {
+				fmt.Printf("Your ETH address: %s\n", eu.GetAddress())
 				fmt.Printf("Your balance: %d ETH (wei), %d TWBTC (wei)\n", _balance, _twbtc)
 			}
 		case "2":
