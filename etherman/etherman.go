@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/TEENet-io/bridge-go/common"
 	bridge "github.com/TEENet-io/bridge-go/contracts/TEENetBtcBridge"
@@ -403,4 +404,46 @@ func (etherman *Etherman) OnCanonicalChain(hash ethcommon.Hash) (bool, error) {
 
 	// compare the given hash with the canonical block header hash
 	return hash == canonicalHeader.Hash(), nil
+}
+
+// Fetch the newest eth balance of addr, in satoshi.
+func (etherman *Etherman) GetBalance(addr ethcommon.Address) (*big.Int, error) {
+	balance, err := etherman.ethClient.BalanceAt(context.Background(), addr, nil)
+	if err != nil {
+		return nil, err
+	}
+	return balance, nil
+}
+
+// Wait for the tx to be mined and get the receipt.
+// If the tx is reverted, return false+nil.
+// If the tx is successful, return true+nil.
+// This is a blocking function.
+// If rpc call unsuccesful, return false + err
+// If waiting timeout, will also return false + error
+func (etherman *Etherman) WaitForTxReceipt(tx *types.Transaction, retryTimes int, retryInterval int) (bool, error) {
+	RETRY_INTERVAL := time.Duration(retryInterval) * time.Second // seconds
+	for i := 0; i < retryTimes; i++ {
+		receipt, err := etherman.ethClient.TransactionReceipt(context.Background(), tx.Hash())
+
+		if err != nil {
+			// if not found receipt just poll again.
+			if err.Error() == ethereum.NotFound.Error() {
+				time.Sleep(RETRY_INTERVAL)
+				continue
+			} else { // other rpc error then report the error.
+				return false, err
+			}
+		}
+		if receipt != nil {
+			if receipt.Status == 1 {
+				logger.WithField("evm_txid", tx.Hash().Hex()).Info("Transaction executed successfully")
+				return true, nil
+			} else {
+				logger.WithField("evm_txid", tx.Hash().Hex()).Error("Transaction reverted")
+				return false, nil
+			}
+		}
+	}
+	return false, errors.New("timeout waiting for tx receipt: " + tx.Hash().Hex())
 }

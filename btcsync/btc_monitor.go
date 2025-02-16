@@ -104,6 +104,9 @@ func (m *BTCMonitor) Scan() error {
 	}
 
 	numbersToFetch := latestBlockHeight - m.LastVistedBlockHeight - CONSIDER_FINALIZED
+	if numbersToFetch == 0 {
+		return nil // no blocks to scan. and no error
+	}
 	blocks, err := m.RpcClient.GetBlocks(int(numbersToFetch), CONSIDER_FINALIZED)
 	for _, block := range blocks {
 		if len(block.Transactions) == 0 {

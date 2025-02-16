@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 
-	"github.com/TEENet-io/bridge-go/logconfig"
 	"github.com/TEENet-io/bridge-go/multisig"
 	"github.com/btcsuite/btcd/chaincfg"
 
@@ -17,7 +16,7 @@ const (
 
 func main() {
 	// Set overall config level to Debug
-	logconfig.ConfigDebugLogger()
+	// logconfig.ConfigDebugLogger()
 
 	// Tool to read environment variables
 	viper.AutomaticEnv()
@@ -39,7 +38,7 @@ func main() {
 	}
 
 	// Make the configuration
-	bsc := LoadBridgeServerConfig()
+	bsc := PrepareBridgeServerConfig()
 	if bsc == nil {
 		fmt.Printf("Error loading bridge server configuration\n")
 		return
@@ -59,8 +58,8 @@ func initializeViper(filePath string) bool {
 	return true
 }
 
-// LoadBridgeServerConfig reads configuration variables and returns a BridgeServerConfig.
-func LoadBridgeServerConfig() *cmd.BridgeServerConfig {
+// PrepareBridgeServerConfig reads configuration variables and returns a BridgeServerConfig.
+func PrepareBridgeServerConfig() *cmd.BridgeServerConfig {
 
 	// *** prepare objects that aren't string type ***
 
