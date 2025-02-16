@@ -11,7 +11,6 @@ import (
 	"syscall"
 
 	"github.com/TEENet-io/bridge-go/cmd"
-	"github.com/TEENet-io/bridge-go/logconfig"
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/spf13/viper"
@@ -23,7 +22,7 @@ const (
 
 func main() {
 	// Set overall config level to Debug
-	logconfig.ConfigDebugLogger()
+	// logconfig.ConfigDebugLogger()
 
 	// Tool to read environment variables
 	viper.AutomaticEnv()
