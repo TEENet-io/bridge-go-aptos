@@ -59,7 +59,7 @@ func (txmgr *EthTxManager) monitorPendingTxs(ctx context.Context, mtx *Monitored
 	sentAfter, err := txmgr.etherman.Client().HeaderByHash(ctx, mtx.SentAfter)
 	newLogger.Debugf("sentAfter: %v", sentAfter)
 	if err != nil {
-		newLogger.Errorf("failed to get 'sentAfter' evm block: err=%v", err)
+		newLogger.Errorf("rpc failed to get 'sentAfter' block: err=%v", err)
 		return ErrEthermanHeaderByHash
 	}
 	latest, err := txmgr.etherman.Client().HeaderByNumber(ctx, nil)

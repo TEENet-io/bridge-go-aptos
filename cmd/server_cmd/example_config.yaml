@@ -15,8 +15,14 @@ BTC_RPC_USERNAME: "admin1"
 BTC_RPC_PWD: "123"
 BTC_CHAIN_CONFIG: "regtest" # mainnet, testnet
 BTC_CORE_ACCOUNT_PRIV: "cUWcwxzt2LiTxQCkQ8FKw67gd2NuuZ182LpX9uazB93JLZmwakBP" # bridge's private key
-BTC_CORE_ACCOUNT_ADDR: "mvqq54khZQta7zDqFGoyN7BVK7Li4Xwnih" # bridge's address
+BTC_CORE_ACCOUNT_ADDR: "mvqq54khZQta7zDqFGoyN7BVK7Li4Xwnih" # bridge's address (can receive deposit BTCs)
 
 # HTTP
 HTTP_IP: "0.0.0.0" # server listens on ...
 HTTP_PORT: "8080"
+
+# Extra
+# If you use pre-deployed bridge and twBTC, you set these two addresses.
+# Otherwise (if strings are empty), the server will deploy new bridge and twBTC upon start.
+PREDEFINED_BRIDGE_ADDRESS: "0xf3E3f2b5Bb78586bD4eB8Ce0F3A30CDB6Ff822aA"
+PREDEFINED_TWBTC_ADDRESS: "0x716A2626Ede43704Ac5841b198BB6E317deabe77"

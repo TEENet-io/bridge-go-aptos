@@ -10,6 +10,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 
 	logger "github.com/sirupsen/logrus"
@@ -32,7 +33,15 @@ type RealEthChain struct {
 // rpc_url: the ethereum json rpc to connect to.
 // priv_key: the private key of the bridge controlled account.
 // schnorrSigner: the schnorr signer to be used in the bridge contract.
-func NewRealEthChain(rpc_url string, priv_key *ecdsa.PrivateKey, schnorrSigner multisig.SchnorrSigner) (*RealEthChain, error) {
+// predefinedBridgeAddress: if you have a pre-deployed bridge contract, provide its address here, or "" if you haven't.
+// predefinedTwbtcAddress: if you have a pre-deployed twbtc contract, provide its address here, or "" if you haven't.
+func NewRealEthChain(
+	rpc_url string,
+	priv_key *ecdsa.PrivateKey,
+	schnorrSigner multisig.SchnorrSigner,
+	predefinedBridgeAddress string,
+	predefinedTwbtcAddress string,
+) (*RealEthChain, error) {
 	client, err := ethclient.Dial(rpc_url)
 	if err != nil {
 		logger.Fatalf("Failed to connect to the Ethereum client: %v", err)
@@ -53,45 +62,53 @@ func NewRealEthChain(rpc_url string, priv_key *ecdsa.PrivateKey, schnorrSigner m
 	// Create auth object from private key
 	coreAccount := NewAuth(priv_key, chainId)
 
-	// Deploy bridge smart contracts.
-	pk_x, _, err := schnorrSigner.Pub()
-	if err != nil {
-		return nil, err
+	var bridgeAddress common.Address
+	var contract *mybridge.TEENetBtcBridge
+
+	// Deploy bridge smart contracts (if pre-deployed then simply bind to them).
+	if predefinedBridgeAddress != "" && predefinedTwbtcAddress != "" {
+		bridgeAddress = common.HexToAddress(predefinedBridgeAddress)
+	} else {
+		pk_x, _, err := schnorrSigner.Pub()
+		if err != nil {
+			return nil, err
+		}
+
+		var deployTx *types.Transaction
+		bridgeAddress, deployTx, contract, err = mybridge.DeployTEENetBtcBridge(
+			coreAccount,
+			client,
+			pk_x)
+		if err != nil {
+			return nil, err
+		}
+
+		// Wait for the deployment transaction to be mined
+		_, err = bind.WaitDeployed(context.Background(), client, deployTx)
+		if err != nil {
+			logger.Fatalf("Deployment tx not mined or failed: %v", err)
+			return nil, err
+		}
+		// Compare bridge contract public key with the one we provided
+		_pk, err := contract.Pk(nil)
+		if err != nil {
+			return nil, err
+		}
+		if pk_x.Cmp(_pk) != 0 {
+			return nil, err
+		}
 	}
 
-	bridgeAddress, deployTx, contract, err := mybridge.DeployTEENetBtcBridge(
-		coreAccount,
-		client,
-		pk_x)
-	if err != nil {
-		return nil, err
-	}
-
-	// Wait for the deployment transaction to be mined
-	_, err = bind.WaitDeployed(context.Background(), client, deployTx)
-	if err != nil {
-		logger.Fatalf("Deployment tx not mined or failed: %v", err)
-		return nil, err
-	}
-
+	// Binding!
 	// bridgeContract is a functional golang entity of the deployed bridge contract
 	bridgeContract, err := mybridge.NewTEENetBtcBridge(bridgeAddress, client)
 	if err != nil {
 		return nil, err
 	}
 
-	// TWBTC contract address
+	// TWBTC contract address (inferrable from bridge contract)
 	twbtcAddress, err := bridgeContract.Twbtc(nil)
 	if err != nil {
-		return nil, err
-	}
-
-	// Compare bridge contract public key with the one we provided
-	_pk, err := contract.Pk(nil)
-	if err != nil {
-		return nil, err
-	}
-	if pk_x.Cmp(_pk) != 0 {
 		return nil, err
 	}
 

@@ -70,6 +70,10 @@ type BridgeServerConfig struct {
 	// Http side
 	HttpIp   string // eg. 0.0.0.0
 	HttpPort string // eg. 8080
+
+	// Predefined ETH smart contract addresses
+	PredefinedBridgeContractAddr string // bridge contract address
+	PredefinedTwbtcContractAddr  string // twbtc contract address
 }
 
 // BridgeServer holds the objects that consists of the bridge server.
@@ -126,7 +130,7 @@ func NewBridgeServer(bsc *BridgeServerConfig, ctx context.Context, wg *sync.Wait
 		logger.Fatalf("failed to create core eth account controlled by bridge: %v", err)
 		return nil, err
 	}
-	realEth, err := etherman.NewRealEthChain(bsc.EthRpcUrl, eth_core_account, bsc.MSchnorrSigner)
+	realEth, err := etherman.NewRealEthChain(bsc.EthRpcUrl, eth_core_account, bsc.MSchnorrSigner, bsc.PredefinedBridgeContractAddr, bsc.PredefinedTwbtcContractAddr)
 	logger.WithField("BridgeContractAddress", realEth.BridgeContractAddress.Hex()).Info("Bridge contract address")
 	logger.WithField("TwbtcContractAddress", realEth.TwbtcContractAddress.Hex()).Info("TWBTC contract address")
 	if err != nil {

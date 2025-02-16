@@ -68,12 +68,11 @@ cUWcwxzt2LiTxQCkQ8FKw67gd2NuuZ182LpX9uazB93JLZmwakBP
 
 ## Problems:
 
-1) BTC lastblock height is not fetched in db, but using the "latest" height.
-2) BTC side components doesn't use ctx as stop signal, better use.
-3) Many unused code in project. Use tool (staticcheck or golangci-lint) to find and remove them, or remove them manually.
-4) `Id` field of type `MonitoredTx` is used of different purposes, shall separate. not RE-USED.
-5) `ethtxmanager.MonitoredTx`, the last block hash is stored. However, in real life (not sim), the blck hash is not search-able. So better using last block height (int64) instead of hash. This now breaks the logic of finding expired Txs.
-6) Automatic `ImportPrivateKeyRescan` and `ImportAddressRescan` on BTC node to tell BTC node to track on specific address. Otherwise the BTC RPC node will not track the address (so our rpc query will return empty).
-7) `sentAfter` breaks the deposit logic. Level-0 bug.
-8) Need more fileds on server config to prevent re-deploy of smart contracts, use the existing one.
-9) Move Btc Regtest mining function to automatic area.
+- [ ] BTC lastblock height is not fetched in db, but using the "latest" height on the BTC Chain it is viewing.
+- [ ] BTC components doesn't use ctx as stop signal, better use for graceful shutdown.
+- [ ] Unused code in project. Use tool (staticcheck or golangci-lint) to find and remove them, or remove them manually.
+- [ ] Eth side `Id` field of type `MonitoredTx` is used of different purposes, shall separate. not REUSED.
+- [ ] `ethtxmanager.MonitoredTx`:`sentAfter` breaks the deposit logic. Level-0 bug. The last block hash is stored. However, in real life (not sim), the blck hash is not search-able. So better using last block height (int64) instead of hash. This now breaks the logic of finding expired Txs.
+- [ ] Automatic `ImportPrivateKeyRescan` and `ImportAddressRescan` on BTC node to tell BTC node to track on specific address. Otherwise the BTC RPC node will not track the address (so our rpc query will return empty).
+- [x] Need more config fileds in YAML of on server config to prevent new-deploy of smart contracts, use the existing smart contracts.
+- [ ] Move Btc Regtest mining function to automatic step, no need for users to mine manually.
