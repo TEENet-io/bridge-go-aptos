@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 
+	"github.com/TEENet-io/bridge-go/logconfig"
 	"github.com/TEENet-io/bridge-go/multisig"
 	"github.com/btcsuite/btcd/chaincfg"
 
@@ -16,7 +17,7 @@ const (
 
 func main() {
 	// Set overall config level to Debug
-	// logconfig.ConfigDebugLogger()
+	logconfig.ConfigDebugLogger()
 
 	// Tool to read environment variables
 	viper.AutomaticEnv()
@@ -105,5 +106,8 @@ func PrepareBridgeServerConfig() *cmd.BridgeServerConfig {
 		// Http side
 		HttpIp:   viper.GetString("HTTP_IP"),
 		HttpPort: viper.GetString("HTTP_PORT"),
+		// predefined smart contract address (if any)
+		PredefinedBridgeContractAddr: viper.GetString("PREDEFINED_BRIDGE_ADDRESS"),
+		PredefinedTwbtcContractAddr:  viper.GetString("PREDEFINED_TWBTC_ADDRESS"),
 	}
 }

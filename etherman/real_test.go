@@ -28,7 +28,7 @@ func TestConnect(t *testing.T) {
 	}
 
 	// 4) Create the real ethereum chain that is terraformed.
-	realEth, err := etherman.NewRealEthChain(url, core_account, ss)
+	realEth, err := etherman.NewRealEthChain(url, core_account, ss, "", "")
 	if err != nil {
 		t.Fatalf("failed to create real eth chain: %v", err)
 	}
