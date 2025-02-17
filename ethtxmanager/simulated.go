@@ -36,11 +36,12 @@ func RandMonitoredTx(status MonitoredTxStatus, outpointNum int) *MonitoredTx {
 	}
 
 	mt := &MonitoredTx{
-		TxHash:    common.RandBytes32(),
-		Id:        common.RandBytes32(),
-		SentAfter: common.RandBytes32(),
-		MinedAt:   minedAt,
-		Status:    status,
+		TxHash:       common.RandBytes32(),
+		Id:           common.RandBytes32(),
+		SentAfter:    common.RandBytes32(),
+		SentAfterBlk: 0,
+		MinedAt:      minedAt,
+		Status:       status,
 	}
 
 	return mt

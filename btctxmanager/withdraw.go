@@ -26,7 +26,7 @@ import (
 
 const (
 	QUERY_DB_INTERVAL = 1 * time.Second
-	BTC_TX_FEE        = int64(0.001 * 1e8)
+	BTC_TX_FEE        = int64(0.001 * 1e8) // 0.001 BTC
 )
 
 type BtcTxManager struct {
@@ -111,9 +111,19 @@ func (m *BtcTxManager) CreateBTCRedeemTx(redeem *state.Redeem) (*wire.MsgTx, err
 	var requestTxHash [32]byte
 	copy(requestTxHash[:], redeem.RequestTxHash.Bytes())
 
+	dst_addr := utils.Remove0xPrefix(redeem.Receiver)
+	dst_amount := redeem.Amount.Int64()
+
+	logger.WithFields(logger.Fields{
+		"dst_addr":           dst_addr,
+		"dst_amount":         dst_amount,
+		"requestTxHash":      requestTxHash,
+		"btc_tx_fee (extra)": BTC_TX_FEE,
+	}).Debug("CreateBTCRedeemTx")
+
 	redeemTx, err := m.legacySigner.MakeRedeemTx(
-		utils.Remove0xPrefix(redeem.Receiver),
-		redeem.Amount.Int64(),
+		dst_addr,
+		dst_amount,
 		requestTxHash, // we just fill in the eth redeem request tx hash as the identifier.
 		m.legacySigner.P2PKH.EncodeAddress(),
 		BTC_TX_FEE, // TODO: remove hard code of fee.
@@ -176,6 +186,13 @@ func (m *BtcTxManager) WithdrawLoop() {
 			}
 
 			// New Redeem!
+			logger.WithFields(logger.Fields{
+				"reqTxHash":  redeem.RequestTxHash.Hex(),
+				"prepTxHash": redeem.PrepareTxHash.Hex(),
+				"amount":     redeem.Amount.Int64(),
+				"receiver":   redeem.Receiver,
+			}).Info("new btc redeem")
+
 			btcTxId, err := m.WithdrawBTC(redeem)
 			if err != nil {
 				// Log the error and continue with the next redeem

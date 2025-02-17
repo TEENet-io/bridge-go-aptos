@@ -3,8 +3,10 @@ package ethtxmanager
 import (
 	"context"
 	"errors"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/core/types"
 	logger "github.com/sirupsen/logrus"
 )
 
@@ -52,15 +54,16 @@ func (txmgr *EthTxManager) monitorPendingTxs(ctx context.Context, mtx *Monitored
 		}
 	}
 
-	// check timeout for monitoring the tx
-	newLogger.Debugf("monitored evm tx, field SentAfter %v", mtx.SentAfter)
-	newLogger.Debugf("monitored evm tx, field SentAfter.Hex() %s", mtx.SentAfter.Hex())
-
-	sentAfter, err := txmgr.etherman.Client().HeaderByHash(ctx, mtx.SentAfter)
-	newLogger.Debugf("sentAfter: %v", sentAfter)
+	var sentAfter *types.Header
+	sentAfter, err = txmgr.etherman.Client().HeaderByHash(ctx, mtx.SentAfter)
 	if err != nil {
-		newLogger.Errorf("rpc failed to get 'sentAfter' block: err=%v", err)
-		return ErrEthermanHeaderByHash
+		// Add a fixing logic, that uses block number if block hash is not found
+		sentAfter, err = txmgr.etherman.Client().HeaderByNumber(ctx, big.NewInt(mtx.SentAfterBlk))
+		if err != nil {
+			newLogger.Errorf("rpc failed to get 'sentAfter' block via block hash: %s err=%v", mtx.SentAfter.Hex(), err)
+			newLogger.Errorf("rpc failed to get 'sentAfter' block via block number: %d err=%v", mtx.SentAfterBlk, err)
+			return ErrEthermanHeaderByHash
+		}
 	}
 	latest, err := txmgr.etherman.Client().HeaderByNumber(ctx, nil)
 	if err != nil {
@@ -69,6 +72,7 @@ func (txmgr *EthTxManager) monitorPendingTxs(ctx context.Context, mtx *Monitored
 	}
 
 	diff := latest.Number.Uint64() - sentAfter.Number.Uint64()
+	newLogger.Debug("latest_blk %d, sentAfter_blk %d", latest.Number.Uint64(), sentAfter.Number.Uint64())
 	if diff > txmgr.cfg.TimeoutOnMonitoringPendingTxs {
 		newLogger.Debugf("tx has not been mined for %d blocks", txmgr.cfg.TimeoutOnMonitoringPendingTxs)
 		err := txmgr.mgrdb.UpdateMonitoredTxStatus(mtx.TxHash, Timeout)

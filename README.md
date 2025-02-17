@@ -31,9 +31,11 @@ Test Accounts
 Ethereum (address+private key)
 
 ```
+Bridge's ETH Wallet.
 0x85b427C84731bC077BA5A365771D2b64c5250Ac8
 dbcec79f3490a6d5d162ca2064661b85c40c93672968bfbd906b952e38c3e8de
 
+User's ETH Wallet
 0xdab133353Cff0773BAcb51d46195f01bD3D03940
 e751da9079ca6b4e40e03322b32180e661f1f586ca1914391c56d665ffc8ec74
 
@@ -47,12 +49,11 @@ e751da9079ca6b4e40e03322b32180e661f1f586ca1914391c56d665ffc8ec74
 bcb90227d0058d7f72867d43b67f7196c91c06b761dad7dde379223c5409b0a5
 ```
 
-Bitcoin Regtest (address+private key)
+Bitcoin Regtest Accounts (address+private key)
 
 
 ```c
-// This btc wallet holds a lot of money.
-// Also acts the coinbase receiver (block mines and reward goes to this address)
+// Act as the coinbase receiver (block mines and reward goes to this address)
 mkVXZnqaaKt4puQNr4ovPHYg48mjguFCnT
 cNSHjGk52rQ6iya8jdNT9VJ8dvvQ8kPAq5pcFHsYBYdDqahWuneH
 
@@ -60,10 +61,14 @@ cNSHjGk52rQ6iya8jdNT9VJ8dvvQ8kPAq5pcFHsYBYdDqahWuneH
 moHYHpgk4YgTCeLBmDE2teQ3qVLUtM95Fn
 cQthTMaKUU9f6br1hMXdGFXHwGaAfFFerNkn632BpGE6KXhTMmGY
 
-
 // bridge's btc wallet
 mvqq54khZQta7zDqFGoyN7BVK7Li4Xwnih
 cUWcwxzt2LiTxQCkQ8FKw67gd2NuuZ182LpX9uazB93JLZmwakBP
+```
+
+Bicoin Testnet Accounts
+
+```
 ```
 
 ## Problems:
@@ -72,8 +77,12 @@ cUWcwxzt2LiTxQCkQ8FKw67gd2NuuZ182LpX9uazB93JLZmwakBP
 - [ ] BTC components doesn't use ctx as stop signal, better use for graceful shutdown.
 - [ ] Unused code in project. Use tool (staticcheck or golangci-lint) to find and remove them, or remove them manually.
 - [ ] Eth side `Id` field of type `MonitoredTx` is used of different purposes, shall separate. not REUSED.
-- [ ] `ethtxmanager.MonitoredTx`:`sentAfter` breaks the deposit logic. Level-0 bug. The last block hash is stored. However, in real life (not sim), the blck hash is not search-able. So better using last block height (int64) instead of hash. This now breaks the logic of finding expired Txs.
-- [ ] Automatic `ImportPrivateKeyRescan` and `ImportAddressRescan` on BTC node to tell BTC node to track on specific address. Otherwise the BTC RPC node will not track the address (so our rpc query will return empty).
+- [x] `ethtxmanager.MonitoredTx`:`sentAfter` breaks the monitor logic. <Level-0> bug. The last block hash is stored. However, in real life (not sim), the blck hash is not search-able. So better using last block height (int64) as a back up of hash. This now breaks the logic of finding expired Txs in local geth (regtest mode), but doesn't affect Sepolia Testnet or SimEtherman.
+- [ ] Automatic `ImportPrivateKeyRescan` and `ImportAddressRescan` on BTC node (regardless of local private node or regtest node) to tell BTC node wallet to track on specific address. Otherwise the BTC RPC node will not track the address (so our rpc balance / utxo query will return empty).
 - [x] Need more config fileds in YAML of on server config to prevent new-deploy of smart contracts, use the existing smart contracts.
 - [ ] Move Btc Regtest mining function to automatic step, no need for users to mine manually.
-- [ ] View Balance of btc/eth user shall contain address.
+- [x] View Balance of btc/eth user shall contain address.
+- [ ] Remove hard coded redeem fee: `BTC_TX_FEE` (btctxmanager/withdraw.go) = 0.001, `SAFE_MARGIN` (btcvault/vault.go) = 0.001.
+- [ ] ETH side synchronizer shall start not from 0 but from  a predefined block height, if not the last block height (if db is empty)
+- [ ] "state missing" latest chain id (1337) + latest block (start from 0), shall we start from a specific number, to avoid full-scan of blockchain (like the deployment block of bridge/twbtc smart contract)?
+- [ ] Estimate BTC Tx fee (vbyte) based on the network!

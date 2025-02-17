@@ -12,7 +12,8 @@ import (
 )
 
 const (
-	TIMEOUT_DELAY int64 = 1800 // half an hour
+	TIMEOUT_DELAY int64 = 1800               // half an hour
+	SAFE_MARGIN         = int64(0.001 * 1e8) // 0.001 BTC
 )
 
 // TreasureVault is a vault that stores UTXOs
@@ -148,14 +149,18 @@ func (tv *TreasureVault) GetUTXODetail(txID string, vout int32) (*VaultUTXO, err
 	return utxo, nil
 }
 
-// Implement BtcWallet interface
-// to interact with ETH Tx Manager
+// Implement BtcWallet interface to interact with eth_tx_manager
+// eth_tx_manager will request and lock (write in smart contract)
+// about the UTXOs that are collected to satisify the redeem.
+// We can't collect just "barely" enough UTXOs to satisfy,
+// Indeed we need to estamate the btc tx fee and add to it.
+// at least leave some safe margin.
 func (tv *TreasureVault) Request(
 	reqTxId ethcommon.Hash,
 	amount *big.Int,
 	ch chan<- []state.Outpoint,
 ) error {
-	utxos, err := tv.ChooseAndLock(amount.Int64())
+	utxos, err := tv.ChooseAndLock(amount.Int64() + SAFE_MARGIN)
 	if err != nil {
 		return err
 	}

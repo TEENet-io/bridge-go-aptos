@@ -437,10 +437,18 @@ func (etherman *Etherman) WaitForTxReceipt(tx *types.Transaction, retryTimes int
 		}
 		if receipt != nil {
 			if receipt.Status == 1 {
-				logger.WithField("evm_txid", tx.Hash().Hex()).Info("Transaction executed successfully")
+				logger.WithFields(logger.Fields{
+					"evm_txid":   tx.Hash().Hex(),
+					"block_hash": receipt.BlockHash.Hex(),
+					"block_num":  receipt.BlockNumber.Int64(),
+				}).Info("Transaction executed successfully")
 				return true, nil
 			} else {
-				logger.WithField("evm_txid", tx.Hash().Hex()).Error("Transaction reverted")
+				logger.WithFields(logger.Fields{
+					"evm_txid":   tx.Hash().Hex(),
+					"block_hash": receipt.BlockHash.Hex(),
+					"block_num":  receipt.BlockNumber.Int64(),
+				}).Error("Transaction reverted")
 				return false, nil
 			}
 		}

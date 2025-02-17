@@ -64,12 +64,19 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ethTicker.C:
+			// Fetch new finalized block number from rpc
 			newFinalized, err := s.etherman.GetLatestFinalizedBlockNumber()
 			if err != nil {
 				return err
 			}
 
 			// continue if new finalized block number is less than the last processed block number
+			logger.WithFields(logger.Fields{
+				"newFinalized":  newFinalized.Int64(),
+				"lastFinalized": s.lastFinalized.Int64(),
+				"new > last?":   newFinalized.Cmp(s.lastFinalized) == 1,
+			}).Debug("eth rpc sync")
+
 			if newFinalized.Cmp(s.lastFinalized) != 1 {
 				continue
 			}
@@ -83,10 +90,11 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 			for num.Cmp(newFinalized) != 1 {
 				minted, requested, prepared, err := s.etherman.GetEventLogs(num)
 				logger.WithFields(logger.Fields{
+					"block#":    num,
 					"minted":    len(minted),
 					"requested": len(requested),
 					"prepared":  len(prepared),
-				}).Debug("events")
+				}).Debug("sync events")
 				if err != nil {
 					return err
 				}
