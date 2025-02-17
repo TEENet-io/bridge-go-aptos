@@ -4,6 +4,7 @@ package assembler
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcutil"
@@ -172,7 +173,7 @@ func (lw *LegacySigner) craftRedeemOutput(
 	// Calc change_amount
 	change_amount := sum - dst_amount - fee_amount
 	if change_amount < 0 {
-		return nil, errors.New("change_amount < 0")
+		return nil, fmt.Errorf("change_amount < 0, sum: %d, dst_amount: %d, fee_amount: %d", sum, dst_amount, fee_amount)
 	}
 
 	// 1st output: to the dst receiver

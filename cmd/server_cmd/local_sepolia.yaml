@@ -1,12 +1,12 @@
 # Example configuration file for the server
 
 # ETH
-ETH_RPC_URL: "http://localhost:8545" # http://" + SERVER + ":" + PORT
+ETH_RPC_URL: "https://eth-sepolia.public.blastapi.io" # http://" + SERVER + ":" + PORT
 ETH_CORE_ACCOUNT_PRIV: "dbcec79f3490a6d5d162ca2064661b85c40c93672968bfbd906b952e38c3e8de" # address: 0x85b427C84731bC077BA5A365771D2b64c5250Ac8
 
 # DB
 # You can use full path or just the file name to imply current path.
-DB_FILE_PATH: "bridge.db"
+DB_FILE_PATH: "local_btc_sepolia_eth_bridge.db"
 
 # BTC
 BTC_RPC_SERVER: "127.0.0.1"
@@ -24,5 +24,5 @@ HTTP_PORT: "8080"
 # Extra
 # If you use pre-deployed bridge and twBTC, you set these two addresses.
 # Otherwise (if strings are empty), the server will deploy new bridge and twBTC upon start.
-PREDEFINED_BRIDGE_ADDRESS: "0xf3E3f2b5Bb78586bD4eB8Ce0F3A30CDB6Ff822aA"
-PREDEFINED_TWBTC_ADDRESS: "0x716A2626Ede43704Ac5841b198BB6E317deabe77"
+PREDEFINED_BRIDGE_ADDRESS: ""
+PREDEFINED_TWBTC_ADDRESS: ""

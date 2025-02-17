@@ -80,18 +80,6 @@ func (txmgr *EthTxManager) handleMintTx(
 		logger.Errorf("failed to get latest block header: err=%v", err)
 		return ErrEthermanHeaderByNumber
 	}
-
-	latest_block, err := txmgr.etherman.Client().BlockByNumber(context.Background(), nil)
-	if err != nil {
-		logger.Errorf("failed to get latest block: err=%v", err)
-		return ErrEthermanHeaderByNumber
-	}
-
-	if latest_header.Hash() != latest_block.Hash() {
-		logger.Errorf("latest header hash and block hash are not the same: header=%s, block=%s", latest_header.Hash().String(), latest_block.Hash().String())
-	} else {
-		logger.Infof("latest header hash and block hash are the same: header=%s, block=%s", latest_header.Hash().String(), latest_block.Hash().String())
-	}
 	logger.Debugf("got latest eth block: num=%d", latest_header.Number)
 
 	tx, err := txmgr.etherman.Mint(params)
@@ -105,9 +93,10 @@ func (txmgr *EthTxManager) handleMintTx(
 
 	// Save the monitored tx
 	mt := &MonitoredTx{
-		TxHash:    tx.Hash(),
-		Id:        params.BtcTxId,
-		SentAfter: latest_header.Hash(), // interesting, using block hash as sendAfter not block number.
+		TxHash:       tx.Hash(),
+		Id:           params.BtcTxId,
+		SentAfter:    latest_header.Hash(), // interesting, using block hash as sendAfter not block number.
+		SentAfterBlk: latest_header.Number.Int64(),
 	}
 	newLogger.Debugf("latest block hash: 0x%x, block number: %d", latest_header.Hash(), latest_header.Number)
 	err = txmgr.mgrdb.InsertPendingMonitoredTx(mt)

@@ -157,9 +157,10 @@ func (txmgr *EthTxManager) handleRedeemPrepareTx(
 	newLogger.Debug("tx sent to prepare redeem")
 
 	mt := &MonitoredTx{
-		TxHash:    tx.Hash(),
-		Id:        params.RequestTxHash,
-		SentAfter: latest.Hash(),
+		TxHash:       tx.Hash(),
+		Id:           params.RequestTxHash,
+		SentAfter:    latest.Hash(),
+		SentAfterBlk: latest.Number.Int64(),
 	}
 	err = txmgr.mgrdb.InsertPendingMonitoredTx(mt)
 	if err != nil {

@@ -53,8 +53,8 @@ const (
 
 	// This btc wallet holds a lot of money.
 	// Also acts the coinbase receiver (block mines and reward goes to this address)
-	coinbase_legacy_priv_key_str = "cNSHjGk52rQ6iya8jdNT9VJ8dvvQ8kPAq5pcFHsYBYdDqahWuneH"
 	coinbase_legacy_addr_str     = "mkVXZnqaaKt4puQNr4ovPHYg48mjguFCnT"
+	coinbase_legacy_priv_key_str = "cNSHjGk52rQ6iya8jdNT9VJ8dvvQ8kPAq5pcFHsYBYdDqahWuneH"
 
 	// btc chain
 	BTC_RPC_SERVER   = "127.0.0.1"
@@ -63,8 +63,8 @@ const (
 	BTC_RPC_PWD      = "123"
 
 	// user's btc wallet
-	btc_user_legacy_priv_key_str = "cQthTMaKUU9f6br1hMXdGFXHwGaAfFFerNkn632BpGE6KXhTMmGY"
-	btc_user_legacy_addr_str     = "moHYHpgk4YgTCeLBmDE2teQ3qVLUtM95Fn"
+	BTC_USER_ACCOUNT_ADDR = "moHYHpgk4YgTCeLBmDE2teQ3qVLUtM95Fn"
+	BTC_USER_ACCOUNT_PRIV = "cQthTMaKUU9f6br1hMXdGFXHwGaAfFFerNkn632BpGE6KXhTMmGY"
 
 	// bridge's btc wallet (receive deposits from users)
 	BTC_CORE_ACCOUNT_PRIV = "cUWcwxzt2LiTxQCkQ8FKw67gd2NuuZ182LpX9uazB93JLZmwakBP"
@@ -85,12 +85,12 @@ const (
 	ETH_RPC_URL = "http://localhost:8545"
 
 	// user's eth wallet
-	ETH_USER_PRIVATE_KEY = "dbcec79f3490a6d5d162ca2064661b85c40c93672968bfbd906b952e38c3e8de"
-	ETH_USER_ADDR        = "0x85b427C84731bC077BA5A365771D2b64c5250Ac8"
+	ETH_BRIDGE_ADDR        = "0x85b427C84731bC077BA5A365771D2b64c5250Ac8"
+	ETH_BRIDGE_PRIVATE_KEY = "dbcec79f3490a6d5d162ca2064661b85c40c93672968bfbd906b952e38c3e8de"
 
 	// bridge's eth wallet (to mint(), to redeem() and to deploy smart contracts)
-	ETH_BRIDGE_PRIVATE_KEY = "e751da9079ca6b4e40e03322b32180e661f1f586ca1914391c56d665ffc8ec74"
-	ETH_BRIDGE_ADDR        = "0xdab133353Cff0773BAcb51d46195f01bD3D03940"
+	ETH_USER_ADDR        = "0xdab133353Cff0773BAcb51d46195f01bD3D03940"
+	ETH_USER_PRIVATE_KEY = "e751da9079ca6b4e40e03322b32180e661f1f586ca1914391c56d665ffc8ec74"
 
 	HTTP_IP   = "0.0.0.0"
 	HTTP_PORT = "8080"
@@ -214,7 +214,6 @@ func TestEndtoEnd(t *testing.T) {
 	bs, err := cmd.NewBridgeServer(bsc, ctx, &wg)
 	if err != nil {
 		logger.Fatalf("failed to create bridge server: %v", err)
-		return
 	}
 
 	t.Logf("bridge server: twbtc contract address: %s", bs.EthEnv.TwbtcContractAddress.Hex())
@@ -244,9 +243,9 @@ func TestEndtoEnd(t *testing.T) {
 
 	// Send the deposit p2 -> p3
 	// Create a sender (p2)
-	user_btc_wallet, err := assembler.NewBasicSigner(btc_user_legacy_priv_key_str, assembler.GetRegtestParams())
+	user_btc_wallet, err := assembler.NewBasicSigner(BTC_USER_ACCOUNT_PRIV, assembler.GetRegtestParams())
 	if err != nil {
-		t.Fatalf("cannot create wallet from private key %s", btc_user_legacy_priv_key_str)
+		t.Fatalf("cannot create wallet from private key %s", BTC_USER_ACCOUNT_PRIV)
 	}
 	wallet, err := assembler.NewLegacySigner(*user_btc_wallet)
 	if err != nil {
