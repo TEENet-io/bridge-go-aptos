@@ -234,7 +234,10 @@ func NewBridgeServer(bsc *BridgeServerConfig, ctx context.Context, wg *sync.Wait
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		myEthSynchronizer.Sync(ctx) // eth-side synchronizer
+		err := myEthSynchronizer.Sync(ctx) // eth-side synchronizer
+		if err != nil {
+			logger.Fatalf("failed to sync eth: %v", err)
+		}
 	}()
 	// Don't forget to call wg.Wait() in the main routine.
 
