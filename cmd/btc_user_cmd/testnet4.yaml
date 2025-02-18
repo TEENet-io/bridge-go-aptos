@@ -8,4 +8,10 @@ BTC_CORE_ACCOUNT_ADDR: "mtcpH6hvvCjtKz6zYFZm5Cbqg1kgi5a9tf" # user's address
 BTC_CORE_ACCOUNT_PRIV: "cUvcSxBzLSikMmewez4dY1Ucxyste3Cf2ZJsqzD5RxmVPWF8r4MV" # user's private key
 
 # Extra
-REGISTER_USER_ON_CHAIN: true # if in local testing setup, true; if public btc node setup, false
+# if true, register the address for tracking all its UTXOs.
+# This will trigger a whole rescan of blockchain.
+# Very slow, can take hours.
+# if false, will NOT register the address for tracking all its UTXOs.
+# You can use other tools like `bitcoin-cli importaddress <address> "" false` to register the address and avoiding rescan.
+# Then use `bitcoin-cli rescanblockchain <start_block_number>` to rescan partially the blockchain.
+REGISTER_USER_ON_CHAIN: false
