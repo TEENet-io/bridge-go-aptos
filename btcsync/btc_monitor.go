@@ -32,7 +32,7 @@ import (
 // Once an interested action is found, notify all the observers.
 
 const (
-	CONSIDER_FINALIZED = 6               // 6 blocks we consider finalized
+	CONSIDER_FINALIZED = 1               // 1 blocks we consider finalized
 	SCAN_INTERVAL      = 3 * time.Second // 3 seconds, then we scan again
 )
 

@@ -1,0 +1,29 @@
+# Example configuration file for the server
+
+# ETH
+ETH_RPC_URL: "https://eth-sepolia.public.blastapi.io" # http://" + SERVER + ":" + PORT
+# This eth account is controlled by bridge to do Mint() and RedeemPrepare()
+ETH_CORE_ACCOUNT_PRIV: "dbcec79f3490a6d5d162ca2064661b85c40c93672968bfbd906b952e38c3e8de" # address: 0x85b427C84731bC077BA5A365771D2b64c5250Ac8
+
+# DB
+# You can use full path or just the file name to imply current path.
+DB_FILE_PATH: "testnet4_sepolia_bridge.db"
+
+# BTC
+BTC_RPC_SERVER: "127.0.0.1"
+BTC_RPC_PORT: "5000"
+BTC_RPC_USERNAME: "qweruoiasvl123"
+BTC_RPC_PWD: "zxcvuoajflk"
+BTC_CHAIN_CONFIG: "testnet" # mainnet, testnet
+BTC_CORE_ACCOUNT_ADDR: "mnQ9tBEkNXXEyJqKeSK1TWJV3LngVSjanV" # bridge's address (can receive deposit BTCs)
+BTC_CORE_ACCOUNT_PRIV: "cU78RfXmYEXsdNpiC8AppdpNg6Ni58s8nF8LFFWuMVAQGx51v3HY" # bridge's private key
+
+# HTTP
+HTTP_IP: "0.0.0.0" # server listens on ...
+HTTP_PORT: "8080"
+
+# Extra
+# If you use pre-deployed bridge and twBTC, you set these two addresses.
+# Otherwise (if strings are empty), the server will deploy new bridge and twBTC upon start.
+PREDEFINED_BRIDGE_ADDRESS: "0x50181B8711402b406fd1D667442ff0cd8F98409A"
+PREDEFINED_TWBTC_ADDRESS: "0xF9e57483deDaE12feCA5d2cd38977f9fA1Bb8f55"
