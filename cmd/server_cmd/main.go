@@ -92,6 +92,7 @@ func PrepareBridgeServerConfig() *cmd.BridgeServerConfig {
 		// eth side
 		EthRpcUrl:          viper.GetString("ETH_RPC_URL"),
 		EthCoreAccountPriv: viper.GetString("ETH_CORE_ACCOUNT_PRIV"),
+		EthRetroScanBlk:    viper.GetInt64("ETH_RETRO_SCAN_BLK"),
 		MSchnorrSigner:     schnorrSigner,
 		// state side
 		DbFilePath: viper.GetString("DB_FILE_PATH"),

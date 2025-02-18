@@ -3,7 +3,7 @@
 # ETH
 ETH_RPC_URL: "http://localhost:8545" # http://" + SERVER + ":" + PORT
 ETH_CORE_ACCOUNT_PRIV: "dbcec79f3490a6d5d162ca2064661b85c40c93672968bfbd906b952e38c3e8de" # address: 0x85b427C84731bC077BA5A365771D2b64c5250Ac8
-
+ETH_RETRO_SCAN_BLK: -1
 # DB
 # You can use full path or just the file name to imply current path.
 DB_FILE_PATH: "local_test_bridge.db"

@@ -36,17 +36,21 @@ func New(
 		return nil, ErrChainIDUnmatched(cfg.EthChainID, chainID)
 	}
 
-	ethStored, err := st.GetEthFinalizedBlockNumber()
+	blkNumberStored, err := st.GetEthFinalizedBlockNumber()
 	if err != nil {
 		logger.Error("failed to get eth finalized block number from database when initializing eth synchronizer")
 		return nil, err
 	}
 
+	if cfg.EthRetroScanBlkNum != -1 {
+		blkNumberStored = big.NewInt(cfg.EthRetroScanBlkNum)
+	}
+
 	return &Synchronizer{
-		etherman:      etherman,
-		lastFinalized: ethStored,
-		st:            st,
 		cfg:           cfg,
+		etherman:      etherman,
+		st:            st,
+		lastFinalized: blkNumberStored,
 	}, nil
 }
 
@@ -77,6 +81,7 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 				"new > last?":   newFinalized.Cmp(s.lastFinalized) == 1,
 			}).Debug("eth rpc sync")
 
+			// if newFinalized <= lastFinalized, skip the loop.
 			if newFinalized.Cmp(s.lastFinalized) != 1 {
 				continue
 			}
