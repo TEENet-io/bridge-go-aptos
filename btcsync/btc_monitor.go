@@ -132,7 +132,7 @@ func (m *BTCMonitor) Scan() error {
 					return fmt.Errorf("failed to craft deposit action: %v", err)
 					//TODO: shall add refund BTC logic here.
 				}
-				logger.WithField("btcTxId", deposit.TxHash).Debug("Deposit")
+				logger.WithField("btcTxId", deposit.TxHash).Debug("Deposit Found")
 
 				observedUTXO := &ObservedUTXO{
 					BlockNumber: blockHeight,

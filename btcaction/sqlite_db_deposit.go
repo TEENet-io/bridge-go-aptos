@@ -9,6 +9,7 @@ import (
 	"database/sql"
 
 	_ "github.com/mattn/go-sqlite3"
+	logger "github.com/sirupsen/logrus"
 )
 
 type SQLiteDepositStorage struct {
@@ -49,6 +50,13 @@ func (s *SQLiteDepositStorage) init() error {
 }
 
 func (s *SQLiteDepositStorage) AddDeposit(deposit DepositAction) error {
+	// Protection of double adding.
+	if hits, err := s.GetDepositByTxHash(deposit.TxHash); err != nil {
+		return err
+	} else if len(hits) > 0 {
+		logger.WithField("txHash", deposit.TxHash).Debug("BTC Deposit already exists, skip.")
+		return nil // no double adding.
+	}
 	query := `INSERT INTO btc_action_deposit (block_number, block_hash, tx_hash, deposit_value, deposit_receiver, evm_id, evm_addr) VALUES (?, ?, ?, ?, ?, ?, ?)`
 	_, err := s.db.Exec(query, deposit.BlockNumber, deposit.BlockHash, deposit.TxHash, deposit.DepositValue, deposit.DepositReceiver, deposit.EvmID, deposit.EvmAddr)
 	return err
