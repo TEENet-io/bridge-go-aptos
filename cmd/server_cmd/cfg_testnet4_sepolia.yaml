@@ -1,7 +1,8 @@
 # Example configuration file for the server
 
 # ETH
-ETH_RPC_URL: "https://eth-sepolia.public.blastapi.io" # http://" + SERVER + ":" + PORT
+#ETH_RPC_URL: "https://eth-sepolia.public.blastapi.io" # http://" + SERVER + ":" + PORT
+ETH_RPC_URL: "https://rpc-sepolia.rockx.com"
 # This eth account is controlled by bridge to do Mint() and RedeemPrepare()
 ETH_CORE_ACCOUNT_PRIV: "dbcec79f3490a6d5d162ca2064661b85c40c93672968bfbd906b952e38c3e8de" # address: 0x85b427C84731bC077BA5A365771D2b64c5250Ac8
 
