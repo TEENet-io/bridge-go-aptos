@@ -55,6 +55,7 @@ type BridgeServerConfig struct {
 	// eth side
 	EthRpcUrl          string                 // json rpc url
 	EthCoreAccountPriv string                 // private key of the bridge controlled account
+	EthRetroScanBlk    int64                  // retro scan block, tell Sync() to scan from this block, -1 to honor the valude in statedb.
 	MSchnorrSigner     multisig.SchnorrSigner // remote or local both okay. as long as it can sign() and pub()
 	// state side
 	DbFilePath string // db file path
@@ -187,6 +188,7 @@ func NewBridgeServer(bsc *BridgeServerConfig, ctx context.Context, wg *sync.Wait
 			FrequencyToCheckEthFinalizedBlock: frequencyToCheckEthFinalizedBlock,
 			BtcChainConfig:                    bsc.BtcChainConfig,
 			EthChainID:                        realEth.ChainId,
+			EthRetroScanBlkNum:                bsc.EthRetroScanBlk,
 		},
 	)
 	if err != nil {
