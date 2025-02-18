@@ -99,9 +99,9 @@ cVCWa2dzvhVrw2GEih4zSXdxBTmrNghXKFuTHnP5WaiK8zDeTGmF
 - [ ] Move Btc Regtest mining function to automatic step, no need for users to mine manually.
 - [x] View Balance of btc/eth user shall contain address.
 - [ ] Remove hard coded redeem fee: `BTC_TX_FEE` (btctxmanager/withdraw.go) = 0.001, `SAFE_MARGIN` (btcvault/vault.go) = 0.001.
-- [ ] ETH side synchronizer shall start not from 0 but from  a predefined block height, if not the last block height (if db is empty)
-- [ ] "state missing" latest chain id (1337) + latest block (start from 0), shall we start from a specific number, to avoid full-scan of blockchain (like the deployment block of bridge/twbtc smart contract)?
+- [ ] ETH side: synchronizer shall start not from 0 but from  a predefined block height, if not the last block height (if db is empty)
+- [ ] ETH side: "state missing" latest chain id (1337) + latest block (start from 0), shall we start from a specific number, to avoid full-scan of blockchain (like the deployment block of bridge/twbtc smart contract)?
 - [ ] Estimate BTC Tx fee (vbyte) based on the network! 1000 sat = 3.79v (in deposit)
 - [ ] Make btc finalized number 6 a configurable int.
 - [ ] ETH sync: shows prematurely "stopping Eth synchronization" in sepolia environment. must have some problems.
-- [ ] BTC new config: forceStartBlk, trigger a scan from this blk, not newest.
+- [x] BTC new config: forceStartBlk, trigger birige scan from this blk, not newest, nor from 0 blk.

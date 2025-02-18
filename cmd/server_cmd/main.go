@@ -101,6 +101,7 @@ func PrepareBridgeServerConfig() *cmd.BridgeServerConfig {
 		BtcRpcUsername:     viper.GetString("BTC_RPC_USERNAME"),
 		BtcRpcPwd:          viper.GetString("BTC_RPC_PWD"),
 		BtcChainConfig:     btcParams,
+		BtcStartBlk:        viper.GetInt64("BTC_START_BLK"),
 		BtcCoreAccountPriv: viper.GetString("BTC_CORE_ACCOUNT_PRIV"),
 		BtcCoreAccountAddr: viper.GetString("BTC_CORE_ACCOUNT_ADDR"),
 		// Http side

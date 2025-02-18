@@ -13,6 +13,7 @@ BTC_RPC_SERVER: "127.0.0.1"
 BTC_RPC_PORT: "19001"
 BTC_RPC_USERNAME: "admin1"
 BTC_RPC_PWD: "123"
+BTC_START_BLK: -1
 BTC_CHAIN_CONFIG: "regtest" # mainnet, testnet
 BTC_CORE_ACCOUNT_PRIV: "cUWcwxzt2LiTxQCkQ8FKw67gd2NuuZ182LpX9uazB93JLZmwakBP" # bridge's private key
 BTC_CORE_ACCOUNT_ADDR: "mvqq54khZQta7zDqFGoyN7BVK7Li4Xwnih" # bridge's address (can receive deposit BTCs)

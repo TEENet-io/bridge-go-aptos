@@ -64,6 +64,7 @@ type BridgeServerConfig struct {
 	BtcRpcUsername     string           // btc rpc server info
 	BtcRpcPwd          string           // btc rpc server info
 	BtcChainConfig     *chaincfg.Params // regtest, testnet, mainnet? see btcman/assembler/common.go
+	BtcStartBlk        int64            // start block for btc monitor to scan (0=from 0, -1=latest, other=specific block)
 	BtcCoreAccountPriv string           // btc core account private key (who sends btc)
 	BtcCoreAccountAddr string           // btc core account address (who receives deposit) to be monitored.
 
@@ -273,10 +274,15 @@ func NewBridgeServer(bsc *BridgeServerConfig, ctx context.Context, wg *sync.Wait
 	go myBtcTxMgr.WithdrawLoop()
 
 	// *** Create <btc monitor> for btc2evm deposits ***
-	_latest_height, _ := myBtcRpcClient.GetLatestBlockHeight()
+	var _start_blk int64
+	if bsc.BtcStartBlk == -1 {
+		_start_blk, _ = myBtcRpcClient.GetLatestBlockHeight()
+	} else {
+		_start_blk = bsc.BtcStartBlk
+	}
 
 	// Attention: we start from the latest block height on BTC for clean slate.
-	myBtcMonitor, err := setupBtcMonitor(myBtcRpcClient, bsc.BtcCoreAccountAddr, btcMgrStorage, int(_latest_height))
+	myBtcMonitor, err := setupBtcMonitor(myBtcRpcClient, bsc.BtcCoreAccountAddr, btcMgrStorage, int(_start_blk))
 	if err != nil {
 		logger.Fatalf("cannot create monitor, %v", err)
 		return nil, err
