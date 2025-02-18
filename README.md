@@ -66,9 +66,25 @@ mvqq54khZQta7zDqFGoyN7BVK7Li4Xwnih
 cUWcwxzt2LiTxQCkQ8FKw67gd2NuuZ182LpX9uazB93JLZmwakBP
 ```
 
-Bicoin Testnet Accounts
+Bicoin Testnet4 Accounts
 
-```
+```c
+// user's btc wallet
+mtcpH6hvvCjtKz6zYFZm5Cbqg1kgi5a9tf
+cUvcSxBzLSikMmewez4dY1Ucxyste3Cf2ZJsqzD5RxmVPWF8r4MV
+
+// bridge's btc wallet
+mnQ9tBEkNXXEyJqKeSK1TWJV3LngVSjanV
+cU78RfXmYEXsdNpiC8AppdpNg6Ni58s8nF8LFFWuMVAQGx51v3HY
+
+// other #1
+mpuvVJxfbnwYej7NmAwEb1wFhMiq6VKzNH
+cRxEqXANSYzm3aFQigEnXxWTdde3Kwcuy2vX4n1hETDnFKZpAvTQ
+
+// other #2
+mk36ppADLBQFztXbsW2WkFMGCTK2hgJXge
+cVCWa2dzvhVrw2GEih4zSXdxBTmrNghXKFuTHnP5WaiK8zDeTGmF
+
 ```
 
 ## Problems:
