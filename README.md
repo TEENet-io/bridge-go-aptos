@@ -94,11 +94,14 @@ cVCWa2dzvhVrw2GEih4zSXdxBTmrNghXKFuTHnP5WaiK8zDeTGmF
 - [ ] Unused code in project. Use tool (staticcheck or golangci-lint) to find and remove them, or remove them manually.
 - [ ] Eth side `Id` field of type `MonitoredTx` is used of different purposes, shall separate. not REUSED.
 - [x] `ethtxmanager.MonitoredTx`:`sentAfter` breaks the monitor logic. <Level-0> bug. The last block hash is stored. However, in real life (not sim), the blck hash is not search-able. So better using last block height (int64) as a back up of hash. This now breaks the logic of finding expired Txs in local geth (regtest mode), but doesn't affect Sepolia Testnet or SimEtherman.
-- [ ] Automatic `ImportPrivateKeyRescan` and `ImportAddressRescan` on BTC node (regardless of local private node or regtest node) to tell BTC node wallet to track on specific address. Otherwise the BTC RPC node will not track the address (so our rpc balance / utxo query will return empty).
+- [x] Automatic `ImportPrivateKeyRescan` and `ImportAddressRescan` on BTC node (regardless of local private node or regtest node) to tell BTC node wallet to track on specific address. Otherwise the BTC RPC node will not track the address (so our rpc balance / utxo query will return empty).
 - [x] Need more config fileds in YAML of on server config to prevent new-deploy of smart contracts, use the existing smart contracts.
 - [ ] Move Btc Regtest mining function to automatic step, no need for users to mine manually.
 - [x] View Balance of btc/eth user shall contain address.
 - [ ] Remove hard coded redeem fee: `BTC_TX_FEE` (btctxmanager/withdraw.go) = 0.001, `SAFE_MARGIN` (btcvault/vault.go) = 0.001.
 - [ ] ETH side synchronizer shall start not from 0 but from  a predefined block height, if not the last block height (if db is empty)
 - [ ] "state missing" latest chain id (1337) + latest block (start from 0), shall we start from a specific number, to avoid full-scan of blockchain (like the deployment block of bridge/twbtc smart contract)?
-- [ ] Estimate BTC Tx fee (vbyte) based on the network!
+- [ ] Estimate BTC Tx fee (vbyte) based on the network! 1000 sat = 3.79v (in deposit)
+- [ ] Make btc finalized number 6 a configurable int.
+- [ ] ETH sync: shows prematurely "stopping Eth synchronization" in sepolia environment. must have some problems.
+- [ ] BTC new config: forceStartBlk, trigger a scan from this blk, not newest.
