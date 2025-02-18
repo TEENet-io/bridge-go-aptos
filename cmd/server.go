@@ -224,12 +224,18 @@ func NewBridgeServer(bsc *BridgeServerConfig, ctx context.Context, wg *sync.Wait
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		myState.Start(ctx) // state
+		err := myState.Start(ctx) // state
+		if err != nil {
+			logger.Fatalf("failed to sync eth: %v", err)
+		}
 	}()
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		myEthTxMgr.Start(ctx) // eth-side tx manager
+		err := myEthTxMgr.Start(ctx) // eth-side tx manager
+		if err != nil {
+			logger.Fatalf("failed to sync eth: %v", err)
+		}
 	}()
 	wg.Add(1)
 	go func() {
