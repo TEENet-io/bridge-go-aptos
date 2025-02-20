@@ -14,9 +14,9 @@ import (
 type RedeemStatus string
 
 const (
-	RedeemStatusRequested RedeemStatus = "requested"
-	RedeemStatusPrepared  RedeemStatus = "prepared"
-	RedeemStatusCompleted RedeemStatus = "completed"
+	RedeemStatusRequested RedeemStatus = "requested" // user requested
+	RedeemStatusPrepared  RedeemStatus = "prepared"  // bridge prepared utxos for request, not sent on btc yet.
+	RedeemStatusCompleted RedeemStatus = "completed" // bridge sent btc tx and btc tx is mined.
 	RedeemStatusInvalid   RedeemStatus = "invalid"
 )
 

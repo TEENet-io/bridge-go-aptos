@@ -109,7 +109,7 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 						"block#":        target_blk_num,
 						"mintTx":        "0x" + hex.EncodeToString(ev.TxHash[:]),
 						"amount":        ev.Amount,
-						"receiver(btc)": ev.Receiver,
+						"receiver(eth)": ev.Receiver,
 					}).Info("Minted event")
 					s.st.GetNewMintedEventChannel() <- &MintedEvent{
 						MintTxHash: ev.TxHash,

@@ -256,7 +256,12 @@ func (st *State) Start(ctx context.Context) error {
 				if err = st.statedb.UpdateAfterPrepared(redeem); err != nil {
 					return ErrDBOpUpdateRedeem
 				}
-				newLogger.Debug("update redeem after prepared")
+
+				newLogger.WithFields(logger.Fields{
+					"status":     redeem.Status,
+					"reqTxHash":  redeem.RequestTxHash.String(),
+					"prepTxHash": redeem.PrepareTxHash.String(),
+				}).Info("updated redeem after prepared")
 
 				return nil
 			}
