@@ -46,7 +46,7 @@ type BTCMonitor struct {
 }
 
 // Given a BTC transaction ID, finds a record in the database
-func (m *BTCMonitor) QueryRedeemTx(btcTxID string) bool {
+func (m *BTCMonitor) QueryRedeemTxFromDB(btcTxID string) bool {
 	record, err := m.mgrState.QueryByBtcTxId(btcTxID)
 	if err != nil {
 		return false
@@ -88,6 +88,9 @@ func NewBTCMonitor(addressStr string, chainConfig *chaincfg.Params, rpcClient *r
 }
 
 // Scan represents a signle round of scanning the blockchain
+// Scan for blocks,
+// Scan each block for txs.
+// Scan each tx for related Deposit/Transfer/Redeem actions.
 // It will return nothing if success, otherwise an error
 func (m *BTCMonitor) Scan() error {
 	// Scrap blockchain
@@ -104,6 +107,7 @@ func (m *BTCMonitor) Scan() error {
 	}
 
 	numbersToFetch := latestBlockHeight - m.LastVistedBlockHeight - CONSIDER_FINALIZED
+
 	logger.WithFields(logger.Fields{
 		"latestBlockHeight":     latestBlockHeight,
 		"LastVistedBlockHeight": m.LastVistedBlockHeight,
@@ -116,24 +120,34 @@ func (m *BTCMonitor) Scan() error {
 	}
 
 	blocks, err := m.RpcClient.GetBlocks(int(numbersToFetch), CONSIDER_FINALIZED)
+
 	for _, block := range blocks {
+		// skip no transaction blocks
 		if len(block.Transactions) == 0 {
 			continue
 		}
 		for _, tx := range block.Transactions {
 			blockHeight, err := m.RpcClient.GetBlockHeightByHash(btcutil.NewBlock(block).Hash())
 			if err != nil {
-				return fmt.Errorf("failed to get block height via hash: %v", err)
+				logger.WithFields(logger.Fields{
+					"blockHash": btcutil.NewBlock(block).Hash(),
+					"btcTxId":   tx.TxHash(),
+				}).Warnf("failed to get block height by hash: %v", err)
+				continue
 			}
 			// check if the BTC tx is a user's bridge deposit
 			maybe_deposit := myutils.MaybeDepositTx(tx, m.BridgeBTCAddress, m.ChainConfig)
 			if maybe_deposit {
 				deposit, err := myutils.CraftDepositAction(tx, blockHeight, block, m.BridgeBTCAddress, m.ChainConfig)
 				if err != nil {
-					return fmt.Errorf("failed to craft deposit action: %v", err)
-					//TODO: shall add REFUND BTC logic here.
+					logger.WithFields(logger.Fields{
+						"blockNum": blockHeight,
+						"btcTxId":  tx.TxHash(),
+					}).Warnf("failed to craft deposit action from a maybe_deposit: %v", err)
+					continue
+					//TODO: shall add REFUND BTC logic here if user actually mal-formed the deposit data.
 				}
-				logger.WithField("btcTxId", deposit.TxHash).Debug("Deposit Found")
+				logger.WithField("btcTxId", deposit.TxHash).Info("Deposit Found")
 
 				observedUTXO := &ObservedUTXO{
 					BlockNumber: blockHeight,
@@ -157,7 +171,7 @@ func (m *BTCMonitor) Scan() error {
 							"btcTxId": tx.TxHash().String(),
 							"vout":    transfer.Vout,
 							"amount":  transfer.Amount,
-						}).Debug("Other Transfer Found")
+						}).Info("Other Transfer Found")
 
 						observedUTXO := &ObservedUTXO{
 							BlockNumber: blockHeight,
@@ -178,9 +192,9 @@ func (m *BTCMonitor) Scan() error {
 			// if so, set the redeem state of mgr state to be minted.
 			// notify observers to set the state on core shared state.
 			_btc_txid := tx.TxHash().String()
-			if m.QueryRedeemTx(_btc_txid) {
+			if m.QueryRedeemTxFromDB(_btc_txid) {
 
-				logger.WithField("btcTxId", _btc_txid).Debug("Redeem Found on blockchain")
+				logger.WithField("btcTxId", _btc_txid).Info("Sent Redeem Found on blockchain")
 
 				reqTxHash := m.FinishRedeem(_btc_txid)
 
@@ -210,7 +224,7 @@ func (m *BTCMonitor) ScanLoop() {
 	for {
 		err := m.Scan()
 		if err != nil {
-			fmt.Printf("Error during scan: %v\n", err)
+			logger.Warnf("BTC ScanLoop error: %v", err)
 		}
 		// Sleep for a while before the next scan
 		time.Sleep(SCAN_INTERVAL)
