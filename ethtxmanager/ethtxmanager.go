@@ -145,19 +145,28 @@ func (txmgr *EthTxManager) Start(ctx context.Context) error {
 				errCh <- ErrDBOpGetRedeemsByStatus
 			}
 
+			if len(redeemsFromDB) > 0 {
+				for _, redeem := range redeemsFromDB {
+					logger.WithFields(logger.Fields{
+						"status":    redeem.Status,
+						"reqTxHash": redeem.RequestTxHash.String(),
+					}).Debug("redeems (requested) from db")
+				}
+			}
+
 			redeems := []*state.Redeem{}
 			for _, redeem := range redeemsFromDB {
 				// Check whether there is any pending tx that has tried to prepare the redeem
 				mts, err := txmgr.mgrdb.GetMonitoredTxsById(redeem.RequestTxHash)
 				if err != nil {
-					logger.Errorf("failed to get monitored tx by request tx hash: err=%v", err)
+					logger.Errorf("failed to get monitored tx in db by request tx hash: err=%v", err)
 					errCh <- ErrDBOpGetMonitoredTxByID
 				}
-				if len(mts) == 0 {
+				if len(mts) == 0 { // no pending tx that has tried to prepare the redeem
 					// Add the redeem to the list of redeems to be prepared
 					// if there is no pending tx that has tried to prepare the redeem
 					redeems = append(redeems, redeem)
-				} else {
+				} else { // if monitored tx, but the prepre tx is timeout, re-prepare
 					// Add the redeem to the list of redeems to be prepared
 					// if all the txs that have tried to prepare the redeem have timed out
 					isTimeout := true
@@ -172,6 +181,8 @@ func (txmgr *EthTxManager) Start(ctx context.Context) error {
 					}
 				}
 			}
+
+			logger.WithField("num", len(redeems)).Info("redeems to be prepared")
 
 			if len(redeems) == 0 {
 				continue
