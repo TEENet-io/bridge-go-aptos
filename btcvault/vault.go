@@ -9,6 +9,7 @@ import (
 	"github.com/TEENet-io/bridge-go/state"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
+	logger "github.com/sirupsen/logrus"
 )
 
 const (
@@ -128,6 +129,15 @@ func (tv *TreasureVault) Peek() ([]VaultUTXO, int64, error) {
 	return _utxos, _total, nil
 }
 
+func (tv *TreasureVault) Status() {
+	_utxos, sum, err := tv.Peek()
+	logger.WithFields(logger.Fields{
+		"utxos": _utxos,
+		"sum":   sum,
+		"err":   err,
+	}).Info("UTXO Vault Status")
+}
+
 // ReleaseByCommand releases UTXOs by their transaction ID and vout
 func (tv *TreasureVault) ReleaseByCommand(txID string, vout int32) error {
 	utxo, err := tv.backend.QueryByTxIDAndVout(txID, vout)
@@ -173,6 +183,8 @@ func (tv *TreasureVault) Request(
 	amount *big.Int,
 	ch chan<- []state.Outpoint,
 ) error {
+	tv.Status() // report status
+
 	utxos, err := tv.ChooseAndLock(amount.Int64() + SAFE_MARGIN)
 	if err != nil {
 		return err
