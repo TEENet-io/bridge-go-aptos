@@ -167,7 +167,7 @@ func (st *State) Start(ctx context.Context) error {
 				"reqTx", ev.RequestTxHash.String(),
 			)
 
-			handleEvent := func() error {
+			handleRedeemRequestEvent := func() error {
 				// Check if the redeem already exists
 				ok, _, err := st.statedb.HasRedeem(ev.RequestTxHash)
 				if err != nil {
@@ -195,7 +195,7 @@ func (st *State) Start(ctx context.Context) error {
 				return nil
 			}
 
-			if err := handleEvent(); err != nil {
+			if err := handleRedeemRequestEvent(); err != nil {
 				errCh <- err
 			}
 		// After receiving a redeem prepared event
