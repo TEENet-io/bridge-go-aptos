@@ -125,12 +125,13 @@ func (m *BTCMonitor) Scan() error {
 			if err != nil {
 				return fmt.Errorf("failed to get block height via hash: %v", err)
 			}
-			// check if the BTC tx is a bridge deposit
-			if myutils.MaybeDepositTx(tx, m.BridgeBTCAddress, m.ChainConfig) {
+			// check if the BTC tx is a user's bridge deposit
+			maybe_deposit := myutils.MaybeDepositTx(tx, m.BridgeBTCAddress, m.ChainConfig)
+			if maybe_deposit {
 				deposit, err := myutils.CraftDepositAction(tx, blockHeight, block, m.BridgeBTCAddress, m.ChainConfig)
 				if err != nil {
 					return fmt.Errorf("failed to craft deposit action: %v", err)
-					//TODO: shall add refund BTC logic here.
+					//TODO: shall add REFUND BTC logic here.
 				}
 				logger.WithField("btcTxId", deposit.TxHash).Debug("Deposit Found")
 
@@ -148,6 +149,29 @@ func (m *BTCMonitor) Scan() error {
 				m.Publisher.NotifyUTXO(*observedUTXO)
 				// skip the rest of the conditions
 				continue
+			} else {
+				transfers := myutils.MaybeJustTransfer(tx, m.BridgeBTCAddress, m.ChainConfig)
+				if len(transfers) > 0 {
+					for _, transfer := range transfers {
+						logger.WithFields(logger.Fields{
+							"btcTxId": tx.TxHash().String(),
+							"vout":    transfer.Vout,
+							"amount":  transfer.Amount,
+						}).Debug("Other Transfer Found")
+
+						observedUTXO := &ObservedUTXO{
+							BlockNumber: blockHeight,
+							BlockHash:   block.BlockHash().String(),
+							TxID:        tx.TxHash().String(),
+							Vout:        int32(transfer.Vout),
+							Amount:      transfer.Amount,
+							PkScript:    tx.TxOut[transfer.Vout].PkScript,
+						}
+
+						// Notify Observers
+						m.Publisher.NotifyUTXO(*observedUTXO)
+					}
+				}
 			}
 
 			// check if the BTC tx matches a bridge withdraw in our managment state.

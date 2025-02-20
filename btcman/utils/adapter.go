@@ -39,6 +39,41 @@ func MaybeDepositTx(tx *wire.MsgTx, targetAddress btcutil.Address, chainParams *
 	return flag1 && flag2
 }
 
+func MaybeJustTransfer(tx *wire.MsgTx, targetAddress btcutil.Address, chainParams *chaincfg.Params) []struct {
+	Vout   int
+	Amount int64
+} {
+	// Check if the tx has at least 1 output
+	if len(tx.TxOut) < 1 {
+		return nil
+	}
+
+	var results []struct {
+		Vout   int
+		Amount int64
+	}
+
+	// for each txout, loop, if any of them pays to us, then it is a transfer.
+	// mark the vout.
+	for i := 0; i < len(tx.TxOut); i++ {
+		output := tx.TxOut[i]
+		_, addresses, _, err := txscript.ExtractPkScriptAddrs(output.PkScript, chainParams)
+		if err != nil || len(addresses) == 0 || addresses[0].EncodeAddress() != targetAddress.EncodeAddress() || output.Value == 0 {
+			continue
+		}
+
+		results = append(results, struct {
+			Vout   int
+			Amount int64
+		}{
+			Vout:   i,
+			Amount: output.Value,
+		})
+	}
+
+	return results
+}
+
 // CraftDepositAction creates a DepositAction from the given tx
 func CraftDepositAction(tx *wire.MsgTx, blockHeight int32, block *wire.MsgBlock, targetAddress btcutil.Address, chainParams *chaincfg.Params) (*btcaction.DepositAction, error) {
 

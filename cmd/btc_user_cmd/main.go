@@ -91,8 +91,9 @@ func main() {
 		fmt.Println("What to do:")
 		fmt.Println("1) View balance")
 		fmt.Println("2) View recent UTXOs")
-		fmt.Println("3) Send deposit")
+		fmt.Println("3) Send deposit to bridge")
 		fmt.Println("4) Tell BTC network to mine blocks (regtest only)")
+		fmt.Println("5) Transfer BTC to another address")
 		fmt.Print("Type option and press Enter: ")
 
 		// Wait for input.
@@ -133,6 +134,9 @@ func main() {
 			} else {
 				fmt.Printf("Mined %d blocks\n", len(_blks))
 			}
+		case "5":
+			fmt.Println("Sending some btc to another address...")
+			sendTransfer(bu)
 		default:
 			fmt.Println("Unknown option, try again.")
 		}
@@ -226,6 +230,50 @@ func sendDeposit(bu *cmd.BtcUser) (string, error) {
 	btcTxId, err := bu.DepositToBridge(int64(amountToSend), int64(feeAmount), bridgeBtcWalletAddress, ethReceiverAddress, ethNetworkID)
 	if err != nil {
 		fmt.Printf("Error sending deposit: %s\n", err)
+		return "", err
+	}
+	return btcTxId, nil
+}
+
+func sendTransfer(bu *cmd.BtcUser) (string, error) {
+	scanner := bufio.NewScanner(os.Stdin)
+
+	fmt.Print("Enter receiver address: ")
+	scanner.Scan()
+	receiverBtcWalletAddress := strings.TrimSpace(scanner.Text())
+
+	fmt.Print("Enter amount to send (in satoshis): ")
+	scanner.Scan()
+	amountToSend, err := strconv.Atoi(strings.TrimSpace(scanner.Text()))
+	if err != nil {
+		fmt.Printf("Invalid amount: %s\n", err)
+		return "", err
+	}
+
+	fmt.Print("Enter Tx fee amount (in satoshis, recommend minimum 100000 for regtest): ")
+	scanner.Scan()
+	feeAmount, err := strconv.Atoi(strings.TrimSpace(scanner.Text()))
+	if err != nil {
+		fmt.Printf("Invalid fee amount: %s\n", err)
+		return "", err
+	}
+
+	fmt.Printf("Sending %d satoshis to %s with a fee of %d satoshis.\n",
+		amountToSend, receiverBtcWalletAddress, feeAmount)
+
+	// check if user's balance is enough
+	balance, err := bu.GetBalance()
+	if err != nil {
+		fmt.Printf("Error getting balance: %s\n", err)
+		return "", err
+	}
+	if balance < int64(amountToSend+feeAmount) {
+		fmt.Printf("Not enough balance: have %d, need %d\n", balance, amountToSend+feeAmount)
+	}
+	// Here you would call the function to send the deposit using the collected inputs.
+	btcTxId, err := bu.TransferOut(int64(amountToSend), int64(feeAmount), receiverBtcWalletAddress)
+	if err != nil {
+		fmt.Printf("Error sending transfer: %s\n", err)
 		return "", err
 	}
 	return btcTxId, nil

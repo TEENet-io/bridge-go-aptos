@@ -124,9 +124,9 @@ func (m *BtcTxManager) CreateBTCRedeemTx(redeem *state.Redeem) (*wire.MsgTx, err
 	redeemTx, err := m.legacySigner.MakeRedeemTx(
 		dst_addr,
 		dst_amount,
-		requestTxHash, // we just fill in the eth redeem request tx hash as the identifier.
-		m.legacySigner.P2PKH.EncodeAddress(),
-		BTC_TX_FEE, // TODO: remove hard code of fee.
+		requestTxHash,                        // we just fill in the eth redeem request tx hash as the identifier.
+		m.legacySigner.P2PKH.EncodeAddress(), // change recevier addr
+		BTC_TX_FEE,                           // TODO: remove hard code of fee.
 		utxos,
 	)
 	if err != nil {

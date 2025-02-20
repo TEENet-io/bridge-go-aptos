@@ -192,8 +192,64 @@ func (bu *BtcUser) DepositToBridge(amount int64, feeAmount int64, bridgeAddress 
 		return "", err
 	}
 
-	logger.WithField("txHash", depositBtcTxHash.String()).Info("Tx sent")
+	logger.WithField("BTC_TX_ID", depositBtcTxHash.String()).Info("Tx sent")
 	return depositBtcTxHash.String(), nil
+}
+
+func (bu *BtcUser) TransferOut(amount int64, feeAmount int64, receiverAddr string) (string, error) {
+	logger.WithFields(logger.Fields{
+		"amount":       amount,
+		"receiverAddr": receiverAddr,
+	}).Info("Transfer btc")
+
+	// safe guard: check if user has enough balance to make a transfer.
+	balance, err := bu.GetBalance()
+	if err != nil {
+		return "", err
+	}
+	if balance < amount+feeAmount {
+		logger.WithFields(logger.Fields{
+			"balance":        balance,
+			"requiredAmount": amount + feeAmount,
+		}).Error("not enough balance to make a transfer")
+		return "", fmt.Errorf("not enough balance: have %d, need %d", balance, amount+feeAmount)
+	}
+
+	// Fetch UTXOs
+	utxos, err := bu.GetUtxos()
+	if err != nil {
+		return "", err
+	}
+
+	// Select barely enough UTXO(s) to spend
+	selected_utxos, err := utxo.SelectUtxo(convertToPointerSlice(utxos), amount, feeAmount)
+	if err != nil {
+		logger.WithField("error", err).Error("cannot select enough utxos for transfer")
+		return "", err
+	}
+	logger.WithField("count", len(selected_utxos)).Info("User UTXOs selected")
+
+	// Craft [Transfer Tx]
+	tx, err := bu.MyLegacySigner.MakeTransferOutTx(receiverAddr, amount, bu.MyUserConfig.BtcCoreAccountAddr, feeAmount, selected_utxos)
+	if err != nil {
+		logger.WithField("error", err).Error("cannot create Tx")
+		return "", err
+	}
+
+	logger.WithFields(logger.Fields{
+		"TxIn":  len(tx.TxIn),
+		"TxOut": len(tx.TxOut),
+	}).Info("Crafted transfer Tx")
+
+	// Send [Transfer Tx] via RPC
+	transferBtcTxHash, err := bu.BtcRpcClient.SendRawTx(tx)
+	if err != nil {
+		logger.WithField("error", err).Error("send raw Tx error")
+		return "", err
+	}
+
+	logger.WithField("BTC_TX_ID", transferBtcTxHash.String()).Info("Tx sent")
+	return transferBtcTxHash.String(), nil
 }
 
 func (bu *BtcUser) MineEnoughBlocks() ([]*chainhash.Hash, error) {
