@@ -89,7 +89,7 @@ func (txmgr *EthTxManager) handleMintTx(
 	}
 
 	newLogger := logger.WithField("mintTx", tx.Hash().String())
-	newLogger.Debugf("mint tx sent: eth_tx_id=%s", tx.Hash().String())
+	newLogger.Infof("mint tx sent: eth_tx_id=%s", tx.Hash().String())
 
 	// Save the monitored tx
 	mt := &MonitoredTx{
