@@ -104,7 +104,7 @@ func (txmgr *EthTxManager) handleMintTx(
 		logger.Errorf("failed to insert pending monitored tx: err=%v", err)
 		return ErrDBOpInsertMonitoredTx
 	}
-	newLogger.Debugf("inserted monitored tx: sentAfter(last eth block hash)=0x%x", mt.SentAfter)
+	newLogger.Debugf("inserted monitored tx: sentAfter(last eth block hash)=0x%x, sentAfterBlk=%d", mt.SentAfter, mt.SentAfterBlk)
 
 	return nil
 }

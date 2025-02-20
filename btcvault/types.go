@@ -18,6 +18,9 @@ type VaultUTXOStorage interface {
 	// InsertVaultUTXO inserts a new VaultUTXO into the database
 	InsertVaultUTXO(utxo VaultUTXO) error
 
+	// Select all UTXOs that are usable (not locked, not spent)
+	QueryAllUsableUTXOs() ([]VaultUTXO, error)
+
 	// QueryByBlockNumber retrieves all VaultUTXOs with the specified block number
 	QueryByBlockNumber(blockNumber int32) ([]VaultUTXO, error)
 

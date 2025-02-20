@@ -2,12 +2,12 @@ package btcvault
 
 import (
 	"fmt"
+	"math/big"
 	"sync"
 	"time"
 
-	"math/big"
-
 	"github.com/TEENet-io/bridge-go/state"
+
 	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
@@ -113,6 +113,19 @@ func (tv *TreasureVault) ReleaseByExpire() error {
 	}
 
 	return nil
+}
+
+// Quick function to reveal the current state of the vault
+func (tv *TreasureVault) Peek() ([]VaultUTXO, int64, error) {
+	_utxos, err := tv.backend.QueryAllUsableUTXOs()
+	if err != nil {
+		return nil, 0, err
+	}
+	_total, err := tv.backend.SumMoney()
+	if err != nil {
+		return nil, 0, err
+	}
+	return _utxos, _total, nil
 }
 
 // ReleaseByCommand releases UTXOs by their transaction ID and vout
