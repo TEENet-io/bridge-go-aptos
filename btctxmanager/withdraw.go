@@ -212,7 +212,7 @@ func (m *BtcTxManager) WithdrawLoop() {
 			logger.WithFields(logger.Fields{
 				"reqTxHash": reqTxHash,
 				"btcTxId":   btcTxId.String(),
-			}).Debug("New BTC withdraw sent")
+			}).Debug("new BTC withdraw sent")
 
 			// Insert the redeem record in mgrState (wait for future update)
 			err = m.mgrState.InsertRedeem(&btcaction.RedeemAction{

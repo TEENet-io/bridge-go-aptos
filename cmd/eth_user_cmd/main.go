@@ -149,12 +149,16 @@ func sendRedeem(eu *cmd.EthUser) (string, error) {
 	scanner.Scan()
 	receiverBtcAddress := strings.TrimSpace(scanner.Text())
 
-	fmt.Print("Enter amount to redeem (in satoshis): ")
+	fmt.Print("Enter amount to redeem (in satoshis, must > 100,000): ")
 	scanner.Scan()
 	amountToRedeem, err := strconv.Atoi(strings.TrimSpace(scanner.Text()))
 	if err != nil {
 		fmt.Printf("Invalid amount: %s\n", err)
 		return "", err
+	}
+
+	if amountToRedeem < 100000 {
+		return "", fmt.Errorf("amount must be greater than 100,000 otherwise considered as dust attack on BTC")
 	}
 
 	fmt.Printf("Sending redeem request to bridge... receiver: %s, amount: %d\n", receiverBtcAddress, amountToRedeem)
@@ -166,7 +170,7 @@ func sendRedeem(eu *cmd.EthUser) (string, error) {
 	}
 	if _twbtc_balance.Cmp(big.NewInt(int64(amountToRedeem))) < 0 {
 		fmt.Printf("Insufficient TWBTC balance: %d\n", _twbtc_balance)
-		return "", fmt.Errorf("Insufficient TWBTC balance")
+		return "", fmt.Errorf("insufficient TWBTC balance")
 	}
 
 	_redeem_tx_hash, err := eu.InitiateRedeem(big.NewInt(int64(amountToRedeem)), receiverBtcAddress)

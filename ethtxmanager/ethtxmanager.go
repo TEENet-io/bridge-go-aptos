@@ -152,6 +152,8 @@ func (txmgr *EthTxManager) Start(ctx context.Context) error {
 						"reqTxHash": redeem.RequestTxHash.String(),
 					}).Debug("redeems (requested) from db")
 				}
+			} else {
+				logger.WithField("num", 0).Debug("no redeems (=status requested) from db")
 			}
 
 			redeems := []*state.Redeem{}
