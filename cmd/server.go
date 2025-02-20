@@ -35,7 +35,7 @@ import (
 // So we list them here.
 const (
 	// eth synchronizer config
-	frequencyToCheckEthFinalizedBlock = 3 * time.Second
+	frequencyToCheckEthFinalizedBlock = 1 * time.Second
 
 	// eth tx manager config
 	frequencyToPrepareRedeem      = 500 * time.Millisecond // 0.5 second
