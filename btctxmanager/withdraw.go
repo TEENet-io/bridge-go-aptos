@@ -48,7 +48,7 @@ func NewBtcTxManager(treasureVault *btcvault.TreasureVault, legacySigner *assemb
 }
 
 // Find "prepared" redeems from local shared "state"
-func (m *BtcTxManager) FindRedeems() ([]*state.Redeem, error) {
+func (m *BtcTxManager) FindRedeemsFromState() ([]*state.Redeem, error) {
 	redeems, err := m.sharedState.GetPreparedRedeems()
 	if err != nil {
 		return nil, err
@@ -156,7 +156,7 @@ func (m *BtcTxManager) WithdrawBTC(redeem *state.Redeem) (*chainhash.Hash, error
 // Call it in a separate go routine.
 func (m *BtcTxManager) WithdrawLoop() {
 	for {
-		redeems, err := m.FindRedeems()
+		redeems, err := m.FindRedeemsFromState()
 		// if len(redeems) > 0 {
 		// 	logger.Infof("Found redeems: %d", len(redeems))
 		// }
@@ -180,8 +180,18 @@ func (m *BtcTxManager) WithdrawLoop() {
 			}
 
 			if exists {
-				// If a record of the redeem already exists, continue with the next redeem
-				logger.WithField("reqTxHash", reqTxHash).Debug("BTC withdraw already tracked in db")
+				ra, err := m.mgrState.QueryByEthRequestTxId(reqTxHash)
+				if err != nil {
+					logger.WithField("reqTxHash", reqTxHash).Errorf("Failed to query redeem record via reqTxHash: err=%v", err)
+				} else {
+					// If a record of the redeem already exists, continue with the next redeem
+					logger.WithFields(logger.Fields{
+						"reqTxHash": reqTxHash,
+						"btcTxId":   ra.BtcHash,
+						"sent":      ra.Sent,
+						"mined":     ra.Mined,
+					}).Debug("btc redeem tracked in our mgr db")
+				}
 				continue
 			}
 
