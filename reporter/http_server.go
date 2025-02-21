@@ -6,6 +6,7 @@ package reporter
 
 import (
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -110,13 +111,16 @@ func (h *HttpReporter) Deposits(c *gin.Context) {
 
 	// Query the depositdb via evmReceiver
 	depos, err := h.depositdb.GetDepositsByEVMAddr(evmReceiver)
-
-	// depos, err := h.depositdb.GetDeposits()
-	logger.WithField("len(depos)", len(depos)).Info("Query Depos from db")
-
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
+	}
+	logger.WithField("len(depos)", len(depos)).Info("Query Depos from db")
+	if len(depos) == 0 {
+		// order depos by blocknumber desc
+		sort.Slice(depos, func(i, j int) bool {
+			return depos[i].BlockNumber > depos[j].BlockNumber
+		})
 	}
 
 	for _, depo := range depos {
