@@ -27,13 +27,14 @@ type DepositStorage interface {
 	// GetDepositByTxHash queries DepositAction by TxHash.
 	GetDepositByTxHash(txHash string) ([]DepositAction, error)
 
-	// GetDepositByReceiver queries DepositAction by DepositReceiver.
-	GetDepositByReceiver(receiver string) ([]DepositAction, error)
+	// GetDepositsByReceiver queries DepositAction by DepositReceiver.
+	GetDepositsByReceiver(receiver string) ([]DepositAction, error)
 
 	// GetDepositByEVM queries DepositAction by EvmAddr and EvmID.
 	GetDepositByEVM(evmAddr string, evmID int32) ([]DepositAction, error)
 
-	GetDepositByEVMAddr(evmAddr string) ([]DepositAction, error)
+	// GetDepositsByEVMAddr queries DepositAction by EvmAddr.
+	GetDepositsByEVMAddr(evmAddr string) ([]DepositAction, error)
 }
 
 // RedeemAction is a management action.

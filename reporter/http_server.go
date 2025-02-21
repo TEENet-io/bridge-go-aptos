@@ -7,6 +7,7 @@ package reporter
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -20,9 +21,9 @@ import (
 )
 
 const (
-	ROUTE_HELLO   = "/hello"
-	ROUTE_DEPOSIT = "/deposit"
-	ROUTE_REDEEM  = "/redeem"
+	ROUTE_HELLO    = "/hello"
+	ROUTE_DEPOSITS = "/deposits"
+	ROUTE_REDEEM   = "/redeem"
 )
 
 type HttpReporter struct {
@@ -55,7 +56,7 @@ func (h *HttpReporter) SetupRouter() *gin.Engine {
 
 	// Define routes & handlers
 	router.GET(ROUTE_HELLO, Hello)
-	router.GET(ROUTE_DEPOSIT, h.Deposit)
+	router.GET(ROUTE_DEPOSITS, h.Deposits)
 	router.GET(ROUTE_REDEEM, h.Redeem)
 
 	return router
@@ -88,101 +89,64 @@ type DepositResponse struct {
 	EvmMintAmount   string `json:"evm_mint_amount"`    // ethereum mint amount in Wei, int64 => string
 }
 
-// Fetch data from depositdb
-// Publish on the route
-func (h *HttpReporter) Deposit(c *gin.Context) {
-	btcTxID := c.Query("btc_tx_id")        // btc transaction id
+// Fetch a list of deposits.
+// deposits are related to an account, and ordered by time.
+// evm_receiver: ethereum address of receiver on eth side
+func (h *HttpReporter) Deposits(c *gin.Context) {
 	evmReceiver := c.Query("evm_receiver") // evm
 
 	// Check if all parameters are missing
-	if btcTxID == "" && evmReceiver == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "At least one of btc_tx_id, or evm_receiver must be provided"})
+	if evmReceiver == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "evm_receiver must be provided"})
 		return
 	}
 
-	// TODO: protection of parameter check.
+	// Protect / Shape the input
+	evmReceiver = strings.ToLower(evmReceiver)
+	evmReceiver = utils.Remove0xPrefix(evmReceiver)
 
-	// Primarily, deposits are fetched by btc tx id.
-	var btcTxIDs []string
+	var resp []DepositResponse
 
-	// Assemble [btc_tx_id]
-	if evmReceiver != "" {
-		depos, err := h.depositdb.GetDepositByEVMAddr(evmReceiver)
+	// Query the depositdb via evmReceiver
+	depos, err := h.depositdb.GetDepositsByEVMAddr(evmReceiver)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	for _, depo := range depos {
+		_resp := DepositResponse{
+			BtcDepoTxStatus: "confirmed",
+			BtcDepoTxId:     depo.TxHash,
+			BtcDepoAmount:   strconv.FormatInt(depo.DepositValue, 10), // convert int64 to string
+		}
+
+		mint, _, err := h.statedb.GetMint(ethcommon.HexToHash(depo.TxHash))
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-
-		for _, depo := range depos {
-			btcTxIDs = append(btcTxIDs, depo.TxHash)
-		}
-	} else if btcTxID != "" {
-		btcTxIDs = append(btcTxIDs, btcTxID)
-	}
-
-	// If btc_tx_id is provided, fetch a deposit by btc_tx_id.
-	// will always return a single deposit response, even if not found.
-	var resp []DepositResponse
-
-	if len(btcTxIDs) != 0 {
-		for _, _btcTxID := range btcTxIDs {
-
-			depos, err := h.depositdb.GetDepositByTxHash(_btcTxID)
-			// protect
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-				return
-			}
-			// protect
-			if len(depos) > 1 {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Multiple deposits with same btcTxID found"})
-				return
-			}
-
-			if len(depos) == 0 {
-				resp = append(resp, DepositResponse{
-					BtcDepoTxStatus: "not_found",
-					BtcDepoTxId:     _btcTxID,
-				})
-				continue
-			}
-
-			_depo := depos[0]
-
-			_resp := DepositResponse{
-				BtcDepoTxStatus: "confirmed",
-				BtcDepoTxId:     _btcTxID,
-				BtcDepoAmount:   strconv.FormatInt(_depo.DepositValue, 10), // convert int64 to string
-			}
-
-			m, _, err := h.statedb.GetMint(ethcommon.HexToHash(_btcTxID))
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-				return
-			}
-			// no corresponding mint on evm was found.
-			// We don't fill in the evm part of response
-			if m == nil {
-				continue
-			}
-
-			// found mint, but the evm tx hash is not set.
-			if m.MintTxHash == common.EmptyHash {
-				_resp.EvmMintTxStatus = "pending"
-				_resp.EvmMintReceiver = _depo.EvmAddr
-			} else { // found mint, evm tx hash is set.
-				_resp.EvmMintTxStatus = "confirmed"
-				_resp.EvmMintReceiver = _depo.EvmAddr
-				_resp.EvmMintTxId = m.MintTxHash.String()
-				_resp.EvmMintAmount = m.Amount.String()
-			}
-
-			// attach _resp to response
-			resp = append(resp, _resp)
+		// If no corresponding mint on evm was found.
+		// We don't fill in the evm part of response
+		if mint == nil {
+			continue
 		}
 
-		c.JSON(http.StatusOK, gin.H{"data": resp})
+		// found mint, but the evm tx hash is not set.
+		if mint.MintTxHash == common.EmptyHash {
+			_resp.EvmMintTxStatus = "pending"
+			_resp.EvmMintReceiver = depo.EvmAddr
+		} else { // found mint, evm tx hash is set.
+			_resp.EvmMintTxStatus = "confirmed"
+			_resp.EvmMintReceiver = depo.EvmAddr
+			_resp.EvmMintTxId = mint.MintTxHash.String()
+			_resp.EvmMintAmount = mint.Amount.String()
+		}
+
+		// attach _resp to response
+		resp = append(resp, _resp)
 	}
+	c.JSON(http.StatusOK, gin.H{"data": resp})
 }
 
 type RedeemResponse struct {

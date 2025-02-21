@@ -20,11 +20,11 @@ Test Components
 
 Live Components
 
-- [ ] BTC Testnet (connect to BTC Testnet)
-- [ ] ETH Hardhat / Testnet (connect to ETH Testnet)
-- [ ] server.go
-- [ ] btc_user.go
-- [ ] eth_user.go
+- [x] BTC Testnet (connect to BTC Testnet)
+- [x] ETH Testnet (connect to ETH Testnet: sepolia)
+- [x] server.go
+- [x] btc_user.go
+- [x] eth_user.go
 
 Test Accounts
 
@@ -102,6 +102,16 @@ cVCWa2dzvhVrw2GEih4zSXdxBTmrNghXKFuTHnP5WaiK8zDeTGmF
 - [ ] ETH side: synchronizer shall start not from 0 but from  a predefined block height, if not the last block height (if db is empty)
 - [ ] ETH side: "state missing" latest chain id (1337) + latest block (start from 0), shall we start from a specific number, to avoid full-scan of blockchain (like after the blk of deployment block of bridge/twbtc smart contract)?
 - [ ] Estimate BTC Tx fee (vbyte) based on the network! 1000 sat = 3.79v (in deposit)
-- [ ] Make btc_finalized_number a configurable int. (now uses 1)
+- [ ] Make btc_finalized_number / BTC_MATURE_OFFSET a configurable int. (now uses 1 or 0)
 - [x] ETH sync: shows prematurely "stopping Eth synchronization" in sepolia environment. must have some problems. - problem was rpc node doesn't support method "eth_getlogs" and existed prematurely. So we use a more robust node instead.
 - [x] BTC new config: forceStartBlk, trigger birige scan from this blk, not newest, nor from 0 blk.
+- [ ] BTC Deposit Action didn't log the sender. (probably log the Tx sender)
+```
+Bitcoin transactions do not include a dedicated "sender" field. Instead, every input in a transaction spends an output from a previous transaction. This means:
+
+- There is no single sender address; if multiple inputs are used, there could be multiple originating addresses.
+- To infer the sender(s), you must look up each input's referenced previous output and then derive the address from the locking script.
+- For common types (e.g. P2PKH), you can often extract the public key hash from the input’s signature script, but this involves parsing the script and is not as straightforward as an explicit field.
+
+So, in your loop through block.Transactions, you'll need to inspect each transaction's inputs and perform additional lookups or script parsing if you want to determine the originating addresses.
+```
