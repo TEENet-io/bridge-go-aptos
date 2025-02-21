@@ -6,7 +6,7 @@
 ETH_RPC_URL: "https://rpc-sepolia.rockx.com"
 # This eth account is controlled by bridge to do Mint() and RedeemPrepare()
 ETH_CORE_ACCOUNT_PRIV: "dbcec79f3490a6d5d162ca2064661b85c40c93672968bfbd906b952e38c3e8de" # address: 0x85b427C84731bC077BA5A365771D2b64c5250Ac8
-ETH_RETRO_SCAN_BLK: 7745660 # -1: honor statedb last scanned blk, >0 Synchronizer shall start from this block number.
+ETH_RETRO_SCAN_BLK: 7752200  # -1: honor statedb last scanned blk, >0 Synchronizer shall start from this block number.
 
 # DB
 # You can use full path or just the file name to imply current path.
@@ -23,7 +23,7 @@ BTC_CORE_ACCOUNT_ADDR: "mnQ9tBEkNXXEyJqKeSK1TWJV3LngVSjanV" # bridge's address (
 BTC_CORE_ACCOUNT_PRIV: "cU78RfXmYEXsdNpiC8AppdpNg6Ni58s8nF8LFFWuMVAQGx51v3HY" # bridge's private key
 
 # HTTP
-HTTP_IP: "0.0.0.0" # server listens on ...
+HTTP_IP: "127.0.0.1" # server listens on ...
 HTTP_PORT: "8080"
 
 # Extra
