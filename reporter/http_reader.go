@@ -75,7 +75,7 @@ func (hr *HttpReader) GetDepositStatusByReceiver(receiver string) (string, error
 }
 
 func (hr *HttpReader) GetRedeemsByRequester(requester string) (string, error) {
-	url := "http://" + hr.serverIP + ":" + hr.serverPort + ROUTE_REDEEM + "?evm_requester=" + requester
+	url := "http://" + hr.serverIP + ":" + hr.serverPort + ROUTE_REDEEMS + "?evm_requester=" + requester
 	resp, err := http.Get(url)
 	if err != nil {
 		return "", err
