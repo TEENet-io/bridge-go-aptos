@@ -62,6 +62,27 @@ func (s *SQLiteDepositStorage) AddDeposit(deposit DepositAction) error {
 	return err
 }
 
+// Get all the deposits from database.
+func (s *SQLiteDepositStorage) GetDeposits() ([]DepositAction, error) {
+	query := `SELECT block_number, block_hash, tx_hash, deposit_value, deposit_receiver, evm_id, evm_addr FROM btc_action_deposit`
+	rows, err := s.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var deposits []DepositAction
+	for rows.Next() {
+		var deposit DepositAction
+		err := rows.Scan(&deposit.BlockNumber, &deposit.BlockHash, &deposit.TxHash, &deposit.DepositValue, &deposit.DepositReceiver, &deposit.EvmID, &deposit.EvmAddr)
+		if err != nil {
+			return nil, err
+		}
+		deposits = append(deposits, deposit)
+	}
+	return deposits, nil
+}
+
 // Fetch a list of deposit actions by btc transaction hash.
 func (s *SQLiteDepositStorage) GetDepositByTxHash(txHash string) ([]DepositAction, error) {
 	query := `SELECT block_number, block_hash, tx_hash, deposit_value, deposit_receiver, evm_id, evm_addr FROM btc_action_deposit WHERE tx_hash = ?`
