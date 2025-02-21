@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	BTC_MATURE_OFFSET     = 1 // if tx is MATURE_OFFSET blocks old, we consider safe.
+	BTC_MATURE_OFFSET     = 0 // if tx is MATURE_OFFSET blocks old, we consider safe.
 	REGTEST_COINBASE_ADDR = "mkVXZnqaaKt4puQNr4ovPHYg48mjguFCnT"
 	REGTEST_ENOUGH_BLOCKS = 100
 	REGTEST_FEE_SATOSHI   = 0.001 * 1e8 // 0.001 btc
