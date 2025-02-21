@@ -17,7 +17,7 @@ const (
 
 func main() {
 	// Set overall config level to Debug
-	logconfig.ConfigDebugLogger()
+	logconfig.ConfigInfoLogger()
 
 	// Tool to read environment variables
 	viper.AutomaticEnv()

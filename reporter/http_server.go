@@ -103,12 +103,17 @@ func (h *HttpReporter) Deposits(c *gin.Context) {
 
 	// Protect / Shape the input
 	evmReceiver = strings.ToLower(evmReceiver)
-	evmReceiver = utils.Remove0xPrefix(evmReceiver)
+	// Acutally deposits has 0x as prefix when storing in the db.
+	// evmReceiver = utils.Remove0xPrefix(evmReceiver)
 
 	var resp []DepositResponse
 
 	// Query the depositdb via evmReceiver
 	depos, err := h.depositdb.GetDepositsByEVMAddr(evmReceiver)
+
+	// depos, err := h.depositdb.GetDeposits()
+	logger.WithField("len(depos)", len(depos)).Info("Query Depos from db")
+
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

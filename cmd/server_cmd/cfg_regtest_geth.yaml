@@ -19,7 +19,7 @@ BTC_CORE_ACCOUNT_PRIV: "cUWcwxzt2LiTxQCkQ8FKw67gd2NuuZ182LpX9uazB93JLZmwakBP" # 
 BTC_CORE_ACCOUNT_ADDR: "mvqq54khZQta7zDqFGoyN7BVK7Li4Xwnih" # bridge's address (can receive deposit BTCs)
 
 # HTTP
-HTTP_IP: "0.0.0.0" # server listens on ...
+HTTP_IP: "127.0.0.1" # server listens on ...
 HTTP_PORT: "8080"
 
 # Extra

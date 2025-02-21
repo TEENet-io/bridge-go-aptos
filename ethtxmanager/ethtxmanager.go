@@ -184,7 +184,7 @@ func (txmgr *EthTxManager) Start(ctx context.Context) error {
 				}
 			}
 
-			logger.WithField("num", len(redeems)).Info("redeems to be prepared")
+			logger.WithField("num", len(redeems)).Debug("redeems to be prepared")
 
 			if len(redeems) == 0 {
 				continue

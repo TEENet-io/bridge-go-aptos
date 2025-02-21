@@ -24,6 +24,9 @@ type DepositStorage interface {
 	// AddDeposit adds a new DepositAction.
 	AddDeposit(deposit DepositAction) error
 
+	// Get all the deposits!
+	GetDeposits() ([]DepositAction, error)
+
 	// GetDepositByTxHash queries DepositAction by TxHash.
 	GetDepositByTxHash(txHash string) ([]DepositAction, error)
 
