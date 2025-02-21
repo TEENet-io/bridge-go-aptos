@@ -39,7 +39,7 @@ func (hr *HttpReader) GetHello() (string, error) {
 }
 
 func (hr *HttpReader) GetDepositStatus(btcTxID string) (string, error) {
-	url := "http://" + hr.serverIP + ":" + hr.serverPort + ROUTE_DEPOSIT + "?btc_tx_id=" + btcTxID
+	url := "http://" + hr.serverIP + ":" + hr.serverPort + ROUTE_DEPOSITS + "?btc_tx_id=" + btcTxID
 	resp, err := http.Get(url)
 	if err != nil {
 		return "", err
@@ -57,7 +57,7 @@ func (hr *HttpReader) GetDepositStatus(btcTxID string) (string, error) {
 }
 
 func (hr *HttpReader) GetDepositStatusByReceiver(receiver string) (string, error) {
-	url := "http://" + hr.serverIP + ":" + hr.serverPort + ROUTE_DEPOSIT + "?evm_receiver=" + receiver
+	url := "http://" + hr.serverIP + ":" + hr.serverPort + ROUTE_DEPOSITS + "?evm_receiver=" + receiver
 	resp, err := http.Get(url)
 	if err != nil {
 		return "", err
