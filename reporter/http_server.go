@@ -23,7 +23,7 @@ import (
 const (
 	ROUTE_HELLO    = "/hello"
 	ROUTE_DEPOSITS = "/deposits"
-	ROUTE_REDEEM   = "/redeem"
+	ROUTE_REDEEMS  = "/redeems"
 )
 
 type HttpReporter struct {
@@ -57,7 +57,7 @@ func (h *HttpReporter) SetupRouter() *gin.Engine {
 	// Define routes & handlers
 	router.GET(ROUTE_HELLO, Hello)
 	router.GET(ROUTE_DEPOSITS, h.Deposits)
-	router.GET(ROUTE_REDEEM, h.Redeem)
+	router.GET(ROUTE_REDEEMS, h.Redeems)
 
 	return router
 }
@@ -171,7 +171,7 @@ type RedeemResponse struct {
 
 // Fetch data from redeemdb + statedb,
 // assemble response and return.
-func (h *HttpReporter) Redeem(c *gin.Context) {
+func (h *HttpReporter) Redeems(c *gin.Context) {
 	evmRequester := c.Query("evm_requester") // evm requester
 
 	if evmRequester == "" {
@@ -215,7 +215,7 @@ func (h *HttpReporter) Redeem(c *gin.Context) {
 		_requestTxHash := utils.Remove0xPrefix(redeem.RequestTxHash.String())
 		hasIt, err := h.redeemdb.HasRedeem(_requestTxHash)
 
-		logger.WithField("hasIt", hasIt).Info("Redeem Route")
+		logger.WithField("hasIt", hasIt).Debug("Redeem Route")
 
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
