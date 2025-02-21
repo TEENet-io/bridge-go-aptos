@@ -84,7 +84,7 @@ func (s *SQLiteDepositStorage) GetDepositByTxHash(txHash string) ([]DepositActio
 }
 
 // Fetch a list of deposit actions by bridge address.
-func (s *SQLiteDepositStorage) GetDepositByReceiver(receiver string) ([]DepositAction, error) {
+func (s *SQLiteDepositStorage) GetDepositsByReceiver(receiver string) ([]DepositAction, error) {
 	query := `SELECT block_number, block_hash, tx_hash, deposit_value, deposit_receiver, evm_id, evm_addr FROM btc_action_deposit WHERE deposit_receiver = ?`
 	rows, err := s.db.Query(query, receiver)
 	if err != nil {
@@ -125,7 +125,7 @@ func (s *SQLiteDepositStorage) GetDepositByEVM(evmAddr string, evmID int32) ([]D
 	return deposits, nil
 }
 
-func (s *SQLiteDepositStorage) GetDepositByEVMAddr(evmAddr string) ([]DepositAction, error) {
+func (s *SQLiteDepositStorage) GetDepositsByEVMAddr(evmAddr string) ([]DepositAction, error) {
 	query := `SELECT block_number, block_hash, tx_hash, deposit_value, deposit_receiver, evm_id, evm_addr FROM btc_action_deposit WHERE LOWER(evm_addr) = LOWER(?)`
 	rows, err := s.db.Query(query, evmAddr)
 	if err != nil {
