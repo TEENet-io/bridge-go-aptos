@@ -201,7 +201,7 @@ func (txmgr *EthTxManager) Start(ctx context.Context) error {
 				go func() {
 					defer wg.Done()
 					if err := txmgr.prepareRedeem(ctx, redeem); err != nil {
-						errCh <- err
+						// errCh <- err
 					}
 				}()
 			}
