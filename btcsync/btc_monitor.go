@@ -135,6 +135,7 @@ func (m *BTCMonitor) Scan() error {
 			}).Warnf("failed to get block_height by block_hash: %v", err)
 			continue
 		}
+		logger.WithField("blkNum", blockHeight).Info("Scanning btc block")
 		// Go for each Tx, look for Tx that is interested to us.
 		// In general we care about three things:
 		// 1) The output(s) of the Tx, does it form a valid <bridge deposit>?
