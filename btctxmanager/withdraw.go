@@ -119,7 +119,7 @@ func (m *BtcTxManager) CreateBTCRedeemTx(redeem *state.Redeem) (*wire.MsgTx, err
 	logger.WithFields(logger.Fields{
 		"dst_addr":           dst_addr,
 		"dst_amount":         dst_amount,
-		"requestTxHash":      requestTxHash,
+		"requestTxHash":      redeem.RequestTxHash.Hex(),
 		"btc_tx_fee (extra)": BTC_TX_FEE,
 	}).Info("Create BTC Redeem Tx")
 
