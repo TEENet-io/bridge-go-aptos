@@ -133,10 +133,22 @@ func (tv *TreasureVault) Peek() ([]VaultUTXO, int64, error) {
 func (tv *TreasureVault) Status() {
 	_utxos, sum, err := tv.Peek()
 	logger.WithFields(logger.Fields{
-		"utxos": _utxos,
-		"sum":   sum,
-		"err":   err,
+		"sum": sum,
+		"err": err,
 	}).Info("UTXO Vault Status")
+
+	for _, utxo := range _utxos {
+		logger.WithFields(logger.Fields{
+			"txid":        utxo.TxID,
+			"vout":        utxo.Vout,
+			"amount":      utxo.Amount,
+			"lockup":      utxo.Lockup,
+			"spent":       utxo.Spent,
+			"timeout":     utxo.Timeout,
+			"blockNumber": utxo.BlockNumber,
+			"blockHash":   utxo.BlockHash,
+		}).Info("Each UTXO Detail")
+	}
 }
 
 // ReleaseByCommand releases UTXOs by their transaction ID and vout
