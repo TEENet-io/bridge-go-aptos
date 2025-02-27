@@ -114,7 +114,7 @@ func NewBridgeServer(bsc *BridgeServerConfig, ctx context.Context, wg *sync.Wait
 	}
 
 	// 1) Create a <UTXO vault storage>
-	vaultStorage, err := btcvault.NewSQLiteStorage(bsc.DbFilePath, bsc.BtcCoreAccountAddr)
+	vaultStorage, err := btcvault.NewVaultSQLiteStorage(bsc.DbFilePath, bsc.BtcCoreAccountAddr)
 	if err != nil {
 		logger.Fatalf("cannot create vault storage %v", err)
 		return nil, err

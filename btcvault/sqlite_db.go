@@ -7,21 +7,21 @@ import (
 	_ "github.com/mattn/go-sqlite3" // SQLite driver
 )
 
-// SQLiteStorage implements VaultUTXOStorage for SQLite
-type SQLiteStorage struct {
+// VaultSQLiteStorage implements VaultUTXOStorage for SQLite
+type VaultSQLiteStorage struct {
 	uniqueTableID string
 	db            *sql.DB
 }
 
-// NewSQLiteStorage creates a new SQLiteStorage
+// NewVaultSQLiteStorage creates a new SQLiteStorage
 // dbFilePath is the path to the SQLite database file
-func NewSQLiteStorage(dbFilePath string, uniqueID string) (*SQLiteStorage, error) {
+func NewVaultSQLiteStorage(dbFilePath string, uniqueID string) (*VaultSQLiteStorage, error) {
 	db, err := sql.Open("sqlite3", dbFilePath)
 	if err != nil {
 		return nil, err
 	}
 
-	storage := &SQLiteStorage{db: db, uniqueTableID: "vault_utxo_" + uniqueID}
+	storage := &VaultSQLiteStorage{db: db, uniqueTableID: "vault_utxo_" + uniqueID}
 	if err := storage.init(); err != nil {
 		return nil, err
 	}
@@ -31,7 +31,7 @@ func NewSQLiteStorage(dbFilePath string, uniqueID string) (*SQLiteStorage, error
 
 // init initializes the VaultUTXO table and creates an index on tx_id
 // if not existed before.
-func (s *SQLiteStorage) init() error {
+func (s *VaultSQLiteStorage) init() error {
 	query := fmt.Sprintf(`
 	CREATE TABLE IF NOT EXISTS %s (
 		block_number INTEGER,
@@ -43,6 +43,7 @@ func (s *SQLiteStorage) init() error {
 		lockup BOOLEAN,
 		spent BOOLEAN,
 		timeout INTEGER,
+		linked_id TEXT,
 		PRIMARY KEY (tx_id, vout)
 	);
 	CREATE INDEX IF NOT EXISTS idx_tx_id ON %s (tx_id);
@@ -52,18 +53,41 @@ func (s *SQLiteStorage) init() error {
 }
 
 // InsertVaultUTXO inserts a new VaultUTXO into the database
-func (s *SQLiteStorage) InsertVaultUTXO(utxo VaultUTXO) error {
+func (s *VaultSQLiteStorage) InsertVaultUTXO(utxo VaultUTXO) error {
 	query := fmt.Sprintf(`
-	INSERT INTO %s (block_number, block_hash, tx_id, vout, amount, pkscript, lockup, spent, timeout)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+	INSERT INTO %s (block_number, block_hash, tx_id, vout, amount, pkscript, lockup, spent, timeout, linked_id)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 	`, s.uniqueTableID)
-	_, err := s.db.Exec(query, utxo.BlockNumber, utxo.BlockHash, utxo.TxID, utxo.Vout, utxo.Amount, utxo.PkScript, utxo.Lockup, utxo.Spent, utxo.Timeout)
+	_, err := s.db.Exec(query, utxo.BlockNumber, utxo.BlockHash, utxo.TxID, utxo.Vout, utxo.Amount, utxo.PkScript, utxo.Lockup, utxo.Spent, utxo.Timeout, utxo.LinkedId)
 	return err
 }
 
-func (s *SQLiteStorage) QueryAllUTXOs() ([]VaultUTXO, error) {
+func (s *VaultSQLiteStorage) QueryByLinkedID(linkedID string) ([]VaultUTXO, error) {
 	query := fmt.Sprintf(`
-	SELECT block_number, block_hash, tx_id, vout, amount, pkscript, lockup, spent, timeout
+	SELECT block_number, block_hash, tx_id, vout, amount, pkscript, lockup, spent, timeout, linked_id
+	FROM %s
+	WHERE linked_id = ?;
+	`, s.uniqueTableID)
+	rows, err := s.db.Query(query, linkedID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var utxos []VaultUTXO
+	for rows.Next() {
+		var utxo VaultUTXO
+		if err := rows.Scan(&utxo.BlockNumber, &utxo.BlockHash, &utxo.TxID, &utxo.Vout, &utxo.Amount, &utxo.PkScript, &utxo.Lockup, &utxo.Spent, &utxo.Timeout, &utxo.LinkedId); err != nil {
+			return nil, err
+		}
+		utxos = append(utxos, utxo)
+	}
+	return utxos, nil
+}
+
+func (s *VaultSQLiteStorage) QueryAllUTXOs() ([]VaultUTXO, error) {
+	query := fmt.Sprintf(`
+	SELECT block_number, block_hash, tx_id, vout, amount, pkscript, lockup, spent, timeout, linked_id
 	FROM %s;
 	`, s.uniqueTableID)
 	rows, err := s.db.Query(query)
@@ -75,7 +99,7 @@ func (s *SQLiteStorage) QueryAllUTXOs() ([]VaultUTXO, error) {
 	var utxos []VaultUTXO
 	for rows.Next() {
 		var utxo VaultUTXO
-		if err := rows.Scan(&utxo.BlockNumber, &utxo.BlockHash, &utxo.TxID, &utxo.Vout, &utxo.Amount, &utxo.PkScript, &utxo.Lockup, &utxo.Spent, &utxo.Timeout); err != nil {
+		if err := rows.Scan(&utxo.BlockNumber, &utxo.BlockHash, &utxo.TxID, &utxo.Vout, &utxo.Amount, &utxo.PkScript, &utxo.Lockup, &utxo.Spent, &utxo.Timeout, &utxo.LinkedId); err != nil {
 			return nil, err
 		}
 		utxos = append(utxos, utxo)
@@ -83,9 +107,9 @@ func (s *SQLiteStorage) QueryAllUTXOs() ([]VaultUTXO, error) {
 	return utxos, nil
 }
 
-func (s *SQLiteStorage) QueryAllUsableUTXOs() ([]VaultUTXO, error) {
+func (s *VaultSQLiteStorage) QueryAllUsableUTXOs() ([]VaultUTXO, error) {
 	query := fmt.Sprintf(`
-	SELECT block_number, block_hash, tx_id, vout, amount, pkscript, lockup, spent, timeout
+	SELECT block_number, block_hash, tx_id, vout, amount, pkscript, lockup, spent, timeout, linked_id
 	FROM %s
 	WHERE lockup = 0 AND spent = 0;
 	`, s.uniqueTableID)
@@ -98,7 +122,7 @@ func (s *SQLiteStorage) QueryAllUsableUTXOs() ([]VaultUTXO, error) {
 	var utxos []VaultUTXO
 	for rows.Next() {
 		var utxo VaultUTXO
-		if err := rows.Scan(&utxo.BlockNumber, &utxo.BlockHash, &utxo.TxID, &utxo.Vout, &utxo.Amount, &utxo.PkScript, &utxo.Lockup, &utxo.Spent, &utxo.Timeout); err != nil {
+		if err := rows.Scan(&utxo.BlockNumber, &utxo.BlockHash, &utxo.TxID, &utxo.Vout, &utxo.Amount, &utxo.PkScript, &utxo.Lockup, &utxo.Spent, &utxo.Timeout, &utxo.LinkedId); err != nil {
 			return nil, err
 		}
 		utxos = append(utxos, utxo)
@@ -107,9 +131,9 @@ func (s *SQLiteStorage) QueryAllUsableUTXOs() ([]VaultUTXO, error) {
 }
 
 // QueryByBlockNumber retrieves all VaultUTXOs with the specified block number
-func (s *SQLiteStorage) QueryByBlockNumber(blockNumber int32) ([]VaultUTXO, error) {
+func (s *VaultSQLiteStorage) QueryByBlockNumber(blockNumber int32) ([]VaultUTXO, error) {
 	query := fmt.Sprintf(`
-	SELECT block_number, block_hash, tx_id, vout, amount, pkscript, lockup, spent, timeout
+	SELECT block_number, block_hash, tx_id, vout, amount, pkscript, lockup, spent, timeout, linked_id
 	FROM %s
 	WHERE block_number = ?;
 	`, s.uniqueTableID)
@@ -122,7 +146,7 @@ func (s *SQLiteStorage) QueryByBlockNumber(blockNumber int32) ([]VaultUTXO, erro
 	var utxos []VaultUTXO
 	for rows.Next() {
 		var utxo VaultUTXO
-		if err := rows.Scan(&utxo.BlockNumber, &utxo.BlockHash, &utxo.TxID, &utxo.Vout, &utxo.Amount, &utxo.PkScript, &utxo.Lockup, &utxo.Spent, &utxo.Timeout); err != nil {
+		if err := rows.Scan(&utxo.BlockNumber, &utxo.BlockHash, &utxo.TxID, &utxo.Vout, &utxo.Amount, &utxo.PkScript, &utxo.Lockup, &utxo.Spent, &utxo.Timeout, &utxo.LinkedId); err != nil {
 			return nil, err
 		}
 		utxos = append(utxos, utxo)
@@ -131,9 +155,9 @@ func (s *SQLiteStorage) QueryByBlockNumber(blockNumber int32) ([]VaultUTXO, erro
 }
 
 // QueryByBlockHash retrieves all VaultUTXOs with the specified block hash
-func (s *SQLiteStorage) QueryByBlockHash(blockHash string) ([]VaultUTXO, error) {
+func (s *VaultSQLiteStorage) QueryByBlockHash(blockHash string) ([]VaultUTXO, error) {
 	query := fmt.Sprintf(`
-	SELECT block_number, block_hash, tx_id, vout, amount, pkscript, lockup, spent, timeout
+	SELECT block_number, block_hash, tx_id, vout, amount, pkscript, lockup, spent, timeout, linked_id
 	FROM %s
 	WHERE block_hash = ?;
 	`, s.uniqueTableID)
@@ -146,7 +170,7 @@ func (s *SQLiteStorage) QueryByBlockHash(blockHash string) ([]VaultUTXO, error) 
 	var utxos []VaultUTXO
 	for rows.Next() {
 		var utxo VaultUTXO
-		if err := rows.Scan(&utxo.BlockNumber, &utxo.BlockHash, &utxo.TxID, &utxo.Vout, &utxo.Amount, &utxo.PkScript, &utxo.Lockup, &utxo.Spent, &utxo.Timeout); err != nil {
+		if err := rows.Scan(&utxo.BlockNumber, &utxo.BlockHash, &utxo.TxID, &utxo.Vout, &utxo.Amount, &utxo.PkScript, &utxo.Lockup, &utxo.Spent, &utxo.Timeout, &utxo.LinkedId); err != nil {
 			return nil, err
 		}
 		utxos = append(utxos, utxo)
@@ -155,9 +179,9 @@ func (s *SQLiteStorage) QueryByBlockHash(blockHash string) ([]VaultUTXO, error) 
 }
 
 // QueryByTxID retrieves all VaultUTXOs with the specified transaction ID
-func (s *SQLiteStorage) QueryByTxID(txID string) ([]VaultUTXO, error) {
+func (s *VaultSQLiteStorage) QueryByTxID(txID string) ([]VaultUTXO, error) {
 	query := fmt.Sprintf(`
-	SELECT block_number, block_hash, tx_id, vout, amount, pkscript, lockup, spent, timeout
+	SELECT block_number, block_hash, tx_id, vout, amount, pkscript, lockup, spent, timeout, linked_id
 	FROM %s
 	WHERE tx_id = ?;
 	`, s.uniqueTableID)
@@ -170,7 +194,7 @@ func (s *SQLiteStorage) QueryByTxID(txID string) ([]VaultUTXO, error) {
 	var utxos []VaultUTXO
 	for rows.Next() {
 		var utxo VaultUTXO
-		if err := rows.Scan(&utxo.BlockNumber, &utxo.BlockHash, &utxo.TxID, &utxo.Vout, &utxo.Amount, &utxo.PkScript, &utxo.Lockup, &utxo.Spent, &utxo.Timeout); err != nil {
+		if err := rows.Scan(&utxo.BlockNumber, &utxo.BlockHash, &utxo.TxID, &utxo.Vout, &utxo.Amount, &utxo.PkScript, &utxo.Lockup, &utxo.Spent, &utxo.Timeout, &utxo.LinkedId); err != nil {
 			return nil, err
 		}
 		utxos = append(utxos, utxo)
@@ -179,9 +203,9 @@ func (s *SQLiteStorage) QueryByTxID(txID string) ([]VaultUTXO, error) {
 }
 
 // QueryByTxIDAndVout retrieves a VaultUTXO with the specified transaction ID and vout
-func (s *SQLiteStorage) QueryByTxIDAndVout(txID string, vout int32) (*VaultUTXO, error) {
+func (s *VaultSQLiteStorage) QueryByTxIDAndVout(txID string, vout int32) (*VaultUTXO, error) {
 	query := fmt.Sprintf(`
-	SELECT block_number, block_hash, tx_id, vout, amount, pkscript, lockup, spent, timeout
+	SELECT block_number, block_hash, tx_id, vout, amount, pkscript, lockup, spent, timeout, linked_id
 	FROM %s
 	WHERE tx_id = ? AND vout = ?;
 	`, s.uniqueTableID)
@@ -196,6 +220,7 @@ func (s *SQLiteStorage) QueryByTxIDAndVout(txID string, vout int32) (*VaultUTXO,
 		&utxo.Lockup,
 		&utxo.Spent,
 		&utxo.Timeout,
+		&utxo.LinkedId,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil // No matching UTXO found
@@ -208,9 +233,9 @@ func (s *SQLiteStorage) QueryByTxIDAndVout(txID string, vout int32) (*VaultUTXO,
 // QueryExpiredAndLockedUTXOs retrieves UTXOs whose lockup status is true and have expired
 // t is the unix timepoint in seconds.
 // all UTXOs with timeout < t are considered as expired.
-func (s *SQLiteStorage) QueryExpiredAndLockedUTXOs(t int64) ([]VaultUTXO, error) {
+func (s *VaultSQLiteStorage) QueryExpiredAndLockedUTXOs(t int64) ([]VaultUTXO, error) {
 	query := fmt.Sprintf(`
-	SELECT block_number, block_hash, tx_id, vout, amount, pkscript, lockup, spent, timeout
+	SELECT block_number, block_hash, tx_id, vout, amount, pkscript, lockup, spent, timeout, linked_id
 	FROM %s
 	WHERE lockup = 1 AND timeout < ?;
 	`, s.uniqueTableID)
@@ -223,7 +248,7 @@ func (s *SQLiteStorage) QueryExpiredAndLockedUTXOs(t int64) ([]VaultUTXO, error)
 	var utxos []VaultUTXO
 	for rows.Next() {
 		var utxo VaultUTXO
-		if err := rows.Scan(&utxo.BlockNumber, &utxo.BlockHash, &utxo.TxID, &utxo.Vout, &utxo.Amount, &utxo.PkScript, &utxo.Lockup, &utxo.Spent, &utxo.Timeout); err != nil {
+		if err := rows.Scan(&utxo.BlockNumber, &utxo.BlockHash, &utxo.TxID, &utxo.Vout, &utxo.Amount, &utxo.PkScript, &utxo.Lockup, &utxo.Spent, &utxo.Timeout, &utxo.LinkedId); err != nil {
 			return nil, err
 		}
 		utxos = append(utxos, utxo)
@@ -233,9 +258,9 @@ func (s *SQLiteStorage) QueryExpiredAndLockedUTXOs(t int64) ([]VaultUTXO, error)
 
 // QueryEnoughUTXOs selects enough UTXOs to cover the specified amount
 // If amount cannot be satisified, will return (nil, error)
-func (s *SQLiteStorage) QueryEnoughUTXOs(amount int64) ([]VaultUTXO, error) {
+func (s *VaultSQLiteStorage) QueryEnoughUTXOs(amount int64) ([]VaultUTXO, error) {
 	query := fmt.Sprintf(`
-	SELECT block_number, block_hash, tx_id, vout, amount, pkscript, lockup, spent, timeout
+	SELECT block_number, block_hash, tx_id, vout, amount, pkscript, lockup, spent, timeout, linked_id
 	FROM %s
 	WHERE lockup = 0 AND spent = 0
 	ORDER BY amount DESC;
@@ -250,7 +275,7 @@ func (s *SQLiteStorage) QueryEnoughUTXOs(amount int64) ([]VaultUTXO, error) {
 	var total int64
 	for rows.Next() {
 		var utxo VaultUTXO
-		if err := rows.Scan(&utxo.BlockNumber, &utxo.BlockHash, &utxo.TxID, &utxo.Vout, &utxo.Amount, &utxo.PkScript, &utxo.Lockup, &utxo.Spent, &utxo.Timeout); err != nil {
+		if err := rows.Scan(&utxo.BlockNumber, &utxo.BlockHash, &utxo.TxID, &utxo.Vout, &utxo.Amount, &utxo.PkScript, &utxo.Lockup, &utxo.Spent, &utxo.Timeout, &utxo.LinkedId); err != nil {
 			return nil, err
 		}
 		utxos = append(utxos, utxo)
@@ -266,7 +291,7 @@ func (s *SQLiteStorage) QueryEnoughUTXOs(amount int64) ([]VaultUTXO, error) {
 }
 
 // SetLockup sets the lockup status of a VaultUTXO identified by txID and vout
-func (s *SQLiteStorage) SetLockup(txID string, vout int32, lockup bool) error {
+func (s *VaultSQLiteStorage) SetLockup(txID string, vout int32, lockup bool) error {
 	query := fmt.Sprintf(`
 	UPDATE %s
 	SET lockup = ?
@@ -277,7 +302,7 @@ func (s *SQLiteStorage) SetLockup(txID string, vout int32, lockup bool) error {
 }
 
 // SetSpent sets the spent status of a VaultUTXO identified by txID and vout
-func (s *SQLiteStorage) SetSpent(txID string, vout int32, spent bool) error {
+func (s *VaultSQLiteStorage) SetSpent(txID string, vout int32, spent bool) error {
 	query := fmt.Sprintf(`
 	UPDATE %s
 	SET spent = ?
@@ -287,8 +312,18 @@ func (s *SQLiteStorage) SetSpent(txID string, vout int32, spent bool) error {
 	return err
 }
 
+func (s *VaultSQLiteStorage) SetLinkedID(txID string, vout int32, linkedID string) error {
+	query := fmt.Sprintf(`
+	UPDATE %s
+	SET linked_id = ?
+	WHERE tx_id = ? AND vout = ?;
+	`, s.uniqueTableID)
+	_, err := s.db.Exec(query, linkedID, txID, vout)
+	return err
+}
+
 // SetTimeout sets the expiry timepoint of a VaultUTXO identified by txID and vout
-func (s *SQLiteStorage) SetTimeout(txID string, vout int32, timeout int64) error {
+func (s *VaultSQLiteStorage) SetTimeout(txID string, vout int32, timeout int64) error {
 	query := fmt.Sprintf(`
 	UPDATE %s
 	SET timeout = ?
@@ -300,7 +335,7 @@ func (s *SQLiteStorage) SetTimeout(txID string, vout int32, timeout int64) error
 
 // SumMoney calculates the total amount of all VaultUTXOs
 // Only the unspent & not locked up UTXOs are counted.
-func (s *SQLiteStorage) SumMoney() (int64, error) {
+func (s *VaultSQLiteStorage) SumMoney() (int64, error) {
 	query := fmt.Sprintf(`
 	SELECT SUM(amount)
 	FROM %s

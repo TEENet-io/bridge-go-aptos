@@ -10,13 +10,17 @@ type VaultUTXO struct {
 	PkScript    []byte // Public key script (shall use when unlocking this script)
 	Lockup      bool   // Lockup status, if the utxo is lockup for future spending.
 	Spent       bool   // Spent status, if the utxo is really spent as input.
-	Timeout     int64  // Unix timestamp in seconds, set to 0 if untouched
+	Timeout     int64  // Unix timestamp in seconds, set to 0 if untouched.
+	LinkedId    string // Linked ID, if the utxo is linked to a spender ID, like reqTxHash from ETH side.
 }
 
 // VaultUTXOStorage defines the interface for database operations on VaultUTXO
 type VaultUTXOStorage interface {
 	// InsertVaultUTXO inserts a new VaultUTXO into the database
 	InsertVaultUTXO(utxo VaultUTXO) error
+
+	// Query UTXOs with linkedID
+	QueryByLinkedID(linkedID string) ([]VaultUTXO, error)
 
 	// Select all the UTXOs in the database
 	QueryAllUTXOs() ([]VaultUTXO, error)
@@ -53,6 +57,9 @@ type VaultUTXOStorage interface {
 	// It is a Unix timestamp in seconds
 	// If time pass beyond the timeout specified timepoint, the UTXO lock will be considered as expired
 	SetTimeout(txID string, vout int32, timeout int64) error
+
+	// Set the linked ID to the UTXO
+	SetLinkedID(txID string, vout int32, linkedID string) error
 
 	// SumMoney calculates the total amount of all VaultUTXOs
 	// Excludes locked UTXOs.

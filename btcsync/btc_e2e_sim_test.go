@@ -319,7 +319,7 @@ func TestDeposit(t *testing.T) {
 	t.Logf("db file name: %s", db_file_name)
 
 	// 1) Create a UTXO vault storage
-	vault_st, err := btcvault.NewSQLiteStorage(db_file_name, p3_legacy_addr_str)
+	vault_st, err := btcvault.NewVaultSQLiteStorage(db_file_name, p3_legacy_addr_str)
 	if err != nil {
 		t.Fatalf("cannot create vault storage %v", err)
 	}
