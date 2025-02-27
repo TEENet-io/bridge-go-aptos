@@ -52,7 +52,7 @@ func (txmgr *EthTxManager) prepareRedeem(ctx context.Context, redeem *state.Rede
 		chForOutpoints,
 	)
 	if err != nil {
-		newLogger.Errorf("failed to request spendable outpoints with err=%v", err)
+		newLogger.Errorf("xfailed to request spendable outpoints with err=%v", err)
 		return ErrBtcWalletRequest
 	}
 
@@ -60,7 +60,7 @@ func (txmgr *EthTxManager) prepareRedeem(ctx context.Context, redeem *state.Rede
 	if err != nil {
 		return err
 	}
-	newLogger.Debugf("outpoints received: %d", len(outpoints))
+	newLogger.Infof("outpoints received: %d", len(outpoints))
 
 	// Compute the signing hash
 	redeem.Outpoints = append([]state.Outpoint{}, outpoints...)
@@ -86,7 +86,7 @@ func (txmgr *EthTxManager) prepareRedeem(ctx context.Context, redeem *state.Rede
 	if err != nil {
 		return err
 	}
-	newLogger.Debug("schnorr signature received")
+	newLogger.Info("schnorr signature received")
 
 	params.Rx = common.BigIntClone(req.Rx)
 	params.S = common.BigIntClone(req.S)
@@ -154,7 +154,7 @@ func (txmgr *EthTxManager) handleRedeemPrepareTx(
 	}
 
 	newLogger := logger.WithField("prepareTx", tx.Hash().String())
-	newLogger.Debug("tx sent to prepare redeem")
+	newLogger.Info("prepare redeem tx sent")
 
 	mt := &MonitoredTx{
 		TxHash:       tx.Hash(),
