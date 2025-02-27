@@ -39,6 +39,7 @@ func MaybeDepositTx(tx *wire.MsgTx, targetAddress btcutil.Address, chainParams *
 	return flag1 && flag2
 }
 
+// Check for each <Tx out>, if found money to us, mark the UTXO.
 func MaybeJustTransfer(tx *wire.MsgTx, targetAddress btcutil.Address, chainParams *chaincfg.Params) []struct {
 	Vout   int
 	Amount int64
