@@ -35,15 +35,15 @@ import (
 // So we list them here.
 const (
 	// eth synchronizer config
-	frequencyToCheckEthFinalizedBlock = 1 * time.Second
+	frequencyToCheckEthFinalizedBlock = 5 * time.Second
 
 	// eth tx manager config
-	frequencyToPrepareRedeem      = 500 * time.Millisecond // 0.5 second
-	frequencyToMint               = 500 * time.Millisecond
-	frequencyToMonitorPendingTxs  = 500 * time.Millisecond
-	timeoutOnWaitingForSignature  = 2 * time.Second
-	timtoutOnWaitingForOutpoints  = 1 * time.Second
-	timeoutOnMonitoringPendingTxs = 10 // blocks
+	frequencyToPrepareRedeem      = 5 * time.Second // read db, gather UTXO, prepare & send RedeemPrepare Tx on ETH side.
+	frequencyToMint               = 5 * time.Second // read db, issue Mint Tx on ETH side.
+	frequencyToMonitorPendingTxs  = 10 * time.Second
+	timeoutOnWaitingForSignature  = 10 * time.Second
+	timtoutOnWaitingForOutpoints  = 5 * time.Second // gather UTXOs from BTC wallet.
+	timeoutOnMonitoringPendingTxs = 64              // (two finalize phase) blocks
 
 	// btc publisher-observer config
 	CHANNEL_BUFFER_SIZE = 10

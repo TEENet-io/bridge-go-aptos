@@ -210,6 +210,7 @@ func (s *SQLiteStorage) QueryExpiredAndLockedUTXOs(t int64) ([]VaultUTXO, error)
 }
 
 // QueryEnoughUTXOs selects enough UTXOs to cover the specified amount
+// If amount cannot be satisified, will return (nil, error)
 func (s *SQLiteStorage) QueryEnoughUTXOs(amount int64) ([]VaultUTXO, error) {
 	query := fmt.Sprintf(`
 	SELECT block_number, block_hash, tx_id, vout, amount, pkscript, lockup, spent, timeout

@@ -13,8 +13,7 @@ import (
 )
 
 const (
-	CONFIRM_SAFE = 6 // minimum confirm threshold to consider Tx is finalized.
-	MAX_CONFIRM  = 9999999
+	MAX_CONFIRM = 9999999
 )
 
 type RpcClientConfig struct {
