@@ -52,6 +52,7 @@ func (tv *TreasureVault) AddUTXO(
 		Lockup:      false,
 		Spent:       false,
 		Timeout:     0,
+		LinkedId:    "",
 	}
 
 	// Don't duplicate insert!
@@ -70,10 +71,22 @@ func (tv *TreasureVault) AddUTXO(
 // ChooseAndLock selects UTXOs that sum to at least the target amount and locks them
 // In bitcoin world, ususally you need to specify the target amount big enough to inlucude the fee.
 // If the target amount cannot be satisfied, it will return nil + error.
-func (tv *TreasureVault) ChooseAndLock(targetAmount int64) ([]VaultUTXO, error) {
+// The chosen UTXOs will mark the field with linkedID (like a unique identifier for the redeem, the reqTxHash)
+// It will prevent double-entry of same linkedID.
+func (tv *TreasureVault) ChooseAndLock(targetAmount int64, linkedID string) ([]VaultUTXO, error) {
 	// protection against concurrent updates
 	tv.updateMu.Lock()
 	defer tv.updateMu.Unlock()
+
+	// Check to see if we have already locked UTXOs for the linkedID
+	hits, err := tv.backend.QueryByLinkedID(linkedID)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(hits) > 0 {
+		return nil, fmt.Errorf("linkedID %s already exists, don't perform UTXO lock for it again", linkedID)
+	}
 
 	utxos, err := tv.backend.QueryEnoughUTXOs(targetAmount)
 	if err != nil {
@@ -82,13 +95,20 @@ func (tv *TreasureVault) ChooseAndLock(targetAmount int64) ([]VaultUTXO, error) 
 
 	for i, utxo := range utxos {
 		utxos[i].Lockup = true
-		timepoint := time.Now().Unix() + TIMEOUT_DELAY
-		utxos[i].Timeout = timepoint
 		err := tv.backend.SetLockup(utxo.TxID, utxo.Vout, true)
 		if err != nil {
 			return nil, err
 		}
+
+		timepoint := time.Now().Unix() + TIMEOUT_DELAY
+		utxos[i].Timeout = timepoint
 		err = tv.backend.SetTimeout(utxo.TxID, utxo.Vout, timepoint)
+		if err != nil {
+			return nil, err
+		}
+
+		utxos[i].LinkedId = linkedID
+		err = tv.backend.SetLinkedID(utxo.TxID, utxo.Vout, linkedID)
 		if err != nil {
 			return nil, err
 		}
@@ -206,7 +226,7 @@ func (tv *TreasureVault) Request(
 	tv.Status() // report status
 
 	// if not enough utxos, return error
-	utxos, err := tv.ChooseAndLock(amount.Int64() + SAFE_MARGIN)
+	utxos, err := tv.ChooseAndLock(amount.Int64()+SAFE_MARGIN, reqTxId.Hex())
 	if err != nil {
 		return err
 	}
