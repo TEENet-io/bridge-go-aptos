@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	TIMEOUT_DELAY int64 = 1800               // half an hour
+	TIMEOUT_DELAY int64 = 3600               // an hour, then the utxo is considered released and can be used again.
 	SAFE_MARGIN         = int64(0.001 * 1e8) // 0.001 BTC
 )
 
@@ -68,6 +68,7 @@ func (tv *TreasureVault) AddUTXO(
 
 // ChooseAndLock selects UTXOs that sum to at least the target amount and locks them
 // In bitcoin world, ususally you need to specify the target amount big enough to inlucude the fee.
+// If the target amount cannot be satisfied, it will return nil + error.
 func (tv *TreasureVault) ChooseAndLock(targetAmount int64) ([]VaultUTXO, error) {
 	// protection against concurrent updates
 	tv.updateMu.Lock()
@@ -185,6 +186,7 @@ func (tv *TreasureVault) Request(
 ) error {
 	tv.Status() // report status
 
+	// if not enough utxos, return error
 	utxos, err := tv.ChooseAndLock(amount.Int64() + SAFE_MARGIN)
 	if err != nil {
 		return err

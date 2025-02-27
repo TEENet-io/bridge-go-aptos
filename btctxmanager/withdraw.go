@@ -10,6 +10,7 @@ package btctxmanager
 */
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/TEENet-io/bridge-go/btcaction"
@@ -18,6 +19,7 @@ import (
 	"github.com/TEENet-io/bridge-go/btcman/utils"
 	"github.com/TEENet-io/bridge-go/btcman/utxo"
 	"github.com/TEENet-io/bridge-go/btcvault"
+	"github.com/TEENet-io/bridge-go/common"
 	"github.com/TEENet-io/bridge-go/state"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
@@ -206,7 +208,17 @@ func (m *BtcTxManager) WithdrawLoop() {
 			btcTxId, err := m.WithdrawBTC(redeem)
 			if err != nil {
 				// Log the error and continue with the next redeem
-				logger.Errorf("Failed to withdraw BTC for redeem %v: %v", redeem, err)
+				fields := logger.Fields{
+					"reqTxHash":  redeem.RequestTxHash.Hex(),
+					"prepTxHash": redeem.PrepareTxHash.Hex(),
+					"amount":     redeem.Amount.Int64(),
+					"receiver":   redeem.Receiver,
+				}
+				for i, outpoint := range redeem.Outpoints {
+					fields[fmt.Sprintf("outpoint_%d_txid", i)] = common.TrimHexPrefix(outpoint.TxId.Hex())
+					fields[fmt.Sprintf("outpoint_%d_idx", i)] = outpoint.Idx
+				}
+				logger.WithFields(fields).Errorf("build & withdraw BTC tx error: %v", err)
 				continue
 			}
 			logger.WithFields(logger.Fields{

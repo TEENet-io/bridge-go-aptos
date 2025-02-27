@@ -32,8 +32,8 @@ import (
 // Once an interested action is found, notify all the observers.
 
 const (
-	CONSIDER_FINALIZED = 0               // 1 blocks old we consider finalized
-	SCAN_INTERVAL      = 3 * time.Second // 3 seconds, then we scan again
+	BLK_MATURE_OFFSET = 1               // 1 blocks old we consider finalized
+	SCAN_INTERVAL     = 3 * time.Second // 3 seconds, then we scan again
 )
 
 type BTCMonitor struct {
@@ -106,12 +106,12 @@ func (m *BTCMonitor) Scan() error {
 		return nil // no blocks to scan. and no error
 	}
 
-	numbersToFetch := latestBlockHeight - m.LastVistedBlockHeight - CONSIDER_FINALIZED
+	numbersToFetch := latestBlockHeight - m.LastVistedBlockHeight - BLK_MATURE_OFFSET
 
 	logger.WithFields(logger.Fields{
 		"latestBlockHeight":     latestBlockHeight,
 		"LastVistedBlockHeight": m.LastVistedBlockHeight,
-		"CONSIDER_FINALIZED":    CONSIDER_FINALIZED,
+		"CONSIDER_FINALIZED":    BLK_MATURE_OFFSET,
 		"numbersToFetch":        numbersToFetch,
 	}).Debug("Scanning btc blocks")
 
@@ -119,7 +119,7 @@ func (m *BTCMonitor) Scan() error {
 		return nil // no blocks to scan. and no error
 	}
 
-	blocks, err := m.RpcClient.GetBlocks(int(numbersToFetch), CONSIDER_FINALIZED)
+	blocks, err := m.RpcClient.GetBlocks(int(numbersToFetch), BLK_MATURE_OFFSET)
 
 	for _, block := range blocks {
 		// skip no transaction blocks

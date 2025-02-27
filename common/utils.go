@@ -11,13 +11,13 @@ import (
 // HexStrToEthAddress converts a hex string (with/without prefix 0x) to [32]byte
 func HexStrToBytes32(hexStr string) [32]byte {
 	var bytes32 [32]byte
-	copy(bytes32[:], ethcommon.Hex2BytesFixed(trimHexPrefix(hexStr), 32))
+	copy(bytes32[:], ethcommon.Hex2BytesFixed(TrimHexPrefix(hexStr), 32))
 	return bytes32
 }
 
 // HexStrToBigInt converts a hex string (with/without prefix 0x) to *big.Int
 func HexStrToBigInt(hexStr string) *big.Int {
-	bigInt, ok := new(big.Int).SetString(trimHexPrefix(hexStr), 16)
+	bigInt, ok := new(big.Int).SetString(TrimHexPrefix(hexStr), 16)
 	if !ok {
 		return nil
 	}
@@ -34,7 +34,8 @@ func BigIntToHexStr(bigInt *big.Int) string {
 	return appendHexPrefix(bigInt.Text(16))
 }
 
-func trimHexPrefix(str string) string {
+// Trim 0x or 0X prefix off the string.
+func TrimHexPrefix(str string) string {
 	s := strings.TrimPrefix(str, "0x")
 	return strings.TrimPrefix(s, "0X")
 }
@@ -78,7 +79,7 @@ func RandBigInt(byteNum int) *big.Int {
 // Shorten shortens a hex string so that both sides have n characters and
 // the rest is replaced with "..."
 func Shorten(hexStr string, n int) string {
-	str := trimHexPrefix(hexStr)
+	str := TrimHexPrefix(hexStr)
 
 	if len(str) <= n*2 {
 		return appendHexPrefix(str)

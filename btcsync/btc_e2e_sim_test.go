@@ -48,9 +48,8 @@ const (
 	RETRY_TIMES         = 10 // retry times for checking the deposit/utxo
 	CHANNEL_BUFFER_SIZE = 10
 
-	MAX_BLOCKS  = 107 // Generate > 100 blocks to get recognized balance on bitcoin core.
-	MIN_BLOCKS  = 1   // Minimum step to generate blocks
-	SAFE_BLOCKS = 6   // Minimum confirm threshold to consider Tx is finalized.
+	MAX_BLOCKS = 107 // Generate > 100 blocks to get recognized balance on bitcoin core.
+	MIN_BLOCKS = 1   // Minimum step to generate blocks
 
 	// SEND_SATOSHI    = 0.1 * 1e8   // 0.1 btc
 	FEE_SATOSHI     = 0.001 * 1e8 // 0.001 btc

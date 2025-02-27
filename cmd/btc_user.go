@@ -18,10 +18,10 @@ import (
 )
 
 const (
-	BTC_MATURE_OFFSET     = 0 // if tx is MATURE_OFFSET blocks old, we consider safe.
-	REGTEST_COINBASE_ADDR = "mkVXZnqaaKt4puQNr4ovPHYg48mjguFCnT"
-	REGTEST_ENOUGH_BLOCKS = 100
-	REGTEST_FEE_SATOSHI   = 0.001 * 1e8 // 0.001 btc
+	BLK_MATURE_OFFSET       = 1 // if a block is BLK_MATURE_OFFSET blocks old, we consider safe.
+	REGTEST_COINBASE_ADDR   = "mkVXZnqaaKt4puQNr4ovPHYg48mjguFCnT"
+	REGTEST_GENERATE_BLOCKS = 101         // Generate 101 blocks in regest.
+	REGTEST_FEE_SATOSHI     = 0.001 * 1e8 // 0.001 btc
 )
 
 type BtcUserConfig struct {
@@ -101,7 +101,7 @@ func (bu *BtcUser) Close() {
 }
 
 func (bu *BtcUser) GetUtxos() ([]utxo.UTXO, error) {
-	utxos, err := bu.BtcRpcClient.GetUtxoList(bu.MyLegacySigner.P2PKH, BTC_MATURE_OFFSET)
+	utxos, err := bu.BtcRpcClient.GetUtxoList(bu.MyLegacySigner.P2PKH, BLK_MATURE_OFFSET)
 	if err != nil {
 		logger.WithFields(logger.Fields{
 			"user_address": bu.MyLegacySigner.P2PKH.EncodeAddress(),
@@ -117,7 +117,7 @@ func (bu *BtcUser) GetUtxos() ([]utxo.UTXO, error) {
 }
 
 func (bu *BtcUser) GetBalance() (int64, error) {
-	balance, err := bu.BtcRpcClient.GetBalance(bu.MyLegacySigner.P2PKH, BTC_MATURE_OFFSET)
+	balance, err := bu.BtcRpcClient.GetBalance(bu.MyLegacySigner.P2PKH, BLK_MATURE_OFFSET)
 	if err != nil {
 		logger.WithFields(logger.Fields{
 			"user_address": bu.MyLegacySigner.P2PKH.EncodeAddress(),
@@ -259,7 +259,7 @@ func (bu *BtcUser) MineEnoughBlocks() ([]*chainhash.Hash, error) {
 	}
 
 	_coinbase_addr, _ := assembler.DecodeAddress(REGTEST_COINBASE_ADDR, bu.MyUserConfig.BtcChainConfig)
-	return bu.BtcRpcClient.GenerateBlocks(REGTEST_ENOUGH_BLOCKS, _coinbase_addr)
+	return bu.BtcRpcClient.GenerateBlocks(REGTEST_GENERATE_BLOCKS, _coinbase_addr)
 }
 
 // Convert from [] to []*
