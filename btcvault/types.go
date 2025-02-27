@@ -8,8 +8,8 @@ type VaultUTXO struct {
 	Vout        int32  // Output index
 	Amount      int64  // Amount in satoshis
 	PkScript    []byte // Public key script (shall use when unlocking this script)
-	Lockup      bool   // Lockup status, default is false
-	Spent       bool   // Spent status, default is false
+	Lockup      bool   // Lockup status, if the utxo is lockup for future spending.
+	Spent       bool   // Spent status, if the utxo is really spent as input.
 	Timeout     int64  // Unix timestamp in seconds, set to 0 if untouched
 }
 

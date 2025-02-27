@@ -46,7 +46,7 @@ type BTCMonitor struct {
 }
 
 // Given a BTC transaction ID, finds a record in the database
-func (m *BTCMonitor) QueryRedeemTxFromDB(btcTxID string) bool {
+func (m *BTCMonitor) QueryRedeemTxFromMgrDB(btcTxID string) bool {
 	record, err := m.mgrState.QueryByBtcTxId(btcTxID)
 	if err != nil {
 		return false
@@ -60,7 +60,7 @@ func (m *BTCMonitor) QueryRedeemTxFromDB(btcTxID string) bool {
 	return true
 }
 
-// FinishRedeem marks a redeem as completed in the database
+// FinishRedeem marks a redeem as completed in the mgr database
 func (m *BTCMonitor) FinishRedeem(btcTxID string) string {
 	record, _ := m.mgrState.QueryByBtcTxId(btcTxID)
 	logger.WithField("reqTxHash", record.EthRequestTxID).Debug("Complete Redeem Action Triggered")
@@ -193,7 +193,7 @@ func (m *BTCMonitor) Scan() error {
 			// if so, set the redeem state of mgr state to be minted.
 			// notify observers to set the state on core shared state.
 			_btc_txid := tx.TxHash().String()
-			if m.QueryRedeemTxFromDB(_btc_txid) {
+			if m.QueryRedeemTxFromMgrDB(_btc_txid) {
 
 				logger.WithFields(logger.Fields{
 					"blockNum": blockHeight,
@@ -203,13 +203,12 @@ func (m *BTCMonitor) Scan() error {
 				reqTxHash := m.FinishRedeem(_btc_txid)
 
 				// Notify Observers
-				m.Publisher.NotifyRedeem(btcaction.RedeemAction{
+				m.Publisher.NotifyRedeemIsDone(btcaction.RedeemAction{
 					EthRequestTxID: reqTxHash,
 					BtcHash:        _btc_txid,
 					Sent:           true,
 					Mined:          true,
 				})
-				// TODO: shall notify the "change" utxo as observedUTXO for redeem tx
 				continue
 			}
 		}

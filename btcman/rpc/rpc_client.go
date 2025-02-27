@@ -92,6 +92,13 @@ func (r *RpcClient) GetBlockHeightByHash(blockHash *chainhash.Hash) (int32, erro
 	return blockHeight, nil
 }
 
+func reverse[T any](s []T) {
+	n := len(s)
+	for i := 0; i < n/2; i++ {
+		s[i], s[n-i-1] = s[n-i-1], s[i]
+	}
+}
+
 // Fetch nearest n blocks that is finalized (at least offset blocks old).
 // Specify the amount of blocks to retrieve via n.
 // Specify the offset (maturity, suggest 6) via offset.
@@ -123,6 +130,9 @@ func (r *RpcClient) GetBlocks(n int, offset int) ([]*wire.MsgBlock, error) {
 			return nil, err
 		}
 		myBlocks = append(myBlocks, b)
+	}
+	if len(myBlocks) > 1 {
+		reverse(myBlocks)
 	}
 	return myBlocks, nil
 }
