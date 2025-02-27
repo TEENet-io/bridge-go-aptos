@@ -27,8 +27,8 @@ import (
 )
 
 const (
-	QUERY_DB_INTERVAL = 1 * time.Second
-	BTC_TX_FEE        = int64(0.001 * 1e8) // 0.001 BTC
+	QUERY_REDEEM_DB_INTERVAL = 10 * time.Second
+	BTC_TX_FEE               = int64(0.001 * 1e8) // 0.001 BTC
 )
 
 type BtcTxManager struct {
@@ -166,7 +166,7 @@ func (m *BtcTxManager) WithdrawLoop() {
 			// Log the error and continue
 			// Assuming there's a logger in the actual implementation
 			logger.Errorf("Failed to find redeems: %v", err)
-			time.Sleep(QUERY_DB_INTERVAL)
+			time.Sleep(QUERY_REDEEM_DB_INTERVAL)
 			continue
 		}
 
@@ -238,6 +238,6 @@ func (m *BtcTxManager) WithdrawLoop() {
 			}
 		}
 
-		time.Sleep(QUERY_DB_INTERVAL)
+		time.Sleep(QUERY_REDEEM_DB_INTERVAL)
 	}
 }
