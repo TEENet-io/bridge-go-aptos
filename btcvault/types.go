@@ -18,6 +18,9 @@ type VaultUTXOStorage interface {
 	// InsertVaultUTXO inserts a new VaultUTXO into the database
 	InsertVaultUTXO(utxo VaultUTXO) error
 
+	// Select all the UTXOs in the database
+	QueryAllUTXOs() ([]VaultUTXO, error)
+
 	// Select all UTXOs that are usable (not locked, not spent)
 	QueryAllUsableUTXOs() ([]VaultUTXO, error)
 

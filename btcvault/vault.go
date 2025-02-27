@@ -120,7 +120,7 @@ func (tv *TreasureVault) ReleaseByExpire() error {
 
 // Quick function to reveal the current state of the vault
 func (tv *TreasureVault) Peek() ([]VaultUTXO, int64, error) {
-	_utxos, err := tv.backend.QueryAllUsableUTXOs()
+	_utxos, err := tv.backend.QueryAllUTXOs()
 	if err != nil {
 		return nil, 0, err
 	}
@@ -133,6 +133,7 @@ func (tv *TreasureVault) Peek() ([]VaultUTXO, int64, error) {
 
 func (tv *TreasureVault) Status() {
 	_utxos, sum, err := tv.Peek()
+
 	logger.WithFields(logger.Fields{
 		"sum": sum,
 		"err": err,
