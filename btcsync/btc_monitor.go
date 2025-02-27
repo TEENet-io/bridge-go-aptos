@@ -32,8 +32,8 @@ import (
 // Once an interested action is found, notify all the observers.
 
 const (
-	BLK_MATURE_OFFSET = 1               // 1 blocks old we consider finalized
-	SCAN_INTERVAL     = 3 * time.Second // 3 seconds, then we scan again
+	BLK_MATURE_OFFSET     = 1               // ? blocks old we consider finalized
+	SCAN_BTC_BLK_INTERVAL = 3 * time.Second // ? time between we scan the next block.
 )
 
 type BTCMonitor struct {
@@ -111,7 +111,7 @@ func (m *BTCMonitor) Scan() error {
 	logger.WithFields(logger.Fields{
 		"latestBlockHeight":     latestBlockHeight,
 		"LastVistedBlockHeight": m.LastVistedBlockHeight,
-		"CONSIDER_FINALIZED":    BLK_MATURE_OFFSET,
+		"considerFinalized":     BLK_MATURE_OFFSET,
 		"numbersToFetch":        numbersToFetch,
 	}).Debug("Scanning btc blocks")
 
@@ -126,16 +126,23 @@ func (m *BTCMonitor) Scan() error {
 		if len(block.Transactions) == 0 {
 			continue
 		}
+
+		// get block height by block_hash
+		blockHeight, err := m.RpcClient.GetBlockHeightByHash(btcutil.NewBlock(block).Hash())
+		if err != nil {
+			logger.WithFields(logger.Fields{
+				"blockHash": btcutil.NewBlock(block).Hash(),
+			}).Warnf("failed to get block_height by block_hash: %v", err)
+			continue
+		}
+		// Go for each Tx, look for Tx that is interested to us.
+		// In general we care about three things:
+		// 1) The output(s) of the Tx, does it form a valid <bridge deposit>?
+		// 2) The output(s) of the Tx, does it form a valid UTXO so we can spend in the future?
+		// 3) The Tx is a redeem BTC tx that we sent?
 		for _, tx := range block.Transactions {
-			blockHeight, err := m.RpcClient.GetBlockHeightByHash(btcutil.NewBlock(block).Hash())
-			if err != nil {
-				logger.WithFields(logger.Fields{
-					"blockHash": btcutil.NewBlock(block).Hash(),
-					"btcTxId":   tx.TxHash(),
-				}).Warnf("failed to get block height by hash: %v", err)
-				continue
-			}
-			// check if the BTC tx is a user's bridge deposit
+
+			// 1) check if the BTC tx is a <bridge deposit>
 			maybe_deposit := myutils.MaybeDepositTx(tx, m.BridgeBTCAddress, m.ChainConfig)
 			if maybe_deposit {
 				deposit, err := myutils.CraftDepositAction(tx, blockHeight, block, m.BridgeBTCAddress, m.ChainConfig)
@@ -143,48 +150,41 @@ func (m *BTCMonitor) Scan() error {
 					logger.WithFields(logger.Fields{
 						"blockNum": blockHeight,
 						"btcTxId":  tx.TxHash(),
-					}).Warnf("failed to craft deposit action from a maybe_deposit: %v", err)
-					continue
+					}).Warnf("failed to craft deposit_action from a maybe_deposit: %v", err)
 					//TODO: shall add REFUND BTC logic here if user actually mal-formed the deposit data.
+				} else {
+					logger.WithFields(logger.Fields{
+						"blockNum": blockHeight,
+						"btcTxId":  deposit.TxHash,
+					}).Info("Deposit Found")
+					// Notify Observers
+					m.Publisher.NotifyDeposit(*deposit)
 				}
-				logger.WithField("btcTxId", deposit.TxHash).Info("Deposit Found")
+			}
 
-				observedUTXO := &ObservedUTXO{
-					BlockNumber: blockHeight,
-					BlockHash:   block.BlockHash().String(),
-					TxID:        tx.TxHash().String(),
-					Vout:        0, // deposit tx always has vout 0
-					Amount:      deposit.DepositValue,
-					PkScript:    tx.TxOut[0].PkScript,
-				}
+			// Whether or not <bridge deposit>
+			// 2) We fetch ALL the UTXOs that is sending money to us (the bridge)
+			transfers := myutils.MaybeJustTransfer(tx, m.BridgeBTCAddress, m.ChainConfig)
+			if len(transfers) > 0 {
+				for _, transfer := range transfers {
+					logger.WithFields(logger.Fields{
+						"blockNum": blockHeight,
+						"btcTxId":  tx.TxHash().String(),
+						"vout":     transfer.Vout,
+						"amount":   transfer.Amount,
+					}).Info("Other Transfer Found")
 
-				// Notify Observers
-				m.Publisher.NotifyDeposit(*deposit)
-				m.Publisher.NotifyUTXO(*observedUTXO)
-				// skip the rest of the conditions
-				continue
-			} else {
-				transfers := myutils.MaybeJustTransfer(tx, m.BridgeBTCAddress, m.ChainConfig)
-				if len(transfers) > 0 {
-					for _, transfer := range transfers {
-						logger.WithFields(logger.Fields{
-							"btcTxId": tx.TxHash().String(),
-							"vout":    transfer.Vout,
-							"amount":  transfer.Amount,
-						}).Info("Other Transfer Found")
-
-						observedUTXO := &ObservedUTXO{
-							BlockNumber: blockHeight,
-							BlockHash:   block.BlockHash().String(),
-							TxID:        tx.TxHash().String(),
-							Vout:        int32(transfer.Vout),
-							Amount:      transfer.Amount,
-							PkScript:    tx.TxOut[transfer.Vout].PkScript,
-						}
-
-						// Notify Observers
-						m.Publisher.NotifyUTXO(*observedUTXO)
+					observedUTXO := &ObservedUTXO{
+						BlockNumber: blockHeight,
+						BlockHash:   block.BlockHash().String(),
+						TxID:        tx.TxHash().String(),
+						Vout:        int32(transfer.Vout),
+						Amount:      transfer.Amount,
+						PkScript:    tx.TxOut[transfer.Vout].PkScript,
 					}
+
+					// Notify Observers
+					m.Publisher.NotifyUTXO(*observedUTXO)
 				}
 			}
 
@@ -194,7 +194,10 @@ func (m *BTCMonitor) Scan() error {
 			_btc_txid := tx.TxHash().String()
 			if m.QueryRedeemTxFromDB(_btc_txid) {
 
-				logger.WithField("btcTxId", _btc_txid).Info("Sent Redeem Found on blockchain")
+				logger.WithFields(logger.Fields{
+					"blockNum": blockHeight,
+					"btcTxId":  _btc_txid,
+				}).Info("Redeem BTC Tx Found")
 
 				reqTxHash := m.FinishRedeem(_btc_txid)
 
@@ -227,6 +230,6 @@ func (m *BTCMonitor) ScanLoop() {
 			logger.Warnf("BTC ScanLoop error: %v", err)
 		}
 		// Sleep for a while before the next scan
-		time.Sleep(SCAN_INTERVAL)
+		time.Sleep(SCAN_BTC_BLK_INTERVAL)
 	}
 }
