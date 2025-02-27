@@ -37,7 +37,9 @@ func (m *PublisherService) RegisterDepositObserver(observer chan btcaction.Depos
 	m.DepositObservers = append(m.DepositObservers, observer)
 }
 
-func (m *PublisherService) RegisterRedeemObserver(observer chan btcaction.RedeemAction) {
+// Observer listens to the <redeem is done> on BTC blockchain.
+// and notify the observers.
+func (m *PublisherService) RegisterRedeemIsDoneObserver(observer chan btcaction.RedeemAction) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -77,7 +79,7 @@ func (m *PublisherService) NotifyDeposit(da btcaction.DepositAction) {
 }
 
 // Notify "redeem completed" to observers.
-func (m *PublisherService) NotifyRedeem(ra btcaction.RedeemAction) {
+func (m *PublisherService) NotifyRedeemIsDone(ra btcaction.RedeemAction) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
