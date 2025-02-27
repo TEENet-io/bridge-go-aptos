@@ -61,6 +61,28 @@ func (s *SQLiteStorage) InsertVaultUTXO(utxo VaultUTXO) error {
 	return err
 }
 
+func (s *SQLiteStorage) QueryAllUTXOs() ([]VaultUTXO, error) {
+	query := fmt.Sprintf(`
+	SELECT block_number, block_hash, tx_id, vout, amount, pkscript, lockup, spent, timeout
+	FROM %s;
+	`, s.uniqueTableID)
+	rows, err := s.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var utxos []VaultUTXO
+	for rows.Next() {
+		var utxo VaultUTXO
+		if err := rows.Scan(&utxo.BlockNumber, &utxo.BlockHash, &utxo.TxID, &utxo.Vout, &utxo.Amount, &utxo.PkScript, &utxo.Lockup, &utxo.Spent, &utxo.Timeout); err != nil {
+			return nil, err
+		}
+		utxos = append(utxos, utxo)
+	}
+	return utxos, nil
+}
+
 func (s *SQLiteStorage) QueryAllUsableUTXOs() ([]VaultUTXO, error) {
 	query := fmt.Sprintf(`
 	SELECT block_number, block_hash, tx_id, vout, amount, pkscript, lockup, spent, timeout
