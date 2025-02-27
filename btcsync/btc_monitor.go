@@ -111,16 +111,17 @@ func (m *BTCMonitor) Scan() error {
 
 	numbersToFetch := latestBlockHeight - m.LastVistedBlockHeight - BLK_MATURE_OFFSET
 
+	// in following the blockchain mode, we scan for at least 5 blocks back.
+	if numbersToFetch < 5 {
+		numbersToFetch = 5
+	}
+
 	logger.WithFields(logger.Fields{
 		"latestBlockHeight":     latestBlockHeight,
 		"lastVistedBlockHeight": m.LastVistedBlockHeight,
 		"considerFinalized":     BLK_MATURE_OFFSET,
 		"numbersToFetch":        numbersToFetch,
 	}).Info("Scanning btc blocks")
-
-	if numbersToFetch <= 0 {
-		return nil // no blocks to scan. and no error
-	}
 
 	blocks, err := m.RpcClient.GetBlocks(int(numbersToFetch), BLK_MATURE_OFFSET)
 
@@ -138,7 +139,7 @@ func (m *BTCMonitor) Scan() error {
 			}).Warnf("failed to get block_height by block_hash: %v", err)
 			continue
 		}
-		logger.WithField("blkNum", blockHeight).Info("Scanning btc block")
+		logger.WithField("blkNum", blockHeight).Info("Investigate btc blk")
 		// Go for each Tx, look for Tx that is interested to us.
 		// In general we care about three things:
 		// 1) The output(s) of the Tx, does it form a valid <bridge deposit>?
