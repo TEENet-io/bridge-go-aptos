@@ -101,6 +101,9 @@ func (m *BTCMonitor) Scan() error {
 		return fmt.Errorf("failed to get latest block height: %v", err)
 	}
 
+	logger.WithField("btc latest blk", latestBlockHeight).Info("Check BTC blockchain")
+	logger.WithField("last visited blk", m.LastVistedBlockHeight).Info("From memory")
+
 	// If no new blocks to scan.
 	if latestBlockHeight <= m.LastVistedBlockHeight {
 		return nil // no blocks to scan. and no error
@@ -110,10 +113,10 @@ func (m *BTCMonitor) Scan() error {
 
 	logger.WithFields(logger.Fields{
 		"latestBlockHeight":     latestBlockHeight,
-		"LastVistedBlockHeight": m.LastVistedBlockHeight,
+		"lastVistedBlockHeight": m.LastVistedBlockHeight,
 		"considerFinalized":     BLK_MATURE_OFFSET,
 		"numbersToFetch":        numbersToFetch,
-	}).Debug("Scanning btc blocks")
+	}).Info("Scanning btc blocks")
 
 	if numbersToFetch <= 0 {
 		return nil // no blocks to scan. and no error
