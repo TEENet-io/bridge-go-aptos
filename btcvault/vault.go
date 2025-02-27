@@ -3,6 +3,7 @@ package btcvault
 import (
 	"fmt"
 	"math/big"
+	"sort"
 	"sync"
 	"time"
 
@@ -137,6 +138,11 @@ func (tv *TreasureVault) Status() {
 		"err": err,
 	}).Info("UTXO Vault Status")
 
+	// re-order _utxos with blocknumber from low to high
+	sort.Slice(_utxos, func(i, j int) bool {
+		return _utxos[i].BlockNumber < _utxos[j].BlockNumber
+	})
+
 	for _, utxo := range _utxos {
 		logger.WithFields(logger.Fields{
 			"txid":        utxo.TxID,
@@ -146,7 +152,7 @@ func (tv *TreasureVault) Status() {
 			"spent":       utxo.Spent,
 			"timeout":     utxo.Timeout,
 			"blockNumber": utxo.BlockNumber,
-			"blockHash":   utxo.BlockHash,
+			// "blockHash":   utxo.BlockHash,
 		}).Info("Each UTXO Detail")
 	}
 }
