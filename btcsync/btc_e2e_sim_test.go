@@ -4,6 +4,11 @@ package btcsync
 // This test uses a local bitcoin two-node network v0.21.
 // And a Ethereum simulation network.
 
+// Notice:
+// This test uses a local schnorr signer or a remote schnorr signer.
+// Config which to use via a flag switch.
+// (deploy contracts + sign data to contract calls).
+
 // Test BTC deposit (then mint on eth side)
 // 1. Send the deposit
 // 2. Monitor captures the deposit
@@ -45,7 +50,9 @@ import (
 )
 
 const (
-	RETRY_TIMES         = 10 // retry times for checking the deposit/utxo
+	USE_REMOTE_SIGNER = true // If use remote schnorr signer or not.
+
+	RETRY_TIMES         = 30 // retry times for checking the deposit/utxo
 	CHANNEL_BUFFER_SIZE = 10
 
 	MAX_BLOCKS = 107 // Generate > 100 blocks to get recognized balance on bitcoin core.
@@ -73,15 +80,15 @@ const (
 	p3_legacy_addr_str     = "mvqq54khZQta7zDqFGoyN7BVK7Li4Xwnih"
 
 	// eth synchronizer config
-	frequencyToCheckEthFinalizedBlock = 100 * time.Millisecond
+	frequencyToCheckEthFinalizedBlock = 1 * time.Second
 
 	// eth tx manager config
-	frequencyToPrepareRedeem      = 500 * time.Millisecond
-	frequencyToMint               = 500 * time.Millisecond // 0.5 second
-	frequencyToMonitorPendingTxs  = 500 * time.Millisecond
-	timeoutOnWaitingForSignature  = 1 * time.Second
-	timtoutOnWaitingForOutpoints  = 1 * time.Second
-	timeoutOnMonitoringPendingTxs = 10
+	frequencyToPrepareRedeem      = 1 * time.Second
+	frequencyToMint               = 1 * time.Second
+	frequencyToMonitorPendingTxs  = 1 * time.Second
+	timeoutOnWaitingForSignature  = 10 * time.Second
+	timtoutOnWaitingForOutpoints  = 10 * time.Second
+	timeoutOnMonitoringPendingTxs = 128 // blocks
 
 	// eth chain
 	EVM_TEST_ACCOUNTS  = 10
@@ -93,33 +100,33 @@ var SimulatedChainID = big.NewInt(EVM_CHAIN_ID_INT64)
 var SimulatedEthPrivateKeys = etherman.GenPrivateKeys(EVM_TEST_ACCOUNTS)
 
 // Multisign configuration (remote signer)
-// var remoteSignerConfig = mutisig_client.ConnectorConfig{
-// 	UserID:        0,
-// 	Name:          "client0",
-// 	Cert:          "../multisig/config/data/client0.crt",
-// 	Key:           "../multisig/config/data/client0.key",
-// 	CaCert:        "../multisig/config/data/client0-ca.crt",
-// 	ServerAddress: "20.205.130.99:6001",
-// 	ServerCACert:  "../multisig/config/data/node0-ca.crt",
-// }
+var remoteSignerConfig = multisig_client.ConnectorConfig{
+	UserID:        0,
+	Name:          "client0",
+	Cert:          "../multisig_client/config/data/client0.crt",
+	Key:           "../multisig_client/config/data/client0.key",
+	CaCert:        "../multisig_client/config/data/client0-ca.crt",
+	ServerAddress: "52.184.81.32:6001",
+	ServerCACert:  "../multisig_client/config/data/node0-ca.crt",
+}
 
 // Mutisign (remote signer connector)
-// func setupConnector(connConfig mutisig_client.ConnectorConfig) (*mutisig_client.Connector, error) {
-// 	if _, err := os.Stat(connConfig.Cert); os.IsNotExist(err) {
-// 		return nil, err
-// 	}
-// 	if _, err := os.Stat(connConfig.Key); os.IsNotExist(err) {
-// 		return nil, err
-// 	}
-// 	if _, err := os.Stat(connConfig.CaCert); os.IsNotExist(err) {
-// 		return nil, err
-// 	}
-// 	if _, err := os.Stat(connConfig.ServerCACert); os.IsNotExist(err) {
-// 		return nil, err
-// 	}
-// 	c, err := mutisig_client.NewConnector(&connConfig)
-// 	return c, err
-// }
+func setupConnector(connConfig multisig_client.ConnectorConfig) (*multisig_client.Connector, error) {
+	if _, err := os.Stat(connConfig.Cert); os.IsNotExist(err) {
+		return nil, err
+	}
+	if _, err := os.Stat(connConfig.Key); os.IsNotExist(err) {
+		return nil, err
+	}
+	if _, err := os.Stat(connConfig.CaCert); os.IsNotExist(err) {
+		return nil, err
+	}
+	if _, err := os.Stat(connConfig.ServerCACert); os.IsNotExist(err) {
+		return nil, err
+	}
+	c, err := multisig_client.NewConnector(&connConfig)
+	return c, err
+}
 
 // *** Begin configuration of BTC side ***
 
@@ -229,18 +236,25 @@ type testEnv struct {
 // Setup ETH side facilities
 func newTestEnv(t *testing.T, file string, btcChainConfig *chaincfg.Params, btcWallet ethtxmanager.BtcWallet) *testEnv {
 
-	// local schnorr Signer
-	ss, err := multisig_client.NewRandomLocalSchnorrSigner()
-	if err != nil {
-		t.Fatalf("failed to create schnorr wallet: %v", err)
-	}
+	// General type to hold the signer!
+	var ss multisig_client.SchnorrSigner
+	var err error
 
-	// or remote schnorr Signer?
-	// connector, err := setupConnector(remoteSignerConfig)
-	// if err != nil {
-	// 	t.Fatalf("failed to create grpc connector: %v", err)
-	// }
-	// ss := mutisig_client.NewRemoteSchnorrSigner(connector)
+	// Choose local or remote signer?
+	if !USE_REMOTE_SIGNER {
+		// local schnorr Signer
+		ss, err = multisig_client.NewRandomLocalSchnorrSigner()
+		if err != nil {
+			t.Fatalf("failed to create schnorr wallet: %v", err)
+		}
+	} else {
+		// or remote schnorr Signer?
+		connector, err := setupConnector(remoteSignerConfig)
+		if err != nil {
+			t.Fatalf("failed to create grpc connector: %v", err)
+		}
+		ss = multisig_client.NewRemoteSchnorrSigner(connector)
+	}
 
 	sim, err := etherman.NewSimEtherman(SimulatedEthPrivateKeys, ss, etherman.SimulatedChainID)
 	assert.NoError(t, err)
@@ -729,8 +743,12 @@ func TestDeposit(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	// Give it time to let ethtxmanager to prepare the redeem
-	commit()
-	time.Sleep(1 * time.Second)
+	go func() {
+		for i := 0; i < 10; i++ {
+			commit()
+			time.Sleep(1 * time.Second)
+		}
+	}()
 
 	// wait for state to get prepared redeems
 	// loop retry_times, each interval sleep 1 second
@@ -743,7 +761,7 @@ func TestDeposit(t *testing.T) {
 		if len(redeems) > 0 {
 			break
 		}
-		time.Sleep(1 * time.Second)
+		time.Sleep(5 * time.Second)
 	}
 
 	if len(redeems) > 0 {
