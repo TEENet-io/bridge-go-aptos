@@ -1,9 +1,0 @@
-{
-    "userID": 0,
-    "name": "client0",
-    "cert": "config/data/client0.crt",
-    "key": "config/data/client0.key",
-    "caCert": "config/data/client0-ca.crt",
-    "serverAddress": "20.205.130.99:6001",
-    "serverCACert": "config/data/node0-ca.crt"
-}

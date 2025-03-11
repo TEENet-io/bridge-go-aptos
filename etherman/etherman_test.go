@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/TEENet-io/bridge-go/common"
-	"github.com/TEENet-io/bridge-go/multisig"
+	"github.com/TEENet-io/bridge-go/multisig_client"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -15,7 +15,7 @@ import (
 )
 
 var TEST_ETH_ACCOUNTS = GenPrivateKeys(ETH_ACCOUNTS)
-var ss, _ = multisig.NewRandomLocalSchnorrSigner()
+var ss, _ = multisig_client.NewRandomLocalSchnorrSigner()
 
 func TestNonce(t *testing.T) {
 	env, err := NewSimEtherman(TEST_ETH_ACCOUNTS, ss, big.NewInt(1337))

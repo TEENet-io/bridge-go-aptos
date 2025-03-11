@@ -1,10 +1,9 @@
-package multisig
+package multisig_client
 
 import (
+	"crypto/rand"
 	"os"
 	"testing"
-
-	"github.com/TEENet-io/bridge-go/common"
 )
 
 var connConfig = ConnectorConfig{
@@ -13,7 +12,7 @@ var connConfig = ConnectorConfig{
 	Cert:          "config/data/client0.crt",
 	Key:           "config/data/client0.key",
 	CaCert:        "config/data/client0-ca.crt",
-	ServerAddress: "20.205.130.99:6001",
+	ServerAddress: "52.184.81.32:6001",
 	ServerCACert:  "config/data/node0-ca.crt",
 }
 
@@ -43,23 +42,25 @@ func TestSignAndVerify2(t *testing.T) {
 
 	ss := NewRemoteSchnorrSigner(c)
 
-	message := []byte("hello world")
-	rx, s, err := ss.Sign(message)
+	msgHash := make([]byte, 32)
+	_, err = rand.Read(msgHash)
+	if err != nil {
+		t.Fatalf("Error generating random message hash: %v", err)
+	}
+	sig, err := ss.Sign(msgHash)
 	if err != nil {
 		t.Fatalf("Error signing: %v", err)
 	}
 
-	pubKeyX, pubKeyY, err := ss.Pub()
+	pubKey, err := ss.Pub()
 	if err != nil {
 		t.Fatalf("Error getting public key: %v", err)
 	}
 
-	t.Logf("Group Public Key: (%x, %x)\n", pubKeyX, pubKeyY)
+	t.Logf("Group Public Key: %v\n", pubKey)
 
-	// We only verify the X-coordinate of the public key
-	// according to common.btcuti_test.go
-	ok := common.Verify(BigIntToBytes(pubKeyX), message, rx, s)
+	ok := sig.Verify(msgHash, pubKey)
 	if !ok {
-		t.Fatalf("Error verifying signature")
+		t.Fatalf("Signature verification failed")
 	}
 }

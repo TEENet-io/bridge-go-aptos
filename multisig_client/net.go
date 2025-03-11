@@ -1,4 +1,4 @@
-package multisig
+package multisig_client
 
 import (
 	"context"

@@ -31,7 +31,7 @@ import (
 	"github.com/TEENet-io/bridge-go/cmd"
 	sharedcommon "github.com/TEENet-io/bridge-go/common"
 	"github.com/TEENet-io/bridge-go/logconfig"
-	"github.com/TEENet-io/bridge-go/multisig"
+	"github.com/TEENet-io/bridge-go/multisig_client"
 	"github.com/TEENet-io/bridge-go/reporter"
 )
 
@@ -96,7 +96,7 @@ const (
 )
 
 // Multisign configuration (remote signer)
-// var remoteSignerConfig = multisig.ConnectorConfig{
+// var remoteSignerConfig = multisig_client.ConnectorConfig{
 // 	UserID:        0,
 // 	Name:          "client0",
 // 	Cert:          "../multisig/config/data/client0.crt",
@@ -107,7 +107,7 @@ const (
 // }
 
 // Mutisign (remote signer connector)
-// func setupConnector(connConfig multisig.ConnectorConfig) (*multisig.Connector, error) {
+// func setupConnector(connConfig multisig_client.ConnectorConfig) (*multisig_client.Connector, error) {
 // 	if _, err := os.Stat(connConfig.Cert); os.IsNotExist(err) {
 // 		return nil, err
 // 	}
@@ -120,7 +120,7 @@ const (
 // 	if _, err := os.Stat(connConfig.ServerCACert); os.IsNotExist(err) {
 // 		return nil, err
 // 	}
-// 	c, err := multisig.NewConnector(&connConfig)
+// 	c, err := multisig_client.NewConnector(&connConfig)
 // 	return c, err
 // }
 
@@ -157,7 +157,7 @@ func MakeBridgeServerConfig(dbfile string) *cmd.BridgeServerConfig {
 
 	// If your Schnorr signer is created separately, load or initialize it here.
 	// For this example, we assume you have a local schnorr signer that does that.
-	schnorrSigner, err := multisig.NewLocalSchnorrSigner([]byte(BTC_CORE_ACCOUNT_PRIV))
+	schnorrSigner, err := multisig_client.NewLocalSchnorrSigner([]byte(BTC_CORE_ACCOUNT_PRIV))
 	if err != nil {
 		fmt.Printf("Error creating schnorr signer: %s", err)
 		return nil

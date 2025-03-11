@@ -14,7 +14,7 @@ import (
 
 	"github.com/TEENet-io/bridge-go/common"
 	bridge "github.com/TEENet-io/bridge-go/contracts/TEENetBtcBridge"
-	"github.com/TEENet-io/bridge-go/multisig"
+	"github.com/TEENet-io/bridge-go/multisig_client"
 )
 
 const (
@@ -96,19 +96,20 @@ type SimEtherman struct {
 	Chain    *SimulatedChain
 	Etherman *Etherman
 	// Sk          *btcec.PrivateKey // Private key for schnorr signature (simulation of multi-party)
-	MultiSigner multisig.SchnorrSigner
+	MultiSigner multisig_client.SchnorrSigner
 }
 
 // 1. Create a simulated ETH chain, with some genesis acccounts filled with money
 // 2. Random a btc private-public key pair (simulate m-to-n schnorr).
 // 3. Deploy the bridge contract /twbtc contract with the btc public key.
-func NewSimEtherman(privateKeys []*ecdsa.PrivateKey, schnorrSigner multisig.SchnorrSigner, chainId *big.Int) (*SimEtherman, error) {
+func NewSimEtherman(privateKeys []*ecdsa.PrivateKey, schnorrSigner multisig_client.SchnorrSigner, chainId *big.Int) (*SimEtherman, error) {
 	chain := NewSimulatedChain(privateKeys, chainId)
 
-	pk_x, _, err := schnorrSigner.Pub()
+	pub_key, err := schnorrSigner.Pub()
 	if err != nil {
 		return nil, err
 	}
+	pk_x, _ := multisig_client.BtcEcPubKeyToXY(pub_key)
 
 	// Deploy the bridge contract.
 	// Pubkey is embedded in the bridge contract.
@@ -179,7 +180,11 @@ func (env *SimEtherman) GenMintParams(cfg *ParamConfig, btcTxId [32]byte) *MintP
 
 	// Create (rx, s) schnorr signature of (btctxid, ethaddr, amount)
 	content := crypto.Keccak256Hash(common.EncodePacked(btcTxId, receiver.String(), cfg.Amount)).Bytes()
-	rx, s, err := env.MultiSigner.Sign(content[:])
+	_sig, err := env.MultiSigner.Sign(content[:])
+	if err != nil {
+		return nil
+	}
+	rx, s, err := multisig_client.ConvertSigToRS(_sig)
 	if err != nil {
 		return nil
 	}
@@ -271,11 +276,15 @@ func (env *SimEtherman) GenPrepareParams(cfg *ParamConfig) (p *PrepareParams) {
 	// create the hash
 	msg := p.SigningHash()
 	// sign the hash
-	rx, s, err := env.MultiSigner.Sign(msg[:])
+	_sig, err := env.MultiSigner.Sign(msg[:])
 	if err != nil {
 		return nil
 	}
 
+	rx, s, err := multisig_client.ConvertSigToRS(_sig)
+	if err != nil {
+		return nil
+	}
 	p.Rx = rx
 	p.S = s
 
@@ -290,7 +299,15 @@ func (env *SimEtherman) Sign(content []byte) (*big.Int, *big.Int, error) {
 	// with a signle private key = (rx, s)
 	// the signature can be combined with other signatures in real production.
 	// Now is only a simulation. So only a single schnorr signature.
-	return env.MultiSigner.Sign(content)
+	_sig, err := env.MultiSigner.Sign(content)
+	if err != nil {
+		return nil, nil, err
+	}
+	rx, s, err := multisig_client.ConvertSigToRS(_sig)
+	if err != nil {
+		return nil, nil, err
+	}
+	return rx, s, nil
 }
 
 // !!! This is a convenient function.

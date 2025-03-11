@@ -5,7 +5,7 @@
 package ethtxmanager
 
 import (
-	m "github.com/TEENet-io/bridge-go/multisig"
+	m "github.com/TEENet-io/bridge-go/multisig_client"
 )
 
 // This interface is used by eth tx manager
@@ -43,8 +43,13 @@ func (mstw *MockedSchnorrAsyncWallet) SignAsync(
 	request *SignatureRequest,
 	ch chan<- *SignatureRequest,
 ) error {
-	rx, s, err := mstw.ss.Sign(request.SigningHash[:])
+	_sig, err := mstw.ss.Sign(request.SigningHash[:])
 
+	if err != nil {
+		return err
+	}
+
+	rx, s, err := m.ConvertSigToRS(_sig)
 	if err != nil {
 		return err
 	}
@@ -74,8 +79,13 @@ func (rstw *RemoteSchnorrAsyncWallet) SignAsync(
 	request *SignatureRequest,
 	ch chan<- *SignatureRequest,
 ) error {
-	rx, s, err := rstw.ss.Sign(request.SigningHash[:])
+	_sig, err := rstw.ss.Sign(request.SigningHash[:])
 
+	if err != nil {
+		return err
+	}
+
+	rx, s, err := m.ConvertSigToRS(_sig)
 	if err != nil {
 		return err
 	}
