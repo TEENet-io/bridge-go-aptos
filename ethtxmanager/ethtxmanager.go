@@ -193,14 +193,15 @@ func (txmgr *EthTxManager) Start(ctx context.Context) error {
 			wg := sync.WaitGroup{}
 			wg.Add(len(redeems))
 			for _, redeem := range redeems {
-				// Check whether there is a routine currently being handling the redeem
+				// Check whether there is a routine currently handling the redeem
 				if _, ok := txmgr.redeemLock.Load(redeem.RequestTxHash); ok {
 					continue
 				}
 
 				go func() {
 					defer wg.Done()
-					if err := txmgr.prepareRedeem(ctx, redeem); err != nil {
+					if _prepareTxHash, err := txmgr.prepareRedeem(ctx, redeem); err != nil {
+						logger.WithField("prepareTxHash", _prepareTxHash).Errorf("Error occured during prepare a Redeem %v", err)
 						// errCh <- err
 					}
 				}()
