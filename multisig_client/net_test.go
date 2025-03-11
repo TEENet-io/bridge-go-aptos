@@ -1,11 +1,13 @@
-package multisig
+package multisig_client
 
 import (
+	"crypto/rand"
 	"fmt"
 	"os"
 	"testing"
 
-	"github.com/TEENet-io/bridge-go/common"
+	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 )
 
 var testConfig = ConnectorConfig{
@@ -14,7 +16,7 @@ var testConfig = ConnectorConfig{
 	Cert:          "config/data/client0.crt",
 	Key:           "config/data/client0.key",
 	CaCert:        "config/data/client0-ca.crt",
-	ServerAddress: "20.205.130.99:6001",
+	ServerAddress: "52.184.81.32:6001",
 	ServerCACert:  "config/data/node0-ca.crt",
 }
 
@@ -60,20 +62,32 @@ func TestGetSignature(t *testing.T) {
 	}
 	defer c.Close()
 
-	result, err := c.GetSignature([]byte("hello1"))
+	msgHash := make([]byte, 32)
+	_, err = rand.Read(msgHash)
+	if err != nil {
+		t.Fatalf("Error generating random message hash: %v", err)
+	}
+	signature, err := c.GetSignature(msgHash)
 	if err != nil {
 		t.Fatalf("Error getting signature: %v", err)
 	}
-	if len(result) != 64 {
-		t.Fatalf("Invalid signature length: %d, should be 64 bytes", len(result))
+	if len(msgHash) != 32 {
+		t.Fatalf("Invalid message hash length: %d, should be 32 bytes", len(msgHash))
 	}
-	fmt.Printf("Signature: %x\n", result)
+	if len(signature) != 64 {
+		t.Fatalf("Invalid signature length: %d, should be 64 bytes", len(signature))
+	}
+	fmt.Printf("msgHash: %x, Signature: %x\n", msgHash, signature)
 }
 
 func TestSignAndVerify(t *testing.T) {
 
-	// message to be signed.
-	message := []byte("hello1")
+	// message hash to be signed.
+	msgHash := make([]byte, 32)
+	_, err := rand.Read(msgHash)
+	if err != nil {
+		t.Fatalf("Error generating random message hash: %v", err)
+	}
 
 	c, err := setup()
 	if err != nil {
@@ -81,32 +95,40 @@ func TestSignAndVerify(t *testing.T) {
 	}
 	defer c.Close()
 
-	pubkey, err := c.GetPubKey()
+	pubkeyBytes, err := c.GetPubKey()
 	if err != nil {
 		t.Fatalf("Error getting public key: %v", err)
 	}
 
-	if len(pubkey) != 64 {
-		t.Fatalf("Invalid public key length: %d, should be 64 bytes", len(pubkey))
+	if len(pubkeyBytes) != 64 {
+		t.Fatalf("Invalid public key length: %d, should be 64 bytes", len(pubkeyBytes))
 	}
-	fmt.Printf("Group Public Key: %x\n", pubkey)
+	fmt.Printf("Group Public Key: %x\n", pubkeyBytes)
 
-	sig, err := c.GetSignature(message)
+	sigBytes, err := c.GetSignature(msgHash)
 	if err != nil {
 		t.Fatalf("Error getting signature: %v", err)
 	}
-	if len(sig) != 64 {
-		t.Fatalf("Invalid signature length: %d, should be 64 bytes", len(sig))
+	if len(msgHash) != 32 {
+		t.Fatalf("Invalid message hash length: %d, should be 32 bytes", len(msgHash))
 	}
-	fmt.Printf("Signature: %x\n", sig)
+	if len(sigBytes) != 64 {
+		t.Fatalf("Invalid signature length: %d, should be 64 bytes", len(sigBytes))
+	}
+	fmt.Printf("msgHash: %x, Signature: %x\n", msgHash, sigBytes)
 
 	// Verify the signature, message, pubkey
-	success := common.Verify(
-		pubkey[:32], // only the X-coordinate of the public key
-		message,
-		BytesToBigInt(sig[:32]),
-		BytesToBigInt(sig[32:]))
+	pubkeyBytes = append([]byte{0x04}, pubkeyBytes...)
+	pubkey, err := btcec.ParsePubKey(pubkeyBytes)
+	if err != nil {
+		t.Fatalf("Error parsing public key: %v", err)
+	}
+	sig, err := schnorr.ParseSignature(sigBytes)
+	if err != nil {
+		t.Fatalf("Error parsing signature: %v", err)
+	}
 
+	success := sig.Verify(msgHash, pubkey)
 	if !success {
 		t.Fatalf("Error verifying signature")
 	}

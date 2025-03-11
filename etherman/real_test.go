@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/TEENet-io/bridge-go/etherman"
-	"github.com/TEENet-io/bridge-go/multisig"
+	"github.com/TEENet-io/bridge-go/multisig_client"
 )
 
 // Bridge controlled core account, shall have some eth money already.
@@ -16,7 +16,7 @@ func TestConnect(t *testing.T) {
 	url := "http://localhost:8545"
 
 	// 2) prepare the schnorr signer
-	ss, err := multisig.NewRandomLocalSchnorrSigner()
+	ss, err := multisig_client.NewRandomLocalSchnorrSigner()
 	if err != nil {
 		t.Fatalf("failed to create schnorr wallet: %v", err)
 	}

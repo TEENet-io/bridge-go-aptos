@@ -1,26 +1,21 @@
-package multisig
+package multisig_client
 
 import (
-	"math/big"
-
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 )
 
 // Define a local schnorr wallet, which is backed by one single private key.
 type LocalSchnorrSigner struct {
-	Sk  *btcec.PrivateKey // Private key for schnorr signature (simulation of multi-party)
-	PkX *big.Int          // X of the pubkey, used in smart contract creation on Ethereum
-	PkY *big.Int          // Y of the pubkey
+	Sk *btcec.PrivateKey // Private key for schnorr signature (simulation of multi-party)
+	Pk *btcec.PublicKey  // Public key for schnorr signature (simulation of multi-party)
 }
 
 // If user provides a 256-bit (32byte) private key, we can create a schnorr wallet.
 func NewLocalSchnorrSigner(privkey []byte) (*LocalSchnorrSigner, error) {
 	sk, pk := btcec.PrivKeyFromBytes(privkey)
 	return &LocalSchnorrSigner{
-		Sk:  sk,
-		PkX: pk.X(),
-		PkY: pk.Y(),
+		Sk: sk, Pk: pk,
 	}, nil
 }
 
@@ -32,25 +27,21 @@ func NewRandomLocalSchnorrSigner() (*LocalSchnorrSigner, error) {
 	}
 
 	return &LocalSchnorrSigner{
-		Sk:  sk,
-		PkX: sk.PubKey().X(),
-		PkY: sk.PubKey().Y(),
+		Sk: sk, Pk: sk.PubKey(),
 	}, nil
 }
 
 // Make a schnorr signature.
-func (lsw *LocalSchnorrSigner) Sign(message []byte) (*big.Int, *big.Int, error) {
-	sig, err := schnorr.Sign(lsw.Sk, message)
+func (lsw *LocalSchnorrSigner) Sign(msgHash []byte) (*schnorr.Signature, error) {
+	sig, err := schnorr.Sign(lsw.Sk, msgHash)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
+	} else {
+		return sig, nil
 	}
-
-	bytes := sig.Serialize()
-	rx, s := BytesToBigInt(bytes[:32]), BytesToBigInt(bytes[32:])
-	return rx, s, nil
 }
 
 // Return the (X, Y) of the corresponding public key.
-func (lsw *LocalSchnorrSigner) Pub() (*big.Int, *big.Int, error) {
-	return lsw.PkX, lsw.PkY, nil
+func (lsw *LocalSchnorrSigner) Pub() (*btcec.PublicKey, error) {
+	return lsw.Pk, nil
 }

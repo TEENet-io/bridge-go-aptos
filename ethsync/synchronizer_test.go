@@ -8,7 +8,7 @@ import (
 
 	"github.com/TEENet-io/bridge-go/common"
 	"github.com/TEENet-io/bridge-go/etherman"
-	"github.com/TEENet-io/bridge-go/multisig"
+	"github.com/TEENet-io/bridge-go/multisig_client"
 	logger "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
@@ -23,7 +23,7 @@ func TestSync(t *testing.T) {
 		common.Debug = false
 	}()
 
-	ss, err := multisig.NewRandomLocalSchnorrSigner()
+	ss, err := multisig_client.NewRandomLocalSchnorrSigner()
 	if err != nil {
 		t.Fatalf("failed to create schnorr wallet: %v", err)
 	}

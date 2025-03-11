@@ -37,7 +37,7 @@ import (
 	"github.com/TEENet-io/bridge-go/etherman"
 	"github.com/TEENet-io/bridge-go/ethsync"
 	"github.com/TEENet-io/bridge-go/ethtxmanager"
-	"github.com/TEENet-io/bridge-go/multisig"
+	"github.com/TEENet-io/bridge-go/multisig_client"
 	"github.com/TEENet-io/bridge-go/state"
 	"github.com/btcsuite/btcd/chaincfg"
 	ethcommon "github.com/ethereum/go-ethereum/common"
@@ -93,7 +93,7 @@ var SimulatedChainID = big.NewInt(EVM_CHAIN_ID_INT64)
 var SimulatedEthPrivateKeys = etherman.GenPrivateKeys(EVM_TEST_ACCOUNTS)
 
 // Multisign configuration (remote signer)
-// var remoteSignerConfig = multisig.ConnectorConfig{
+// var remoteSignerConfig = mutisig_client.ConnectorConfig{
 // 	UserID:        0,
 // 	Name:          "client0",
 // 	Cert:          "../multisig/config/data/client0.crt",
@@ -104,7 +104,7 @@ var SimulatedEthPrivateKeys = etherman.GenPrivateKeys(EVM_TEST_ACCOUNTS)
 // }
 
 // Mutisign (remote signer connector)
-// func setupConnector(connConfig multisig.ConnectorConfig) (*multisig.Connector, error) {
+// func setupConnector(connConfig mutisig_client.ConnectorConfig) (*mutisig_client.Connector, error) {
 // 	if _, err := os.Stat(connConfig.Cert); os.IsNotExist(err) {
 // 		return nil, err
 // 	}
@@ -117,7 +117,7 @@ var SimulatedEthPrivateKeys = etherman.GenPrivateKeys(EVM_TEST_ACCOUNTS)
 // 	if _, err := os.Stat(connConfig.ServerCACert); os.IsNotExist(err) {
 // 		return nil, err
 // 	}
-// 	c, err := multisig.NewConnector(&connConfig)
+// 	c, err := mutisig_client.NewConnector(&connConfig)
 // 	return c, err
 // }
 
@@ -230,7 +230,7 @@ type testEnv struct {
 func newTestEnv(t *testing.T, file string, btcChainConfig *chaincfg.Params, btcWallet ethtxmanager.BtcWallet) *testEnv {
 
 	// local schnorr Signer
-	ss, err := multisig.NewRandomLocalSchnorrSigner()
+	ss, err := multisig_client.NewRandomLocalSchnorrSigner()
 	if err != nil {
 		t.Fatalf("failed to create schnorr wallet: %v", err)
 	}
@@ -240,7 +240,7 @@ func newTestEnv(t *testing.T, file string, btcChainConfig *chaincfg.Params, btcW
 	// if err != nil {
 	// 	t.Fatalf("failed to create grpc connector: %v", err)
 	// }
-	// ss := multisig.NewRemoteSchnorrSigner(connector)
+	// ss := mutisig_client.NewRemoteSchnorrSigner(connector)
 
 	sim, err := etherman.NewSimEtherman(SimulatedEthPrivateKeys, ss, etherman.SimulatedChainID)
 	assert.NoError(t, err)

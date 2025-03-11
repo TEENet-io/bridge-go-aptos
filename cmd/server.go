@@ -25,7 +25,7 @@ import (
 	"github.com/TEENet-io/bridge-go/etherman"
 	"github.com/TEENet-io/bridge-go/ethsync"
 	"github.com/TEENet-io/bridge-go/ethtxmanager"
-	"github.com/TEENet-io/bridge-go/multisig"
+	"github.com/TEENet-io/bridge-go/multisig_client"
 	"github.com/TEENet-io/bridge-go/reporter"
 	"github.com/TEENet-io/bridge-go/state"
 )
@@ -53,10 +53,10 @@ const (
 // Its easier to load it from env vars or a config file.
 type BridgeServerConfig struct {
 	// eth side
-	EthRpcUrl          string                 // json rpc url
-	EthCoreAccountPriv string                 // private key of the bridge controlled account
-	EthRetroScanBlk    int64                  // retro scan block, tell Sync() to scan from this block, -1 to honor the valude in statedb.
-	MSchnorrSigner     multisig.SchnorrSigner // remote or local both okay. as long as it can sign() and pub()
+	EthRpcUrl          string                        // json rpc url
+	EthCoreAccountPriv string                        // private key of the bridge controlled account
+	EthRetroScanBlk    int64                         // retro scan block, tell Sync() to scan from this block, -1 to honor the valude in statedb.
+	MSchnorrSigner     multisig_client.SchnorrSigner // remote or local both okay. as long as it can sign() and pub()
 	// state side
 	DbFilePath string // db file path
 	// btc side

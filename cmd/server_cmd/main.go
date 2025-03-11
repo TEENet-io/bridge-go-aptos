@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/TEENet-io/bridge-go/logconfig"
-	"github.com/TEENet-io/bridge-go/multisig"
+	"github.com/TEENet-io/bridge-go/multisig_client"
 	"github.com/btcsuite/btcd/chaincfg"
 
 	"github.com/TEENet-io/bridge-go/cmd"
@@ -80,7 +80,7 @@ func PrepareBridgeServerConfig() *cmd.BridgeServerConfig {
 
 	// If your Schnorr signer is created separately, load or initialize it here.
 	// For this example, we assume you have a local schnorr signer that does that.
-	schnorrSigner, err := multisig.NewLocalSchnorrSigner([]byte(viper.GetString("BTC_CORE_ACCOUNT_PRIV")))
+	schnorrSigner, err := multisig_client.NewLocalSchnorrSigner([]byte(viper.GetString("BTC_CORE_ACCOUNT_PRIV")))
 	if err != nil {
 		fmt.Printf("Error creating schnorr signer: %s", err)
 		return nil

@@ -7,7 +7,7 @@ import (
 	"math/big"
 
 	mybridge "github.com/TEENet-io/bridge-go/contracts/TEENetBtcBridge"
-	"github.com/TEENet-io/bridge-go/multisig"
+	"github.com/TEENet-io/bridge-go/multisig_client"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -23,12 +23,12 @@ import (
 
 // Fully terraformed ethereum chain for bridge.
 type RealEthChain struct {
-	RpcClient             *ethclient.Client      // work with ethereum chain
-	ChainId               *big.Int               // chain id of the ethereum network
-	CoreAccount           *bind.TransactOpts     // bridge controlled account (with money) to sign Mint(), Prepare() transactions
-	SchnorrSigner         multisig.SchnorrSigner // Pub() key to be fed into smart contract.
-	BridgeContractAddress common.Address         // created during New process
-	TwbtcContractAddress  common.Address         // created during New process
+	RpcClient             *ethclient.Client             // work with ethereum chain
+	ChainId               *big.Int                      // chain id of the ethereum network
+	CoreAccount           *bind.TransactOpts            // bridge controlled account (with money) to sign Mint(), Prepare() transactions
+	SchnorrSigner         multisig_client.SchnorrSigner // Pub() key to be fed into smart contract.
+	BridgeContractAddress common.Address                // created during New process
+	TwbtcContractAddress  common.Address                // created during New process
 }
 
 // rpc_url: the ethereum json rpc to connect to.
@@ -39,7 +39,7 @@ type RealEthChain struct {
 func NewRealEthChain(
 	rpc_url string,
 	priv_key *ecdsa.PrivateKey,
-	schnorrSigner multisig.SchnorrSigner,
+	schnorrSigner multisig_client.SchnorrSigner,
 	predefinedBridgeAddress string,
 	predefinedTwbtcAddress string,
 ) (*RealEthChain, error) {
@@ -81,10 +81,11 @@ func NewRealEthChain(
 			return nil, fmt.Errorf("[evm] address %s doesn't contain smart contract", predefinedBridgeAddress)
 		}
 	} else {
-		pk_x, _, err := schnorrSigner.Pub()
+		pub_key, err := schnorrSigner.Pub()
 		if err != nil {
 			return nil, err
 		}
+		pk_x, _ := multisig_client.BtcEcPubKeyToXY(pub_key)
 
 		var deployTx *types.Transaction
 		bridgeAddress, deployTx, contract, err = mybridge.DeployTEENetBtcBridge(
