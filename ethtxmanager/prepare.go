@@ -30,7 +30,7 @@ func (txmgr *EthTxManager) prepareRedeem(ctx context.Context, redeem *state.Rede
 	txmgr.redeemLock.Store(redeem.RequestTxHash, true)
 	defer txmgr.redeemLock.Delete(redeem.RequestTxHash)
 
-	newLogger := logger.WithField("requestTxHash", redeem.RequestTxHash.String())
+	newLogger := logger.WithField("reqTx", redeem.RequestTxHash.String())
 
 	// Check the redeem status on bridge contract. If false, either the redeem
 	// has been handled or there is a pending tx that tries to prepare the redeem.
@@ -60,7 +60,7 @@ func (txmgr *EthTxManager) prepareRedeem(ctx context.Context, redeem *state.Rede
 	if err != nil {
 		return nil, err
 	}
-	newLogger.Infof("outpoints received: %d", len(outpoints))
+	newLogger.WithField("num", len(outpoints)).Info("outpoints received")
 
 	// Compute the signing hash
 	redeem.Outpoints = append([]state.Outpoint{}, outpoints...)
