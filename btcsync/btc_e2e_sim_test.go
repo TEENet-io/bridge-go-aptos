@@ -468,7 +468,7 @@ func TestDeposit(t *testing.T) {
 	go monitor.ScanLoop()
 
 	// *** Setup a http server to report status ***
-	logger.Info("Setup http server to report status")
+	logger.Info("Setup http server to report bridge status")
 
 	http_server := reporter.NewHttpReporter("0.0.0.0", "8080", depo_st, btc_mgr_st, ethEnv.statedb)
 	go http_server.Run()

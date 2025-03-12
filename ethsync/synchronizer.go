@@ -110,7 +110,7 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 						"mintTx":        "0x" + hex.EncodeToString(ev.TxHash[:]),
 						"amount":        ev.Amount,
 						"receiver(eth)": ev.Receiver,
-					}).Info("Minted event")
+					}).Info("Minted Event Found")
 					s.st.GetNewMintedEventChannel() <- &MintedEvent{
 						MintTxHash: ev.TxHash,
 						BtcTxId:    ev.BtcTxId,
@@ -126,7 +126,7 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 						"amount":        ev.Amount,
 						"receiver(btc)": ev.Receiver,
 						"sender(evm)":   ev.Sender.String(),
-					}).Info("RedeemRequested event")
+					}).Info("RedeemRequested Event Found")
 					x := &RedeemRequestedEvent{
 						RequestTxHash:   ev.TxHash,
 						Requester:       ev.Sender,
@@ -149,7 +149,7 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 						"prepTx":         "0x" + hex.EncodeToString(ev.TxHash[:]),
 						"reqTx":          "0x" + hex.EncodeToString(ev.EthTxHash[:]),
 						"requester(evm)": ev.Requester.String(),
-					}).Info("RedeemPrepared event")
+					}).Info("RedeemPrepared Event Found")
 
 					outpointTxIds := []ethcommon.Hash{}
 					for _, txid := range ev.OutpointTxIds {
