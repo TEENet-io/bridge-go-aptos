@@ -11,9 +11,11 @@ func ConfigDebugLogger() {
 	myLogger.SetLevel(myLogger.DebugLevel)
 	myLogger.SetFormatter(&myLogger.TextFormatter{
 		ForceColors:            true,
-		DisableTimestamp:       true,
-		DisableLevelTruncation: true,
-		PadLevelText:           true,
+		DisableTimestamp:       false,
+		FullTimestamp:          true,
+		TimestampFormat:        "2006-01-02 15:04:05",
+		DisableLevelTruncation: false,
+		// PadLevelText:           true,
 	})
 }
 
@@ -23,9 +25,11 @@ func ConfigInfoLogger() {
 	myLogger.SetLevel(myLogger.InfoLevel)
 	myLogger.SetFormatter(&myLogger.TextFormatter{
 		ForceColors:            true,
-		DisableTimestamp:       true,
-		DisableLevelTruncation: true,
-		PadLevelText:           true,
+		DisableTimestamp:       false,
+		FullTimestamp:          true,
+		TimestampFormat:        "2006-01-02 15:04:05",
+		DisableLevelTruncation: false,
+		// PadLevelText:           true,
 	})
 }
 
