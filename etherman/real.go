@@ -68,6 +68,7 @@ func NewRealEthChain(
 
 	// Deploy bridge smart contracts (if pre-deployed then simply bind to them).
 	if predefinedBridgeAddress != "" && predefinedTwbtcAddress != "" {
+		logger.Info("Using predefined bridge and twbtc contracts")
 		bridgeAddress = common.HexToAddress(predefinedBridgeAddress)
 		// check the exist of smart contract on this address
 		code, err := client.CodeAt(context.Background(), bridgeAddress, nil)
@@ -81,6 +82,7 @@ func NewRealEthChain(
 			return nil, fmt.Errorf("[evm] address %s doesn't contain smart contract", predefinedBridgeAddress)
 		}
 	} else {
+		logger.Info("Deploying new bridge and twbtc contracts")
 		pub_key, err := schnorrSigner.Pub()
 		if err != nil {
 			return nil, err

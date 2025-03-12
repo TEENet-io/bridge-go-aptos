@@ -1,16 +1,13 @@
 # Example configuration file for the server
 
 # ETH
-#ETH_RPC_URL: "https://sepolia.infura.io/v3/f37af697a9dd4cbfa7e22aaacce33e50"
-#If local test Geth, use http://" + SERVER + ":" + PORT
-ETH_RPC_URL: "https://rpc-sepolia.rockx.com"
-# This eth account is controlled by bridge to do Mint() and RedeemPrepare()
+ETH_RPC_URL: "https://rpc-sepolia.rockx.com" # If local test Geth, use http://" + SERVER + ":" + PORT
+# Below ETH account is controlled by bridge to do Mint() and RedeemPrepare()
 ETH_CORE_ACCOUNT_PRIV: "dbcec79f3490a6d5d162ca2064661b85c40c93672968bfbd906b952e38c3e8de" # address: 0x85b427C84731bC077BA5A365771D2b64c5250Ac8
 ETH_RETRO_SCAN_BLK: 7796653  # -1: honor statedb last scanned blk, >0 Synchronizer shall start from this block number.
 
 # DB
-# You can use full path or just the file name to imply current path.
-DB_FILE_PATH: "testnet4_sepolia_bridge.db"
+DB_FILE_PATH: "testnet4_sepolia_bridge.db" # You can use full path or just the file name to imply current path.
 
 # BTC
 BTC_RPC_SERVER: "127.0.0.1"
@@ -21,6 +18,19 @@ BTC_START_BLK: 71891
 BTC_CHAIN_CONFIG: "testnet" # mainnet, testnet
 BTC_CORE_ACCOUNT_ADDR: "mnQ9tBEkNXXEyJqKeSK1TWJV3LngVSjanV" # bridge's address (can receive deposit BTCs)
 BTC_CORE_ACCOUNT_PRIV: "cU78RfXmYEXsdNpiC8AppdpNg6Ni58s8nF8LFFWuMVAQGx51v3HY" # bridge's private key
+
+# Schnorr Signer
+# Both Local Signer and Remote Signer are supported.
+# Local signer: Use the local BTC_CORE_ACCOUNT to initiate a single-key signer.
+# Remote signer: Use the cert you provied to connect to the remote signer.
+USE_REMOTE_SIGNER: true # If false, then a local signer is created and used upon start.
+REMOTE_SIGNER_USER_ID: 0
+REMOTE_SIGNER_NAME: "client0"
+REMOTE_SIGNER_CERT: "client0.crt"
+REMOTE_SIGNER_KEY: "client0.key"
+REMOTE_SIGNER_CA_CERT: "client0-ca.crt"
+REMOTE_SIGNER_SERVER: "52.184.81.32:6001" # ip+port
+REMOTE_SIGNER_SERVER_CA_CERT: "node0-ca.crt"
 
 # HTTP
 HTTP_IP: "127.0.0.1" # server listens on ...

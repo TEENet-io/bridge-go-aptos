@@ -1,13 +1,12 @@
 # Example configuration file for the server
 
 # ETH
-ETH_RPC_URL: "https://eth-sepolia.public.blastapi.io" # http://" + SERVER + ":" + PORT
+ETH_RPC_URL: "https://eth-sepolia.public.blastapi.io" # "http://" + SERVER + ":" + PORT
 ETH_CORE_ACCOUNT_PRIV: "dbcec79f3490a6d5d162ca2064661b85c40c93672968bfbd906b952e38c3e8de" # address: 0x85b427C84731bC077BA5A365771D2b64c5250Ac8
-ETH_RETRO_SCAN_BLK: -1
+ETH_RETRO_SCAN_BLK: -1 # -1: honor statedb last scanned blk, >0 Synchronizer shall start from this block number.
 
 # DB
-# You can use full path or just the file name to imply current path.
-DB_FILE_PATH: "local_btc_sepolia_eth_bridge.db"
+DB_FILE_PATH: "local_btc_sepolia_eth_bridge.db" # You can use full path or just the file name to imply current path.
 
 # BTC
 BTC_RPC_SERVER: "127.0.0.1"
@@ -18,6 +17,19 @@ BTC_START_BLK: -1
 BTC_CHAIN_CONFIG: "regtest" # mainnet, testnet
 BTC_CORE_ACCOUNT_PRIV: "cUWcwxzt2LiTxQCkQ8FKw67gd2NuuZ182LpX9uazB93JLZmwakBP" # bridge's private key
 BTC_CORE_ACCOUNT_ADDR: "mvqq54khZQta7zDqFGoyN7BVK7Li4Xwnih" # bridge's address (can receive deposit BTCs)
+
+# Schnorr Signer
+# Both Local Signer and Remote Signer are supported.
+# Local signer: Use the local BTC_CORE_ACCOUNT to initiate a single-key signer.
+# Remote signer: Use the cert you provied to connect to the remote signer.
+USE_REMOTE_SIGNER: true # If false, then a local signer is created and used upon start.
+REMOTE_SIGNER_SIGNER_USER_ID: 0
+REMOTE_SIGNER_SIGNER_NAME: "client0"
+REMOTE_SIGNER_SIGNER_CERT: "client0.crt"
+REMOTE_SIGNER_SIGNER_KEY: "client0.key"
+REMOTE_SIGNER_SIGNER_CA_CERT: "client0-ca.crt"
+REMOTE_SIGNER_SIGNER_SERVER: "52.184.81.32:6001" # ip+port
+REMOTE_SIGNER_SIGNER_SERVER_CA_CERT: "node0-ca.crt"
 
 # HTTP
 HTTP_IP: "0.0.0.0" # server listens on ...

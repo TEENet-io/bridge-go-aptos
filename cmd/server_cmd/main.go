@@ -2,12 +2,14 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/TEENet-io/bridge-go/logconfig"
 	"github.com/TEENet-io/bridge-go/multisig_client"
 	"github.com/btcsuite/btcd/chaincfg"
 
 	"github.com/TEENet-io/bridge-go/cmd"
+	logger "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
@@ -45,7 +47,7 @@ func main() {
 		return
 	}
 
-	fmt.Println("Starting bridge server... press Ctrl+C to kill the server")
+	logger.Info("Starting bridge server... press Ctrl+C to kill the server")
 	// Start server and block.
 	cmd.StartBridgeServerAndWait(bsc)
 }
@@ -57,6 +59,24 @@ func initializeViper(filePath string) bool {
 		return false
 	}
 	return true
+}
+
+// Mutisign (remote signer connector)
+func setupRemoteSignerConnector(connConfig multisig_client.ConnectorConfig) (*multisig_client.Connector, error) {
+	if _, err := os.Stat(connConfig.Cert); os.IsNotExist(err) {
+		return nil, err
+	}
+	if _, err := os.Stat(connConfig.Key); os.IsNotExist(err) {
+		return nil, err
+	}
+	if _, err := os.Stat(connConfig.CaCert); os.IsNotExist(err) {
+		return nil, err
+	}
+	if _, err := os.Stat(connConfig.ServerCACert); os.IsNotExist(err) {
+		return nil, err
+	}
+	c, err := multisig_client.NewConnector(&connConfig)
+	return c, err
 }
 
 // PrepareBridgeServerConfig reads configuration variables and returns a BridgeServerConfig.
@@ -79,11 +99,36 @@ func PrepareBridgeServerConfig() *cmd.BridgeServerConfig {
 	}
 
 	// If your Schnorr signer is created separately, load or initialize it here.
-	// For this example, we assume you have a local schnorr signer that does that.
-	schnorrSigner, err := multisig_client.NewLocalSchnorrSigner([]byte(viper.GetString("BTC_CORE_ACCOUNT_PRIV")))
-	if err != nil {
-		fmt.Printf("Error creating schnorr signer: %s", err)
-		return nil
+	var schnorrSigner multisig_client.SchnorrSigner
+	var err error
+	if viper.GetBool("USE_REMOTE_SIGNER") {
+		// Multisign configuration (remote signer)
+		var remoteSignerConfig = multisig_client.ConnectorConfig{
+			UserID:        viper.GetInt("REMOTE_SIGNER_USER_ID"),
+			Name:          viper.GetString("REMOTE_SIGNER_NAME"),
+			Cert:          viper.GetString("REMOTE_SIGNER_CERT"),
+			Key:           viper.GetString("REMOTE_SIGNER_KEY"),
+			CaCert:        viper.GetString("REMOTE_SIGNER_CA_CERT"),
+			ServerAddress: viper.GetString("REMOTE_SIGNER_SERVER"),
+			ServerCACert:  viper.GetString("REMOTE_SIGNER_SERVER_CA_CERT"),
+		}
+		connector, err := setupRemoteSignerConnector(remoteSignerConfig)
+		if err != nil {
+			logger.Fatalf("failed to create grpc connector: %v", err)
+			return nil
+		}
+		schnorrSigner = multisig_client.NewRemoteSchnorrSigner(connector)
+		logger.WithFields(logger.Fields{
+			"remote_signer_server": viper.GetString("REMOTE_SIGNER_SERVER"),
+		}).Info("Using remote schnorr signer")
+	} else {
+		// For this example, we init a local one or a specific remote one.
+		schnorrSigner, err = multisig_client.NewLocalSchnorrSigner([]byte(viper.GetString("BTC_CORE_ACCOUNT_PRIV")))
+		if err != nil {
+			fmt.Printf("Error creating schnorr signer: %s", err)
+			return nil
+		}
+		logger.Info("Using local schnorr signer (from BTC bridge account)")
 	}
 
 	// *** end of preparing objects ***
