@@ -62,6 +62,7 @@ func NewRealEthChain(
 
 	// Create auth object from private key
 	coreAccount := NewAuth(priv_key, chainId)
+	coreAccount.GasLimit = 728410 // set a higher gas limit to prevent deploy bridge contract fail
 
 	var bridgeAddress common.Address
 	var contract *mybridge.TEENetBtcBridge
@@ -88,6 +89,7 @@ func NewRealEthChain(
 			return nil, err
 		}
 		pk_x, _ := multisig_client.BtcEcPubKeyToXY(pub_key)
+		logger.Info("Schnorr pub key received")
 
 		var deployTx *types.Transaction
 		bridgeAddress, deployTx, contract, err = mybridge.DeployTEENetBtcBridge(
@@ -97,6 +99,10 @@ func NewRealEthChain(
 		if err != nil {
 			return nil, err
 		}
+		logger.WithFields(logger.Fields{
+			"bridge_addr": bridgeAddress.Hex(),
+			"deploy_tx":   deployTx.Hash().Hex(),
+		}).Info("Bridge contract deploy Tx sent")
 
 		// Wait for the deployment transaction to be mined
 		_, err = bind.WaitDeployed(context.Background(), client, deployTx)
@@ -104,6 +110,8 @@ func NewRealEthChain(
 			logger.Fatalf("Deployment tx not mined or failed: %v", err)
 			return nil, err
 		}
+		logger.Info("Deploy Complete")
+
 		// Compare bridge contract public key with the one we provided
 		_pk, err := contract.Pk(nil)
 		if err != nil {

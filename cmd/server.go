@@ -133,12 +133,12 @@ func NewBridgeServer(bsc *BridgeServerConfig, ctx context.Context, wg *sync.Wait
 		return nil, err
 	}
 	realEth, err := etherman.NewRealEthChain(bsc.EthRpcUrl, eth_core_account, bsc.MSchnorrSigner, bsc.PredefinedBridgeContractAddr, bsc.PredefinedTwbtcContractAddr)
-	logger.WithField("address", realEth.BridgeContractAddress.Hex()).Info("Bridge contract address")
-	logger.WithField("address", realEth.TwbtcContractAddress.Hex()).Info("TWBTC contract address")
 	if err != nil {
 		return nil, err
 	}
-
+	logger.WithField("address", realEth.BridgeContractAddress.Hex()).Info("Bridge contract address")
+	logger.WithField("address", realEth.TwbtcContractAddress.Hex()).Info("TWBTC contract address")
+	
 	// 2) Create the Etherman instance.
 	myEtherman, err := etherman.NewEtherman(&etherman.EthermanConfig{
 		URL:                   bsc.EthRpcUrl,
