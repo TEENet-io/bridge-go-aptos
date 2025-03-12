@@ -162,7 +162,7 @@ func (m *BtcTxManager) WithdrawLoop() {
 	for {
 		redeems, err := m.FindRedeemsFromState()
 		// if len(redeems) > 0 {
-		// 	logger.Infof("Found redeems: %d", len(redeems))
+		// 	logger.WithField("num", len(redeems)).Info("Found redeems from state")
 		// }
 		if err != nil {
 			// Log the error and continue
