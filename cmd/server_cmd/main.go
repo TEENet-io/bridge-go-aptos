@@ -128,7 +128,7 @@ func PrepareBridgeServerConfig() *cmd.BridgeServerConfig {
 			fmt.Printf("Error creating schnorr signer: %s", err)
 			return nil
 		}
-		logger.Info("Using local schnorr signer (from BTC bridge account)")
+		logger.Info("Using local schnorr signer")
 	}
 
 	// *** end of preparing objects ***

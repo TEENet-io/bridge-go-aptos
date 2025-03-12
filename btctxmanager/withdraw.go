@@ -205,7 +205,7 @@ func (m *BtcTxManager) WithdrawLoop() {
 				"prepTxHash": redeem.PrepareTxHash.Hex(),
 				"amount":     redeem.Amount.Int64(),
 				"receiver":   redeem.Receiver,
-			}).Info("New btc redeem to make")
+			}).Info("New BTC Redeem to withdraw")
 
 			btcTxId, err := m.WithdrawBTC(redeem)
 			if err != nil {
@@ -226,7 +226,7 @@ func (m *BtcTxManager) WithdrawLoop() {
 			logger.WithFields(logger.Fields{
 				"reqTxHash": reqTxHash,
 				"btcTxId":   btcTxId.String(),
-			}).Info("New BTC withdraw sent")
+			}).Info("BTC Redeem withdraw Tx sent")
 
 			// Insert the redeem record in mgrState (wait for future update of "mined" field)
 			err = m.mgrState.InsertRedeem(&btcaction.RedeemAction{

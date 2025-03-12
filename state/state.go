@@ -261,7 +261,7 @@ func (st *State) Start(ctx context.Context) error {
 					"status":     redeem.Status,
 					"reqTxHash":  redeem.RequestTxHash.String(),
 					"prepTxHash": redeem.PrepareTxHash.String(),
-				}).Info("updated redeem after prepared")
+				}).Info("Updated <redeem> after prepared")
 
 				return nil
 			}
