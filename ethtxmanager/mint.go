@@ -61,16 +61,16 @@ func (txmgr *EthTxManager) mint(ctx context.Context, mint *state.Mint) error {
 	if err != nil {
 		return err
 	}
-	newLogger.Debug("schnorr signature requested & received")
+	newLogger.Info("schnorr signature requested & received")
 
 	// set outpoints before saving
 	params.Rx = common.BigIntClone(req.Rx)
 	params.S = common.BigIntClone(req.S)
 
-	return txmgr.handleMintTx(params, newLogger)
+	return txmgr.createMintTx(params, newLogger)
 }
 
-func (txmgr *EthTxManager) handleMintTx(
+func (txmgr *EthTxManager) createMintTx(
 	params *etherman.MintParams,
 	logger *logger.Entry,
 ) error {

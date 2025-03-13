@@ -74,15 +74,18 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 				return err
 			}
 
+			newBlockFound := newFinalized.Cmp(s.lastFinalized) == 1
 			// continue if new finalized block number is less than the last processed block number
-			logger.WithFields(logger.Fields{
-				"newFinalized":  newFinalized.Int64(),
-				"lastFinalized": s.lastFinalized.Int64(),
-				"new > last?":   newFinalized.Cmp(s.lastFinalized) == 1,
-			}).Debug("eth rpc sync")
+			if newBlockFound {
+				logger.WithFields(logger.Fields{
+					"new_finalized_blk":  newFinalized.Int64(),
+					"last_finalized_blk": s.lastFinalized.Int64(),
+					"new > last?":        newBlockFound,
+				}).Info("eth rpc sync")
+			}
 
 			// if newFinalized <= lastFinalized, skip the loop.
-			if newFinalized.Cmp(s.lastFinalized) != 1 {
+			if !newBlockFound {
 				continue
 			}
 
@@ -99,7 +102,7 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 					"minted":    len(minted),
 					"requested": len(requested),
 					"prepared":  len(prepared),
-				}).Debug("sync events of block")
+				}).Info("sync events from eth block")
 				if err != nil {
 					return err
 				}
