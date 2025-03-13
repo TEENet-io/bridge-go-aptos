@@ -97,12 +97,14 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 			target_blk_num := new(big.Int).Add(s.lastFinalized, big.NewInt(1))
 			for target_blk_num.Cmp(newFinalized) != 1 {
 				minted, requested, prepared, err := s.etherman.GetEventLogs(target_blk_num)
-				logger.WithFields(logger.Fields{
-					"block#":    target_blk_num,
-					"minted":    len(minted),
-					"requested": len(requested),
-					"prepared":  len(prepared),
-				}).Info("sync events from eth block")
+				if len(minted) > 0 || len(requested) > 0 || len(prepared) > 0 {
+					logger.WithFields(logger.Fields{
+						"block#":    target_blk_num,
+						"minted":    len(minted),
+						"requested": len(requested),
+						"prepared":  len(prepared),
+					}).Info("sync events from eth block")
+				}
 				if err != nil {
 					return err
 				}
