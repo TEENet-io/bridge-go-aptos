@@ -39,5 +39,5 @@ HTTP_PORT: "8080"
 # Extra
 # If you use pre-deployed bridge and twBTC, you set these two addresses.
 # Otherwise (if strings are empty), the server will deploy new bridge and twBTC upon start.
-PREDEFINED_BRIDGE_ADDRESS: ""
-PREDEFINED_TWBTC_ADDRESS: ""
+PREDEFINED_BRIDGE_ADDRESS: "0x2ad0B6dD18195F4ab8763228747565735912FE86"
+PREDEFINED_TWBTC_ADDRESS: "0xfc65fCC98029844E137f1D2f900DF89400BBbA1c"
