@@ -62,7 +62,7 @@ func NewRealEthChain(
 
 	// Create auth object from private key
 	coreAccount := NewAuth(priv_key, chainId)
-	coreAccount.GasLimit = 728410 // set a higher gas limit to prevent deploy bridge contract fail
+	// coreAccount.GasLimit = 728410 // set a higher gas limit to prevent deploy bridge contract fail
 
 	var bridgeAddress common.Address
 	var contract *mybridge.TEENetBtcBridge
