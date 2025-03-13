@@ -43,7 +43,7 @@ const (
 	frequencyToMonitorPendingTxs  = 10 * time.Second
 	timeoutOnWaitingForSignature  = 10 * time.Second
 	timtoutOnWaitingForOutpoints  = 5 * time.Second // gather UTXOs from BTC wallet.
-	timeoutOnMonitoringPendingTxs = 64              // (two finalize phase) blocks
+	timeoutOnMonitoringPendingTxs = 128             // (4x finalized) blocks
 
 	// btc publisher-observer config
 	CHANNEL_BUFFER_SIZE = 10
@@ -138,7 +138,7 @@ func NewBridgeServer(bsc *BridgeServerConfig, ctx context.Context, wg *sync.Wait
 	}
 	logger.WithField("address", realEth.BridgeContractAddress.Hex()).Info("Bridge contract address")
 	logger.WithField("address", realEth.TwbtcContractAddress.Hex()).Info("TWBTC contract address")
-	
+
 	// 2) Create the Etherman instance.
 	myEtherman, err := etherman.NewEtherman(&etherman.EthermanConfig{
 		URL:                   bsc.EthRpcUrl,
