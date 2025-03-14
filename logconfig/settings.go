@@ -1,6 +1,10 @@
 package logconfig
 
 import (
+	"fmt"
+	"path/filepath"
+	"runtime"
+
 	myLogger "github.com/sirupsen/logrus"
 )
 
@@ -15,7 +19,13 @@ func ConfigDebugLogger() {
 		FullTimestamp:          true,
 		TimestampFormat:        "2006-01-02 15:04:05",
 		DisableLevelTruncation: false,
-		// PadLevelText:           true,
+		CallerPrettyfier: func(f *runtime.Frame) (string, string) {
+			// Extract only the file name from the full path
+			_, file := filepath.Split(f.File)
+			// Extract only the func name from the full path
+			funcName := filepath.Base(f.Function)
+			return fmt.Sprintf("%s()", funcName), fmt.Sprintf("%s:%d", file, f.Line)
+		},
 	})
 }
 
