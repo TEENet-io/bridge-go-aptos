@@ -242,11 +242,11 @@ func TestEndtoEnd(t *testing.T) {
 
 	// Send the deposit p2 -> p3
 	// Create a sender (p2)
-	user_btc_wallet, err := assembler.NewBasicSigner(BTC_USER_ACCOUNT_PRIV, assembler.GetRegtestParams())
+	user_btc_wallet, err := assembler.NewNativeSigner(BTC_USER_ACCOUNT_PRIV, assembler.GetRegtestParams())
 	if err != nil {
 		t.Fatalf("cannot create wallet from private key %s", BTC_USER_ACCOUNT_PRIV)
 	}
-	user_btc_operator, err := assembler.NewLegacyOperator(*user_btc_wallet)
+	user_btc_operator, err := assembler.NewNativeOperator(*user_btc_wallet)
 	if err != nil {
 		t.Fatalf("cannot create legacy wallet")
 	}
