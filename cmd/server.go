@@ -258,12 +258,12 @@ func NewBridgeServer(bsc *BridgeServerConfig, ctx context.Context, wg *sync.Wait
 	}
 
 	// *** Create <btc tx manager> ***
-	bridgeBtcCoreAccount, err := assembler.NewBasicSigner(bsc.BtcCoreAccountPriv, bsc.BtcChainConfig)
+	bridgeBtcCoreAccount, err := assembler.NewNativeSigner(bsc.BtcCoreAccountPriv, bsc.BtcChainConfig)
 	if err != nil {
 		logger.Fatalf("cannot create wallet from private key %s", bsc.BtcCoreAccountPriv)
 		return nil, err
 	}
-	bridgeBtcOperator, err := assembler.NewLegacyOperator(*bridgeBtcCoreAccount)
+	bridgeBtcOperator, err := assembler.NewNativeOperator(*bridgeBtcCoreAccount)
 	if err != nil {
 		logger.Fatalf("cannot create legacy wallet")
 		return nil, err

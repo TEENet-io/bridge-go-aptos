@@ -33,14 +33,14 @@ const (
 
 type BtcTxManager struct {
 	treasureVault *btcvault.TreasureVault   // where to query details of UTXOs.
-	legacySigner  *assembler.LegacyOperator // who signs the txs.
+	legacySigner  *assembler.NativeOperator // who signs the txs.
 	myAssembler   *assembler.Assembler
 	myBtcClient   *rpc.RpcClient                // send/query btc blockchain.
 	sharedState   *state.State                  // fetch and update the shared state. (communicate with eth side)
 	mgrState      btcaction.RedeemActionStorage // tracker of redeems.
 }
 
-func NewBtcTxManager(treasureVault *btcvault.TreasureVault, legacySigner *assembler.LegacyOperator, myBtcClient *rpc.RpcClient, sharedState *state.State, mgrState btcaction.RedeemActionStorage) *BtcTxManager {
+func NewBtcTxManager(treasureVault *btcvault.TreasureVault, legacySigner *assembler.NativeOperator, myBtcClient *rpc.RpcClient, sharedState *state.State, mgrState btcaction.RedeemActionStorage) *BtcTxManager {
 	return &BtcTxManager{
 		treasureVault: treasureVault,
 		legacySigner:  legacySigner,

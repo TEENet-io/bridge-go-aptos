@@ -38,7 +38,7 @@ type BtcUserConfig struct {
 
 type BtcUser struct {
 	BtcRpcClient   *btcrpc.RpcClient         // rpc client
-	MyLegacySigner *assembler.LegacyOperator // user's signer
+	MyLegacySigner *assembler.NativeOperator // user's signer
 	MyAssembler    *assembler.Assembler      // user's btc tx assembler
 	MyUserConfig   *BtcUserConfig            // contains a copy of user's config.
 }
@@ -57,12 +57,12 @@ func NewBtcUser(buc *BtcUserConfig, registerAddress bool) (*BtcUser, error) {
 
 	// Set up signing entity of user
 	// We use that to unlock funds and sign transactions.
-	_basic_signer, err := assembler.NewBasicSigner(buc.BtcCoreAccountPriv, buc.BtcChainConfig)
+	_basic_signer, err := assembler.NewNativeSigner(buc.BtcCoreAccountPriv, buc.BtcChainConfig)
 	if err != nil {
 		logger.WithField("user_priv", buc.BtcCoreAccountPriv).Error("cannot create Basic Signer by private key")
 		return nil, err
 	}
-	_legacy_signer, err := assembler.NewLegacyOperator(*_basic_signer)
+	_legacy_signer, err := assembler.NewNativeOperator(*_basic_signer)
 	if err != nil {
 		logger.Error("cannot create legacy signer from basic signer")
 		return nil, err

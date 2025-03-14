@@ -92,11 +92,11 @@ func TestBalance(t *testing.T) {
 	}
 
 	// Create a signer
-	b_wallet, err := assembler.NewBasicSigner(p1_legacy_priv_key_str, assembler.GetRegtestParams())
+	b_wallet, err := assembler.NewNativeSigner(p1_legacy_priv_key_str, assembler.GetRegtestParams())
 	if err != nil {
 		t.Fatal("cannot create BasicWallet")
 	}
-	wallet, err := assembler.NewLegacyOperator(*b_wallet)
+	wallet, err := assembler.NewNativeOperator(*b_wallet)
 	if err != nil {
 		t.Fatal("cannot create Legacy Wallet")
 	}
@@ -121,11 +121,11 @@ func TestListUtxos(t *testing.T) {
 	}
 
 	// Set up Signer
-	b_wallet, err := assembler.NewBasicSigner(p1_legacy_priv_key_str, assembler.GetRegtestParams())
+	b_wallet, err := assembler.NewNativeSigner(p1_legacy_priv_key_str, assembler.GetRegtestParams())
 	if err != nil {
 		t.Fatal("cannot create BasicWallet")
 	}
-	wallet, err := assembler.NewLegacyOperator(*b_wallet)
+	wallet, err := assembler.NewNativeOperator(*b_wallet)
 	if err != nil {
 		t.Fatal("cannot create Legacy Wallet")
 	}
@@ -201,28 +201,28 @@ func TestLegacySignerTransfer(t *testing.T) {
 	}
 
 	// Create a sender (p1)
-	b_wallet, err := assembler.NewBasicSigner(p1_legacy_priv_key_str, &chaincfg.RegressionNetParams)
+	b_wallet, err := assembler.NewNativeSigner(p1_legacy_priv_key_str, &chaincfg.RegressionNetParams)
 	if err != nil {
 		t.Fatalf("cannot create wallet from private key %s", p1_legacy_addr_str)
 	}
-	legacy_operator, err := assembler.NewLegacyOperator(*b_wallet)
+	native_operator, err := assembler.NewNativeOperator(*b_wallet)
 	if err != nil {
 		t.Fatalf("cannot create legacy wallet")
 	}
-	t.Logf("Sender: %s", legacy_operator.P2PKH.EncodeAddress())
+	t.Logf("Sender: %s", native_operator.P2PKH.EncodeAddress())
 
 	legacy_assembler := &assembler.Assembler{
-		ChainConfig: legacy_operator.ChainConfig,
-		Op:          legacy_operator,
+		ChainConfig: native_operator.ChainConfig,
+		Op:          native_operator,
 	}
 
 	// Query for UTXOs that we can spend
-	utxos, err := r.GetUtxoList(legacy_operator.P2PKH, 1)
+	utxos, err := r.GetUtxoList(native_operator.P2PKH, 1)
 	if err != nil {
-		t.Fatalf("cannot retrieve utxos with address %s, , error %v", legacy_operator.P2PKH.EncodeAddress(), err)
+		t.Fatalf("cannot retrieve utxos with address %s, , error %v", native_operator.P2PKH.EncodeAddress(), err)
 	}
 	if len(utxos) == 0 {
-		t.Fatalf("no utxos to spend, send some bitcoin to address %s first", legacy_operator.P2PKH.EncodeAddress())
+		t.Fatalf("no utxos to spend, send some bitcoin to address %s first", native_operator.P2PKH.EncodeAddress())
 	}
 	t.Logf("utxo found: %d", len(utxos))
 
@@ -240,7 +240,7 @@ func TestLegacySignerTransfer(t *testing.T) {
 	fee_amount := int64(FEE_SATOSHI)
 
 	// change = total (utxo) - send - fee
-	change_addr := legacy_operator.P2PKH.EncodeAddress() // to wallet itself
+	change_addr := native_operator.P2PKH.EncodeAddress() // to wallet itself
 
 	// 1) Check balance of receiver
 	p2_addr, err := assembler.DecodeAddress(p2_legacy_addr_str, assembler.GetRegtestParams())
@@ -281,7 +281,7 @@ func TestLegacySignerTransfer(t *testing.T) {
 	t.Logf("Transaction sent, txHash is %s", txHash.String())
 
 	// Generate enough blocks
-	r.GenerateBlocks(MAX_BLOCKS, legacy_operator.P2PKH)
+	r.GenerateBlocks(MAX_BLOCKS, native_operator.P2PKH)
 
 	// 2) Check the balance of receiver again
 	p2_balance_2, err := r.GetBalance(p2_addr, 1)
@@ -311,11 +311,11 @@ func TestLegacySignerBridgeDeposit(t *testing.T) {
 	}
 
 	// Create a sender (p2)
-	b_wallet, err := assembler.NewBasicSigner(p2_legacy_priv_key_str, &chaincfg.RegressionNetParams)
+	b_wallet, err := assembler.NewNativeSigner(p2_legacy_priv_key_str, &chaincfg.RegressionNetParams)
 	if err != nil {
 		t.Fatalf("cannot create wallet from private key %s", p2_legacy_priv_key_str)
 	}
-	legacy_operator, err := assembler.NewLegacyOperator(*b_wallet)
+	legacy_operator, err := assembler.NewNativeOperator(*b_wallet)
 	if err != nil {
 		t.Fatalf("cannot create legacy wallet")
 	}

@@ -391,11 +391,11 @@ func TestDeposit(t *testing.T) {
 
 	// *** Setup the btc tx manager ***
 	// Create a sender (p3)
-	bridge_btc_wallet, err := assembler.NewBasicSigner(p3_legacy_priv_key_str, assembler.GetRegtestParams())
+	bridge_btc_wallet, err := assembler.NewNativeSigner(p3_legacy_priv_key_str, assembler.GetRegtestParams())
 	if err != nil {
 		t.Fatalf("cannot create wallet from private key %s", p3_legacy_priv_key_str)
 	}
-	bridge_wallet, err := assembler.NewLegacyOperator(*bridge_btc_wallet)
+	bridge_wallet, err := assembler.NewNativeOperator(*bridge_btc_wallet)
 	if err != nil {
 		t.Fatalf("cannot create legacy wallet")
 	}
@@ -497,11 +497,11 @@ func TestDeposit(t *testing.T) {
 
 	// Send the deposit p2 -> p3
 	// Create a sender (p2)
-	user_btc_wallet, err := assembler.NewBasicSigner(p2_legacy_priv_key_str, assembler.GetRegtestParams())
+	user_btc_wallet, err := assembler.NewNativeSigner(p2_legacy_priv_key_str, assembler.GetRegtestParams())
 	if err != nil {
 		t.Fatalf("cannot create wallet from private key %s", p2_legacy_priv_key_str)
 	}
-	legacy_operator, err := assembler.NewLegacyOperator(*user_btc_wallet)
+	legacy_operator, err := assembler.NewNativeOperator(*user_btc_wallet)
 	if err != nil {
 		t.Fatalf("cannot create legacy wallet")
 	}

@@ -64,6 +64,10 @@ cQthTMaKUU9f6br1hMXdGFXHwGaAfFFerNkn632BpGE6KXhTMmGY
 // bridge's btc wallet
 mvqq54khZQta7zDqFGoyN7BVK7Li4Xwnih
 cUWcwxzt2LiTxQCkQ8FKw67gd2NuuZ182LpX9uazB93JLZmwakBP
+
+// P2TR address (dumped from bitcoin-core software)
+bcrt1qvnm6etkkgmyj425hmtdmu4h82zpxudvya4y24n
+cUcHsdBfXphhqLayGuxULxJeABDX74kMtL2gdfyUMVeke3ZJsKQ6
 ```
 
 Bicoin Testnet4 Accounts
