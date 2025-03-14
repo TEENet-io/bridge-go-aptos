@@ -24,6 +24,7 @@ var (
 	ErrInvalidSchnorrSignature                = errors.New("invalid schnorr signature")
 )
 
+// prepareRedeem select UTXOs to satisfy the redeem.
 func (txmgr *EthTxManager) prepareRedeem(ctx context.Context, redeem *state.Redeem) (*ethcommon.Hash, error) {
 	// lock the request tx hash to prevent multiple routines from handling
 	// the same redeem when entering.
@@ -34,14 +35,16 @@ func (txmgr *EthTxManager) prepareRedeem(ctx context.Context, redeem *state.Rede
 
 	// Check the redeem status on bridge contract. If false, either the redeem
 	// has been handled or there is a pending tx that tries to prepare the redeem.
-	ok, err := txmgr.etherman.IsPrepared(redeem.RequestTxHash)
+	found, err := txmgr.etherman.IsPrepared(redeem.RequestTxHash)
 	if err != nil {
 		newLogger.Errorf("Etherman: failed to check if prepared: err=%v", err)
 		return nil, ErrBridgeIsPrepared
 	}
-	if ok {
-		newLogger.Debug("redeem already prepared, skip preparing redeem")
+	if found {
+		newLogger.Debug("redeem already prepared, skip")
 		return &redeem.PrepareTxHash, nil
+	} else {
+		newLogger.Info("redeem not prepared, start to prepare")
 	}
 
 	// request spendable outpoints from btc wallet
@@ -52,7 +55,7 @@ func (txmgr *EthTxManager) prepareRedeem(ctx context.Context, redeem *state.Rede
 		chForOutpoints,
 	)
 	if err != nil {
-		newLogger.Errorf("xfailed to request spendable outpoints with err=%v", err)
+		newLogger.WithField("err", err).Error("failed to request spendable outpoints")
 		return nil, ErrBtcWalletRequest
 	}
 
@@ -77,7 +80,7 @@ func (txmgr *EthTxManager) prepareRedeem(ctx context.Context, redeem *state.Rede
 		chForSignature,
 	)
 	if err != nil {
-		newLogger.Errorf("failed to request signature with err=%v", err)
+		newLogger.WithField("err", err).Error("failed to request signature")
 		return nil, ErrSchnorrWalletSign
 	}
 
@@ -142,15 +145,15 @@ func (txmgr *EthTxManager) createRedeemPrepareTx(
 	// Get the latest block
 	latest, err := txmgr.etherman.Client().HeaderByNumber(context.Background(), nil)
 	if err != nil {
-		logger.Errorf("failed to get latest block: err=%v", err)
+		logger.WithField("err", err).Error("failed to get latest block")
 		return nil, ErrEthermanHeaderByNumber
 	}
 	logger.WithField("latestBlockNumber", latest.Number).Debug("latest block")
 
-	// Send the tx to prepare the requested redeem
+	// Send the redeemprepare Tx on ETH
 	tx, err := txmgr.etherman.RedeemPrepare(params)
 	if err != nil {
-		logger.Errorf("failed to send tx, err=%v", err)
+		logger.WithField("err", err).Error("failed to send RedeemPrepare tx")
 		return nil, ErrBridgeRedeemPrepare
 	}
 

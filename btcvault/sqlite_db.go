@@ -336,8 +336,9 @@ func (s *VaultSQLiteStorage) SetTimeout(txID string, vout int32, timeout int64) 
 // SumMoney calculates the total amount of all VaultUTXOs
 // Only the unspent & not locked up UTXOs are counted.
 func (s *VaultSQLiteStorage) SumMoney() (int64, error) {
+	// If SUM(amount) == NULL then will return 0
 	query := fmt.Sprintf(`
-	SELECT SUM(amount)
+	SELECT COALESCE(SUM(amount), 0)
 	FROM %s
 	WHERE lockup = 0 AND spent = 0;
 	`, s.uniqueTableID)

@@ -151,6 +151,7 @@ func (tv *TreasureVault) Peek() ([]VaultUTXO, int64, error) {
 	return _utxos, _total, nil
 }
 
+// Vault status report
 func (tv *TreasureVault) Status() {
 	_utxos, sum, err := tv.Peek()
 
@@ -158,6 +159,10 @@ func (tv *TreasureVault) Status() {
 		"sum": sum,
 		"err": err,
 	}).Info("UTXO Vault Status")
+
+	if err != nil || len(_utxos) == 0 || sum == 0 {
+		return // don't continue the log process.
+	}
 
 	// re-order _utxos with blocknumber from low to high
 	sort.Slice(_utxos, func(i, j int) bool {
