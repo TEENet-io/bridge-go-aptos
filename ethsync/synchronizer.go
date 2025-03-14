@@ -81,7 +81,7 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 					"new_finalized_blk":  newFinalized.Int64(),
 					"last_finalized_blk": s.lastFinalized.Int64(),
 					"new > last?":        newBlockFound,
-				}).Info("eth rpc sync range")
+				}).Info("Scanning blocks (eth)")
 			}
 
 			// if newFinalized <= lastFinalized, skip the loop.
@@ -103,7 +103,7 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 						"minted":    len(minted),
 						"requested": len(requested),
 						"prepared":  len(prepared),
-					}).Info("sync events from eth block")
+					}).Info("Inspect events from block (eth)")
 				}
 				if err != nil {
 					return err

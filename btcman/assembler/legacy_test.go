@@ -22,7 +22,7 @@ func TestBasicSigner(t *testing.T) {
 		t.Fatalf("Cannot create BasicSigner from private key %s", priv_key_str)
 	}
 }
-func TestLegacySignerP1(t *testing.T) {
+func TestLegacyOperatorP1(t *testing.T) {
 	priv_key_str := p1_legacy_priv_key_str
 
 	bs, err := NewBasicSigner(priv_key_str, &chaincfg.RegressionNetParams)
@@ -30,7 +30,7 @@ func TestLegacySignerP1(t *testing.T) {
 		t.Fatalf("Cannot create BasicSigner from private key %s", priv_key_str)
 	}
 
-	ls, err := NewLegacySigner(*bs)
+	ls, err := NewLegacyOperator(*bs)
 	if err != nil {
 		t.Fatalf("Cannot create LegacySigner from private key %s", priv_key_str)
 	}
@@ -40,7 +40,7 @@ func TestLegacySignerP1(t *testing.T) {
 	}
 }
 
-func TestLegacySignerP2(t *testing.T) {
+func TestLegacyOperatorP2(t *testing.T) {
 	priv_key_str := p2_legacy_priv_key_str
 
 	bs, err := NewBasicSigner(priv_key_str, &chaincfg.RegressionNetParams)
@@ -48,7 +48,7 @@ func TestLegacySignerP2(t *testing.T) {
 		t.Fatalf("Cannot create BasicSigner from private key %s", priv_key_str)
 	}
 
-	ls, err := NewLegacySigner(*bs)
+	ls, err := NewLegacyOperator(*bs)
 	if err != nil {
 		t.Fatalf("Cannot create LegacySigner from private key %s", priv_key_str)
 	}

@@ -246,17 +246,22 @@ func TestEndtoEnd(t *testing.T) {
 	if err != nil {
 		t.Fatalf("cannot create wallet from private key %s", BTC_USER_ACCOUNT_PRIV)
 	}
-	wallet, err := assembler.NewLegacySigner(*user_btc_wallet)
+	user_btc_operator, err := assembler.NewLegacyOperator(*user_btc_wallet)
 	if err != nil {
 		t.Fatalf("cannot create legacy wallet")
 	}
 
-	wallet_addr_str := wallet.P2PKH.EncodeAddress()
+	user_btc_assembler := &assembler.Assembler{
+		ChainConfig: user_btc_operator.ChainConfig,
+		Op:          user_btc_operator,
+	}
+
+	wallet_addr_str := user_btc_operator.P2PKH.EncodeAddress()
 	logger.WithField("addr", wallet_addr_str).Info("User")
 
 	// Query for UTXOs of (p2)
 	// p2 simulates a personal user's wallet.
-	utxos, err := r.GetUtxoList(wallet.P2PKH, 1)
+	utxos, err := r.GetUtxoList(user_btc_operator.P2PKH, 1)
 	if err != nil {
 		t.Fatalf("cannot retrieve utxos with address %s, , error %v", wallet_addr_str, err)
 	}
@@ -310,7 +315,7 @@ func TestEndtoEnd(t *testing.T) {
 		"evm_id":   bs.EthEnv.ChainId.Int64(),
 	}).Info("Deposit data")
 
-	tx, err := wallet.MakeBridgeDepositTx(
+	tx, err := user_btc_assembler.MakeBridgeDepositTx(
 		selected_utxos,
 		bridge_address,
 		deposit_amount,

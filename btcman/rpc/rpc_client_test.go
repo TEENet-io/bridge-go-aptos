@@ -96,7 +96,7 @@ func TestBalance(t *testing.T) {
 	if err != nil {
 		t.Fatal("cannot create BasicWallet")
 	}
-	wallet, err := assembler.NewLegacySigner(*b_wallet)
+	wallet, err := assembler.NewLegacyOperator(*b_wallet)
 	if err != nil {
 		t.Fatal("cannot create Legacy Wallet")
 	}
@@ -125,7 +125,7 @@ func TestListUtxos(t *testing.T) {
 	if err != nil {
 		t.Fatal("cannot create BasicWallet")
 	}
-	wallet, err := assembler.NewLegacySigner(*b_wallet)
+	wallet, err := assembler.NewLegacyOperator(*b_wallet)
 	if err != nil {
 		t.Fatal("cannot create Legacy Wallet")
 	}
@@ -205,19 +205,24 @@ func TestLegacySignerTransfer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("cannot create wallet from private key %s", p1_legacy_addr_str)
 	}
-	wallet, err := assembler.NewLegacySigner(*b_wallet)
+	legacy_operator, err := assembler.NewLegacyOperator(*b_wallet)
 	if err != nil {
 		t.Fatalf("cannot create legacy wallet")
 	}
-	t.Logf("Sender: %s", wallet.P2PKH.EncodeAddress())
+	t.Logf("Sender: %s", legacy_operator.P2PKH.EncodeAddress())
+
+	legacy_assembler := &assembler.Assembler{
+		ChainConfig: legacy_operator.ChainConfig,
+		Op:          legacy_operator,
+	}
 
 	// Query for UTXOs that we can spend
-	utxos, err := r.GetUtxoList(wallet.P2PKH, 1)
+	utxos, err := r.GetUtxoList(legacy_operator.P2PKH, 1)
 	if err != nil {
-		t.Fatalf("cannot retrieve utxos with address %s, , error %v", wallet.P2PKH.EncodeAddress(), err)
+		t.Fatalf("cannot retrieve utxos with address %s, , error %v", legacy_operator.P2PKH.EncodeAddress(), err)
 	}
 	if len(utxos) == 0 {
-		t.Fatalf("no utxos to spend, send some bitcoin to address %s first", wallet.P2PKH.EncodeAddress())
+		t.Fatalf("no utxos to spend, send some bitcoin to address %s first", legacy_operator.P2PKH.EncodeAddress())
 	}
 	t.Logf("utxo found: %d", len(utxos))
 
@@ -235,7 +240,7 @@ func TestLegacySignerTransfer(t *testing.T) {
 	fee_amount := int64(FEE_SATOSHI)
 
 	// change = total (utxo) - send - fee
-	change_addr := wallet.P2PKH.EncodeAddress() // to wallet itself
+	change_addr := legacy_operator.P2PKH.EncodeAddress() // to wallet itself
 
 	// 1) Check balance of receiver
 	p2_addr, err := assembler.DecodeAddress(p2_legacy_addr_str, assembler.GetRegtestParams())
@@ -259,7 +264,7 @@ func TestLegacySignerTransfer(t *testing.T) {
 	t.Logf("utxo selected: %d", len(selected_utxos))
 
 	// Make the Tx
-	tx, err := wallet.MakeTransferOutTx(dst_addr, dst_amount, change_addr, fee_amount, selected_utxos)
+	tx, err := legacy_assembler.MakeTransferOutTx(dst_addr, dst_amount, change_addr, fee_amount, selected_utxos)
 	if err != nil {
 		t.Fatalf("cannot create transfer Tx %v", err)
 	}
@@ -276,7 +281,7 @@ func TestLegacySignerTransfer(t *testing.T) {
 	t.Logf("Transaction sent, txHash is %s", txHash.String())
 
 	// Generate enough blocks
-	r.GenerateBlocks(MAX_BLOCKS, wallet.P2PKH)
+	r.GenerateBlocks(MAX_BLOCKS, legacy_operator.P2PKH)
 
 	// 2) Check the balance of receiver again
 	p2_balance_2, err := r.GetBalance(p2_addr, 1)
@@ -310,16 +315,16 @@ func TestLegacySignerBridgeDeposit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("cannot create wallet from private key %s", p2_legacy_priv_key_str)
 	}
-	wallet, err := assembler.NewLegacySigner(*b_wallet)
+	legacy_operator, err := assembler.NewLegacyOperator(*b_wallet)
 	if err != nil {
 		t.Fatalf("cannot create legacy wallet")
 	}
 
-	wallet_addr_str := wallet.P2PKH.EncodeAddress()
+	wallet_addr_str := legacy_operator.P2PKH.EncodeAddress()
 	t.Logf("Sender: %s", wallet_addr_str)
 
 	// Query for UTXOs of (p2)
-	utxos, err := r.GetUtxoList(wallet.P2PKH, 1)
+	utxos, err := r.GetUtxoList(legacy_operator.P2PKH, 1)
 	if err != nil {
 		t.Fatalf("cannot retrieve utxos with address %s, , error %v", wallet_addr_str, err)
 	}
@@ -360,8 +365,12 @@ func TestLegacySignerBridgeDeposit(t *testing.T) {
 
 	t.Logf("utxo selected: %d", len(selected_utxos))
 
+	legacy_assembler := &assembler.Assembler{
+		ChainConfig: legacy_operator.ChainConfig,
+		Op:          legacy_operator,
+	}
 	// Make the Tx
-	tx, err := wallet.MakeBridgeDepositTx(
+	tx, err := legacy_assembler.MakeBridgeDepositTx(
 		selected_utxos,
 		bridge_address,
 		deposit_amount,

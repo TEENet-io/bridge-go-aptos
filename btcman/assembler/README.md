@@ -21,3 +21,11 @@ interfaces.go # Defines lock and unlock
 locker_impl.go # Implements the lock interface
 legacy.go # A legacy assembler (single private key) implements unlock interface + useful functions
 ```
+
+### Structure
+
+`Signer`, whether backed by local or remote, the core function is can provide a public key (for signature verification) and provide a signing function (to produce signature).
+
+`Operator`, can perform `unlock` interface defined actions. It is the key step to spend previously received UTXOS, it requries you to have either a private key to sign and produce a valid signature, or a remote service to provide a valid signature.
+
+`Assembler`, main entity to craft a proper business logic Tx. It uses `lock` to create locking scripts and `unlock` to produce valid signatures (require operator).

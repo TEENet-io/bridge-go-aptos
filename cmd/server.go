@@ -263,19 +263,19 @@ func NewBridgeServer(bsc *BridgeServerConfig, ctx context.Context, wg *sync.Wait
 		logger.Fatalf("cannot create wallet from private key %s", bsc.BtcCoreAccountPriv)
 		return nil, err
 	}
-	bridgeBtcSigner, err := assembler.NewLegacySigner(*bridgeBtcCoreAccount)
+	bridgeBtcOperator, err := assembler.NewLegacyOperator(*bridgeBtcCoreAccount)
 	if err != nil {
 		logger.Fatalf("cannot create legacy wallet")
 		return nil, err
 	}
-	bridgeBtcAddrstr := bridgeBtcSigner.P2PKH.EncodeAddress()
+	bridgeBtcAddrstr := bridgeBtcOperator.P2PKH.EncodeAddress()
 	if bridgeBtcAddrstr != bsc.BtcCoreAccountAddr {
 		logger.Fatalf("btc core address mismatch: %s != %s", bridgeBtcAddrstr, bsc.BtcCoreAccountAddr)
 	}
 
 	myBtcTxMgr := btctxmanager.NewBtcTxManager(
 		myBtcVault,
-		bridgeBtcSigner,
+		bridgeBtcOperator,
 		myBtcRpcClient,
 		myState,
 		btcMgrStorage,
