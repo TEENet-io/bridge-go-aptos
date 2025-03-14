@@ -216,9 +216,8 @@ func (etherman *Etherman) RedeemRequest(auth *bind.TransactOpts, params *Request
 	return contract.RedeemRequest(auth, params.Amount, string(params.Receiver))
 }
 
-// !!! Bridge initiates this tx !!!
-// Create a real "Redeem Prepare" on the bridge contract.
-// This locks a set of BTC UTXOs = list[(txid, vout)] on the bridge contract.
+// Call "Redeem Prepare" on the bridge contract.
+// This writes a set of BTC UTXOs = list[(txid, vout)] on the bridge contract.
 func (etherman *Etherman) RedeemPrepare(params *PrepareParams) (*types.Transaction, error) {
 	contract, err := etherman.getBridgeContract()
 	if err != nil {

@@ -201,7 +201,7 @@ func (txmgr *EthTxManager) Start(ctx context.Context) error {
 				go func() {
 					defer wg.Done()
 					if _prepareTxHash, err := txmgr.prepareRedeem(ctx, redeem); err != nil {
-						logger.WithField("prepareTxHash", _prepareTxHash).Errorf("Error occured during prepare a Redeem %v", err)
+						logger.WithField("prepareTxHash", _prepareTxHash).Errorf("Error occured during prepare a Redeem: %v", err)
 						// errCh <- err
 					}
 				}()
