@@ -153,7 +153,7 @@ func (txmgr *EthTxManager) Start(ctx context.Context) error {
 					}).Debug("redeems (requested) from db")
 				}
 			} else {
-				logger.WithField("num", 0).Debug("no redeems (=status requested) from db")
+				logger.WithField("num", 0).Debug("redeems=requested (db)")
 			}
 
 			redeems := []*state.Redeem{}
@@ -184,7 +184,7 @@ func (txmgr *EthTxManager) Start(ctx context.Context) error {
 				}
 			}
 
-			logger.WithField("num", len(redeems)).Debug("redeems to be prepared")
+			logger.WithField("num", len(redeems)).Debug("redeems (after filter) to be prepared")
 
 			if len(redeems) == 0 {
 				continue
