@@ -395,7 +395,7 @@ func TestDeposit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("cannot create wallet from private key %s", p3_legacy_priv_key_str)
 	}
-	bridge_wallet, err := assembler.NewLegacySigner(*bridge_btc_wallet)
+	bridge_wallet, err := assembler.NewLegacyOperator(*bridge_btc_wallet)
 	if err != nil {
 		t.Fatalf("cannot create legacy wallet")
 	}
@@ -501,17 +501,21 @@ func TestDeposit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("cannot create wallet from private key %s", p2_legacy_priv_key_str)
 	}
-	wallet, err := assembler.NewLegacySigner(*user_btc_wallet)
+	legacy_operator, err := assembler.NewLegacyOperator(*user_btc_wallet)
 	if err != nil {
 		t.Fatalf("cannot create legacy wallet")
 	}
+	legacy_assembler := &assembler.Assembler{
+		ChainConfig: legacy_operator.ChainConfig,
+		Op:          legacy_operator,
+	}
 
-	wallet_addr_str := wallet.P2PKH.EncodeAddress()
+	wallet_addr_str := legacy_operator.P2PKH.EncodeAddress()
 	logger.WithField("addr", wallet_addr_str).Info("User")
 
 	// Query for UTXOs of (p2)
 	// p2 simulates a personal user's wallet.
-	utxos, err := r.GetUtxoList(wallet.P2PKH, 1)
+	utxos, err := r.GetUtxoList(legacy_operator.P2PKH, 1)
 	if err != nil {
 		t.Fatalf("cannot retrieve utxos with address %s, , error %v", wallet_addr_str, err)
 	}
@@ -566,7 +570,7 @@ func TestDeposit(t *testing.T) {
 		"evm_id":   EVM_CHAIN_ID_INT64,
 	}).Info("Deposit data")
 
-	tx, err := wallet.MakeBridgeDepositTx(
+	tx, err := legacy_assembler.MakeBridgeDepositTx(
 		selected_utxos,
 		bridge_address,
 		deposit_amount,

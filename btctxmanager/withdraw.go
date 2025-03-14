@@ -32,20 +32,25 @@ const (
 )
 
 type BtcTxManager struct {
-	treasureVault *btcvault.TreasureVault       // where to query details of UTXOs.
-	legacySigner  *assembler.LegacySigner       // who to sign the txs.
+	treasureVault *btcvault.TreasureVault   // where to query details of UTXOs.
+	legacySigner  *assembler.LegacyOperator // who signs the txs.
+	myAssembler   *assembler.Assembler
 	myBtcClient   *rpc.RpcClient                // send/query btc blockchain.
 	sharedState   *state.State                  // fetch and update the shared state. (communicate with eth side)
 	mgrState      btcaction.RedeemActionStorage // tracker of redeems.
 }
 
-func NewBtcTxManager(treasureVault *btcvault.TreasureVault, legacySigner *assembler.LegacySigner, myBtcClient *rpc.RpcClient, sharedState *state.State, mgrState btcaction.RedeemActionStorage) *BtcTxManager {
+func NewBtcTxManager(treasureVault *btcvault.TreasureVault, legacySigner *assembler.LegacyOperator, myBtcClient *rpc.RpcClient, sharedState *state.State, mgrState btcaction.RedeemActionStorage) *BtcTxManager {
 	return &BtcTxManager{
 		treasureVault: treasureVault,
 		legacySigner:  legacySigner,
-		myBtcClient:   myBtcClient,
-		sharedState:   sharedState,
-		mgrState:      mgrState,
+		myAssembler: &assembler.Assembler{
+			ChainConfig: legacySigner.ChainConfig,
+			Op:          legacySigner,
+		},
+		myBtcClient: myBtcClient,
+		sharedState: sharedState,
+		mgrState:    mgrState,
 	}
 }
 
@@ -123,7 +128,7 @@ func (m *BtcTxManager) CreateBTCRedeemTx(redeem *state.Redeem) (*wire.MsgTx, err
 		"btc_tx_fee (extra)": BTC_TX_FEE,
 	}).Info("Create BTC Redeem Tx")
 
-	redeemTx, err := m.legacySigner.MakeRedeemTx(
+	redeemTx, err := m.myAssembler.MakeRedeemTx(
 		dst_addr,
 		dst_amount,
 		requestTxHash,                        // we just fill in the eth redeem request tx hash as the identifier.

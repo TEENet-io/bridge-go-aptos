@@ -37,9 +37,10 @@ type BtcUserConfig struct {
 }
 
 type BtcUser struct {
-	BtcRpcClient   *btcrpc.RpcClient       // rpc client
-	MyLegacySigner *assembler.LegacySigner // user's signer
-	MyUserConfig   *BtcUserConfig          // contains a copy of user's config.
+	BtcRpcClient   *btcrpc.RpcClient         // rpc client
+	MyLegacySigner *assembler.LegacyOperator // user's signer
+	MyAssembler    *assembler.Assembler      // user's btc tx assembler
+	MyUserConfig   *BtcUserConfig            // contains a copy of user's config.
 }
 
 // Create a new BTC user.
@@ -61,7 +62,7 @@ func NewBtcUser(buc *BtcUserConfig, registerAddress bool) (*BtcUser, error) {
 		logger.WithField("user_priv", buc.BtcCoreAccountPriv).Error("cannot create Basic Signer by private key")
 		return nil, err
 	}
-	_legacy_signer, err := assembler.NewLegacySigner(*_basic_signer)
+	_legacy_signer, err := assembler.NewLegacyOperator(*_basic_signer)
 	if err != nil {
 		logger.Error("cannot create legacy signer from basic signer")
 		return nil, err
@@ -92,6 +93,7 @@ func NewBtcUser(buc *BtcUserConfig, registerAddress bool) (*BtcUser, error) {
 	return &BtcUser{
 		BtcRpcClient:   myBtcRpcClient,
 		MyLegacySigner: _legacy_signer,
+		MyAssembler:    &assembler.Assembler{ChainConfig: buc.BtcChainConfig, Op: _legacy_signer},
 		MyUserConfig:   buc,
 	}, nil
 }
@@ -166,7 +168,7 @@ func (bu *BtcUser) DepositToBridge(amount int64, feeAmount int64, bridgeAddress 
 	logger.WithField("count", len(selected_utxos)).Info("User UTXOs selected")
 
 	// Craft [Deposit Tx]
-	tx, err := bu.MyLegacySigner.MakeBridgeDepositTx(
+	tx, err := bu.MyAssembler.MakeBridgeDepositTx(
 		selected_utxos,
 		bridgeAddress,
 		amount,
@@ -230,7 +232,7 @@ func (bu *BtcUser) TransferOut(amount int64, feeAmount int64, receiverAddr strin
 	logger.WithField("count", len(selected_utxos)).Info("User UTXOs selected")
 
 	// Craft [Transfer Tx]
-	tx, err := bu.MyLegacySigner.MakeTransferOutTx(receiverAddr, amount, bu.MyUserConfig.BtcCoreAccountAddr, feeAmount, selected_utxos)
+	tx, err := bu.MyAssembler.MakeTransferOutTx(receiverAddr, amount, bu.MyUserConfig.BtcCoreAccountAddr, feeAmount, selected_utxos)
 	if err != nil {
 		logger.WithField("error", err).Error("cannot create Tx")
 		return "", err

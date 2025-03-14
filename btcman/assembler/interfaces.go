@@ -20,29 +20,23 @@ import (
 	"github.com/btcsuite/btcd/wire"
 )
 
-// Locker defines the actions
-// that produce the "locking" part of a Tx.
-// Each action below adds an output clause to the outputs of a Tx.
-type Locker interface {
-	// Add a P2PKH (pay-to-public-key-hash) clause to Tx.
-	// This means adding a legacy btc address receiver as fund receiver.
-	// amount is in satoshi.
-	AddP2PKH(tx *wire.MsgTx, dst_chain_cfg *chaincfg.Params, dst_addr string, amount int64) (*wire.MsgTx, error)
-	// Add a P2WPKH (pay-to-witness-public-key-hash) clause to Tx.
-	// This means adding a segwit btc address receiver as fund receiver.
-	// amount is in satoshi.
-	AddP2WPKH(tx *wire.MsgTx, dst_chain_cfg *chaincfg.Params, dst_addr string, amount int64) (*wire.MsgTx, error)
-	// Add a pay-to-any-type-of-address clause to Tx.
-	// (cannot be type of script address, though)
-	AddPayToAddress(tx *wire.MsgTx, dst_chain_cfg *chaincfg.Params, dst_addr string, amount int64) (*wire.MsgTx, error)
-}
+type Operator interface {
+	// BTC Locking script producer
+	// This action usually <DOES NOT> require any private key or sign process.
+	// that produces the "locking" part of a Tx.
+	// "locking" adds an output clause to the outputs of a BTC Tx.
 
-// Unlocker defins the actions
-// that produce the "unlocking" part of a Tx (aka the inputs).
-// Call Unlock() on a list of UTXO to unlock them (produce valid signature to spend each UTXO)
-type Unlocker interface {
+	// Add a pay-to-any-type-of-address clause to Tx.
+	// (the address cannot be type of script address, though)
+	AppendPayToAddress(tx *wire.MsgTx, dst_chain_cfg *chaincfg.Params, dst_addr string, amount int64) (*wire.MsgTx, error)
+
+	// BTC Unlocking script producer
+	// that produces the "unlocking" part of a Tx (aka the inputs).
+	// This action <REQUIRE> a private key or sign process.
+
+	// Call Unlock() on a list of UTXO to unlock them (produce valid signature to spend each UTXO)
 	// Given a list of UTXO(s), unlock each UTXO and add to unlocking section of MsgTx.
 	// How to unlock? it depends on the specific wallet implementation.
-	// eg. single private key signature, multi-sig, m-n schnorr sign, etc.
-	Unlock(tx *wire.MsgTx, prevOutputs []utxo.UTXO) (*wire.MsgTx, error)
+	// eg. single private key signature, muzlti-sig, m-n schnorr sign, etc.
+	Unlock(tx *wire.MsgTx, prevOutputs []*utxo.UTXO) (*wire.MsgTx, error)
 }
