@@ -82,14 +82,14 @@ func (txmgr *EthTxManager) createMintTx(
 	}
 	logger.Debugf("got latest eth block: num=%d", latest_header.Number)
 
+	// Send the real Mint Tx to Ethereum
 	tx, err := txmgr.etherman.Mint(params)
 	if err != nil {
 		logger.Errorf("failed to mint: err=%v", err)
 		return ErrEthermanMint
 	}
 
-	newLogger := logger.WithField("mintTx", tx.Hash().String())
-	newLogger.Info("Mint tx sent")
+	logger.WithField("mintTx", tx.Hash().String()).Info("Mint tx sent")
 
 	// Save the monitored tx
 	mt := &MonitoredTx{
@@ -98,13 +98,13 @@ func (txmgr *EthTxManager) createMintTx(
 		SentAfter:    latest_header.Hash(), // interesting, using block hash as sendAfter not block number.
 		SentAfterBlk: latest_header.Number.Int64(),
 	}
-	newLogger.Debugf("latest block hash: 0x%x, block number: %d", latest_header.Hash(), latest_header.Number)
+	logger.WithField("hash", latest_header.Hash()).WithField("num", latest_header.Number).Debug("latest block (eth)")
 	err = txmgr.mgrdb.InsertPendingMonitoredTx(mt)
 	if err != nil {
 		logger.Errorf("failed to insert pending monitored tx: err=%v", err)
 		return ErrDBOpInsertMonitoredTx
 	}
-	newLogger.Debugf("inserted monitored tx: sentAfter(last eth block hash)=0x%x, sentAfterBlk=%d", mt.SentAfter, mt.SentAfterBlk)
+	logger.Debugf("inserted monitored tx: sentAfter(last eth block hash)=0x%x, sentAfterBlk=%d", mt.SentAfter, mt.SentAfterBlk)
 
 	return nil
 }
