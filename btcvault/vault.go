@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	TIMEOUT_DELAY int64 = 3600               // an hour, then the utxo is considered released and can be used again.
-	SAFE_MARGIN         = int64(0.001 * 1e8) // 0.001 BTC = 100,000 satoshi
+	TIMEOUT_DELAY int64 = 3600                // an hour, then the utxo is considered released and can be used again.
+	SAFE_MARGIN         = int64(0.0001 * 1e8) // 0.0001 BTC = 10,000 satoshi
 )
 
 // TreasureVault is a vault that stores UTXOs

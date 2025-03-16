@@ -43,9 +43,9 @@ const (
 	MIN_BLOCKS = 1   // Minimum step to generate blocks
 
 	// SEND_SATOSHI    = 0.1 * 1e8   // 0.1 btc
-	FEE_SATOSHI     = 0.001 * 1e8 // 0.001 btc
-	DEPOSIT_SATOSHI = 0.2 * 1e8   // 0.2 btc
-	REDEEM_SATOSHI  = 0.1 * 1e8   // 0.1 btc (half of deposit)
+	WITHDRAW_FEE_SATOSHI = 0.0001 * 1e8 // 0.0001 btc = 10,000 satoshi
+	DEPOSIT_SATOSHI      = 0.2 * 1e8    // 0.2 btc
+	REDEEM_SATOSHI       = 0.1 * 1e8    // 0.1 btc (half of deposit)
 
 	// TEST_EVM_RECEIVER = "0x8ddF05F9A5c488b4973897E278B58895bF87Cb24" // random pick up from etherscan.io
 	// TEST_EVM_ID = 1 // eth mainnet
@@ -271,10 +271,10 @@ func TestEndtoEnd(t *testing.T) {
 	// }
 
 	// Configure a bridge deposit
-	deposit_amount := int64(DEPOSIT_SATOSHI) // deposit ??? btc
-	bridge_address := BTC_CORE_ACCOUNT_ADDR  // bridge wallet
-	change_addr := wallet_addr_str           // change is send back to p2 wallet
-	fee_amount := int64(FEE_SATOSHI)         // fee
+	deposit_amount := int64(DEPOSIT_SATOSHI)  // deposit ??? btc
+	bridge_address := BTC_CORE_ACCOUNT_ADDR   // bridge wallet
+	change_addr := wallet_addr_str            // change is send back to p2 wallet
+	fee_amount := int64(WITHDRAW_FEE_SATOSHI) // fee
 
 	// 1) Check balance of bridge wallet
 	p3_addr, err := assembler.DecodeAddress(BTC_CORE_ACCOUNT_ADDR, assembler.GetRegtestParams())
