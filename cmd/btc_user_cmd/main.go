@@ -258,7 +258,7 @@ func sendTransfer(bu *cmd.BtcUser) (string, error) {
 		return "", fmt.Errorf("amount must be greater than 100,000 otherwise considered as dust attack on BTC")
 	}
 
-	fmt.Print("Enter Tx fee amount (in satoshis, recommend minimum 100000 for regtest): ")
+	fmt.Print("Enter Tx fee amount (in satoshis, recommend minimum 10,000 for regtest): ")
 	scanner.Scan()
 	feeAmount, err := strconv.Atoi(strings.TrimSpace(scanner.Text()))
 	if err != nil {

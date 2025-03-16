@@ -28,7 +28,7 @@ import (
 
 const (
 	QUERY_REDEEM_DB_INTERVAL = 10 * time.Second
-	BTC_TX_FEE               = int64(0.001 * 1e8) // 0.001 BTC
+	BTC_TX_FEE               = int64(0.0001 * 1e8) // 0.0001 BTC = 10,000 satoshi
 )
 
 type BtcTxManager struct {

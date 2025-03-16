@@ -20,8 +20,8 @@ import (
 const (
 	BLK_MATURE_OFFSET       = 1 // if a block is BLK_MATURE_OFFSET blocks old, we consider safe.
 	REGTEST_COINBASE_ADDR   = "mkVXZnqaaKt4puQNr4ovPHYg48mjguFCnT"
-	REGTEST_GENERATE_BLOCKS = 101         // Generate 101 blocks in regest.
-	REGTEST_FEE_SATOSHI     = 0.001 * 1e8 // 0.001 btc
+	REGTEST_GENERATE_BLOCKS = 101          // Generate 101 blocks in regest.
+	REGTEST_FEE_SATOSHI     = 0.0001 * 1e8 // 0.0001 btc = 10,000 satoshi
 )
 
 type BtcUserConfig struct {
