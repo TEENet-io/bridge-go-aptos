@@ -33,7 +33,8 @@ import (
 
 const (
 	BLK_MATURE_OFFSET     = 1               // ? blocks old we consider finalized
-	SCAN_BTC_BLK_INTERVAL = 3 * time.Second // ? time between we scan the next block.
+	SCAN_BTC_BLK_INTERVAL = 3 * time.Second // ? time between we scan the BTC blockchain.
+	RETRO_SCAN_BLOCKS     = 36              // ? blocks to scan (to counter the BTC not producing situation).
 )
 
 type BTCMonitor struct {
@@ -111,9 +112,12 @@ func (m *BTCMonitor) Scan() error {
 
 	numbersToFetch := latestBlockHeight - m.LastVistedBlockHeight - BLK_MATURE_OFFSET
 
-	// in following the blockchain mode, we scan for at least 5 blocks back.
-	if numbersToFetch < 5 {
-		numbersToFetch = 5
+	// Sometimes BTC blockchain can clog,
+	// for at least 6 hours (observed in testnet4),
+	// we scan for at least <RETRO_SCAN_BLOCKS> blocks back.
+	// like 36 blocks for 6 hours, or 72 blocks for 12 hours.
+	if numbersToFetch < RETRO_SCAN_BLOCKS {
+		numbersToFetch = RETRO_SCAN_BLOCKS
 	}
 
 	logger.WithFields(logger.Fields{
