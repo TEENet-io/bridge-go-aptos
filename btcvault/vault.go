@@ -15,7 +15,7 @@ import (
 
 const (
 	TIMEOUT_DELAY int64 = 3600               // an hour, then the utxo is considered released and can be used again.
-	SAFE_MARGIN         = int64(0.001 * 1e8) // 0.001 BTC
+	SAFE_MARGIN         = int64(0.001 * 1e8) // 0.001 BTC = 100,000 satoshi
 )
 
 // TreasureVault is a vault that stores UTXOs
@@ -230,8 +230,15 @@ func (tv *TreasureVault) Request(
 ) error {
 	tv.Status() // report status
 
+	safe_amount := amount.Int64() + SAFE_MARGIN
 	// if not enough utxos, return error
-	utxos, err := tv.ChooseAndLock(amount.Int64()+SAFE_MARGIN, reqTxId.Hex())
+	logger.WithFields(logger.Fields{
+		"req_tx_id":   reqTxId.Hex(),
+		"req_amount":  amount,
+		"safe_amount": safe_amount,
+	}).Info("Query UTXOs for redeem")
+
+	utxos, err := tv.ChooseAndLock(safe_amount, reqTxId.Hex())
 	if err != nil {
 		return err
 	}

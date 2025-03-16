@@ -285,7 +285,7 @@ func (s *VaultSQLiteStorage) QueryEnoughUTXOs(amount int64) ([]VaultUTXO, error)
 		}
 	}
 	if total < amount {
-		return nil, fmt.Errorf("not enough UTXOs to cover the amount required")
+		return nil, fmt.Errorf("not enough UTXOs to cover the amount required, required=%v, have=%v", amount, total)
 	}
 	return utxos, nil
 }
