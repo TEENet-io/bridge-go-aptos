@@ -27,8 +27,16 @@ func NewSchnorrOperator(signer multisig_client.SchnorrSigner, chainConfig *chain
 	if err != nil {
 		return nil, err
 	}
-	// Below line is inspired from github gist.
-	p2trAddr, err := btcutil.NewAddressTaproot(schnorr.SerializePubKey(pk), chainConfig)
+	// from github gist.
+	// https://github.com/babylonlabs-io/babylon/blob/main/crypto/bip322/bip322.go#L175
+	// https://github.com/GoudanWoo/note-minter/blob/7068cfd21ddaa5dce6a42d528facead5ab3ed7c0/utils.go#L28
+	// https://github.com/nayuta-ueno/taproot-redeem-go/blob/9cf43258ecb756d6eadba6096fa797acc740beb5/tx/p2trkey.go#L24
+	// https://github.com/b-harvest/babylon/blob/d4c52f96bd2caca302c054ccc3814fa17bd40749/crypto/bip322/bip322.go#L188
+	tapKey := txscript.ComputeTaprootKeyNoScript(pk)
+	p2trAddr, err := btcutil.NewAddressTaproot(schnorr.SerializePubKey(tapKey), chainConfig)
+
+	// from github gist.
+	// p2trAddr, err := btcutil.NewAddressTaproot(schnorr.SerializePubKey(pk), chainConfig)
 
 	// Below line is from chatgpt, which doesn' pass the test!
 	// p2trAddr, err := btcutil.NewAddressTaproot(pk.SerializeCompressed(), chainConfig)
