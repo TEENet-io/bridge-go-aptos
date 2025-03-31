@@ -172,7 +172,7 @@ func TestMint(t *testing.T) {
 	assert.NoError(t, err)
 	commit()
 
-	balance, err := etherman.TWBTCBalanceOf(params.Receiver)
+	balance, err := etherman.TWBTCBalanceOf(ethcommon.BytesToAddress(params.Receiver))
 	assert.NoError(t, err)
 	assert.Equal(t, big.NewInt(100), balance)
 }

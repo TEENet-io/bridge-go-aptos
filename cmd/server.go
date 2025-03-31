@@ -166,7 +166,7 @@ func NewBridgeServer(bsc *BridgeServerConfig, ctx context.Context, wg *sync.Wait
 	}
 
 	// state
-	myState, err := state.New(myStateDb, &state.StateConfig{ChannelSize: 1, EthChainId: realEth.ChainId})
+	myState, err := state.New(myStateDb, &state.StateConfig{ChannelSize: 1, UniqueChainId: realEth.ChainId})
 	if err != nil {
 		logger.Fatalf("failed to create state: %v", err)
 		return nil, err

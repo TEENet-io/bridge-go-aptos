@@ -8,16 +8,25 @@ import (
 	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
+// The returned string has No 0x prefix
+func ByteSliceToPureHexStr(b []byte) string {
+	return Trim0xPrefix(ethcommon.Bytes2Hex(b))
+}
+
+func HexStrToByteSlice(hexStr string) []byte {
+	return ethcommon.Hex2Bytes(Trim0xPrefix(hexStr))
+}
+
 // HexStrToEthAddress converts a hex string (with/without prefix 0x) to [32]byte
 func HexStrToBytes32(hexStr string) [32]byte {
 	var bytes32 [32]byte
-	copy(bytes32[:], ethcommon.Hex2BytesFixed(TrimHexPrefix(hexStr), 32))
+	copy(bytes32[:], ethcommon.Hex2BytesFixed(Trim0xPrefix(hexStr), 32))
 	return bytes32
 }
 
 // HexStrToBigInt converts a hex string (with/without prefix 0x) to *big.Int
 func HexStrToBigInt(hexStr string) *big.Int {
-	bigInt, ok := new(big.Int).SetString(TrimHexPrefix(hexStr), 16)
+	bigInt, ok := new(big.Int).SetString(Trim0xPrefix(hexStr), 16)
 	if !ok {
 		return nil
 	}
@@ -31,16 +40,16 @@ func BigInt2Bytes32(bigInt *big.Int) [32]byte {
 
 // BigIntToHexStr converts a big int to hex string with prefix 0x
 func BigIntToHexStr(bigInt *big.Int) string {
-	return appendHexPrefix(bigInt.Text(16))
+	return append0xPrefix(bigInt.Text(16))
 }
 
 // Trim 0x or 0X prefix off the string.
-func TrimHexPrefix(str string) string {
+func Trim0xPrefix(str string) string {
 	s := strings.TrimPrefix(str, "0x")
 	return strings.TrimPrefix(s, "0X")
 }
 
-func appendHexPrefix(str string) string {
+func append0xPrefix(str string) string {
 	if strings.HasPrefix(str, "0x") || strings.HasPrefix(str, "0X") {
 		return str
 	}
@@ -79,12 +88,12 @@ func RandBigInt(byteNum int) *big.Int {
 // Shorten shortens a hex string so that both sides have n characters and
 // the rest is replaced with "..."
 func Shorten(hexStr string, n int) string {
-	str := TrimHexPrefix(hexStr)
+	str := Trim0xPrefix(hexStr)
 
 	if len(str) <= n*2 {
-		return appendHexPrefix(str)
+		return append0xPrefix(str)
 	}
-	return appendHexPrefix(str[:n] + "..." + hexStr[len(str)-n:])
+	return append0xPrefix(str[:n] + "..." + hexStr[len(str)-n:])
 }
 
 func BigIntClone(bigInt *big.Int) *big.Int {

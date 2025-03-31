@@ -11,12 +11,13 @@ import (
 
 // Mint represents the process of minting TWBTC
 type Mint struct {
-	BtcTxId    ethcommon.Hash
-	MintTxHash ethcommon.Hash
-	Receiver   ethcommon.Address
+	BtcTxId    ethcommon.Hash // dont touch it for now
+	MintTxHash ethcommon.Hash // 32 bytes
+	Receiver   []byte         // address = 20 bytes on eth, 32 bytes on aptos
 	Amount     *big.Int
 }
 
+// Debug function
 func (m *Mint) String() string {
 	return fmt.Sprintf("%+v", *m)
 }
@@ -34,7 +35,7 @@ func createMintFromMintedEvent(ev *ethsync.MintedEvent) *Mint {
 type sqlMint struct {
 	BtcTxId    string
 	MintTxHash string
-	Receiver   string
+	Receiver   string // it stores pure hex string (from bytes), so no 0x is prepended.
 	Amount     uint64
 }
 
@@ -43,7 +44,7 @@ func (s *sqlMint) encode(m *Mint) (*sqlMint, error) {
 	s = &sqlMint{}
 	s.BtcTxId = m.BtcTxId.String()[2:]
 	s.MintTxHash = m.MintTxHash.String()[2:]
-	s.Receiver = m.Receiver.String()[2:]
+	s.Receiver = common.ByteSliceToPureHexStr(m.Receiver) // No 0x prefix!
 	s.Amount = m.Amount.Uint64()
 
 	return s, nil
@@ -54,7 +55,7 @@ func (s *sqlMint) decode() (*Mint, error) {
 	return &Mint{
 		BtcTxId:    common.HexStrToBytes32("0x" + s.BtcTxId),
 		MintTxHash: common.HexStrToBytes32("0x" + s.MintTxHash),
-		Receiver:   ethcommon.HexToAddress("0x" + s.Receiver),
+		Receiver:   common.HexStrToByteSlice(s.Receiver),
 		Amount:     new(big.Int).SetUint64(s.Amount),
 	}, nil
 }

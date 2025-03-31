@@ -120,7 +120,7 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 						MintTxHash: ev.TxHash,
 						BtcTxId:    ev.BtcTxId,
 						Amount:     new(big.Int).Set(ev.Amount),
-						Receiver:   ev.Receiver,
+						Receiver:   ev.Receiver.Bytes(),
 					}
 				}
 
