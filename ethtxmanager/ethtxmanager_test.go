@@ -443,12 +443,12 @@ func TestMainRoutine(t *testing.T) {
 	mints := []*state.Mint{
 		{
 			BtcTxId:  common.RandBytes32(),
-			Receiver: env.sim.GetAuth(1).From,
+			Receiver: env.sim.GetAuth(1).From.Bytes(),
 			Amount:   big.NewInt(100),
 		},
 		{
 			BtcTxId:  common.RandBytes32(),
-			Receiver: env.sim.GetAuth(2).From,
+			Receiver: env.sim.GetAuth(2).From.Bytes(),
 			Amount:   big.NewInt(200),
 		},
 	}

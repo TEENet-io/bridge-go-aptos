@@ -271,7 +271,7 @@ func newTestEnv(t *testing.T, file string, btcChainConfig *chaincfg.Params, btcW
 	assert.NoError(t, err)
 
 	// create a eth2btc state from the eth2btc statedb
-	st, err := state.New(statedb, &state.StateConfig{ChannelSize: 1, EthChainId: SimulatedChainID})
+	st, err := state.New(statedb, &state.StateConfig{ChannelSize: 1, UniqueChainId: SimulatedChainID})
 	assert.NoError(t, err)
 
 	// create a eth tx manager db

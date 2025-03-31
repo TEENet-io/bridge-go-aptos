@@ -35,7 +35,7 @@ func (s *BTC2EVMObserver) GetNotifiedDeposit() {
 		m := state.Mint{
 			BtcTxId:    ethcommon.HexToHash(data.Basic.TxHash),
 			MintTxHash: common.EmptyHash, // this field is empty until ETH side mints TWBTC.
-			Receiver:   ethcommon.HexToAddress(data.EvmAddr),
+			Receiver:   ethcommon.HexToAddress(data.EvmAddr).Bytes(),
 			Amount:     new(big.Int).SetInt64(data.DepositValue),
 		}
 

@@ -222,7 +222,7 @@ func (m *BtcTxManager) WithdrawLoop() {
 					"receiver":   redeem.Receiver,
 				}
 				for i, outpoint := range redeem.Outpoints {
-					fields[fmt.Sprintf("outpoint_%d_txid", i)] = common.TrimHexPrefix(outpoint.TxId.Hex())
+					fields[fmt.Sprintf("outpoint_%d_txid", i)] = common.Trim0xPrefix(outpoint.TxId.Hex())
 					fields[fmt.Sprintf("outpoint_%d_idx", i)] = outpoint.Idx
 				}
 				logger.WithFields(fields).Errorf("build & withdraw BTC tx error: %v", err)

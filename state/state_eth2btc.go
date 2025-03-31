@@ -46,19 +46,19 @@ func (st *State) initEthChainID() error {
 	}
 
 	if !ok {
-		logger.WithField("chainId", st.cfg.EthChainId).Warn("state: Missing evm chainId, use default")
+		logger.WithField("chainId", st.cfg.UniqueChainId).Warn("state: Missing evm chainId, use default")
 		// save the default value
-		err := st.statedb.SetKeyedValue(KeyEthChainId, common.BigInt2Bytes32(st.cfg.EthChainId))
+		err := st.statedb.SetKeyedValue(KeyEthChainId, common.BigInt2Bytes32(st.cfg.UniqueChainId))
 		if err != nil {
 			return ErrSetEthChainId
 		}
-		st.cache.ethChainId.Store(st.cfg.EthChainId.Bytes())
+		st.cache.ethChainId.Store(st.cfg.UniqueChainId.Bytes())
 	} else {
 		stored := new(big.Int).SetBytes(storedBytes32[:])
 		logger.WithField("evm_chainId", stored.Int64()).Info("State: Load evm chainId from db #")
 
-		if stored.Cmp(st.cfg.EthChainId) != 0 {
-			logger.Errorf("current chain id does not match the stored: curr=%v, stored=%v", st.cfg.EthChainId, stored)
+		if stored.Cmp(st.cfg.UniqueChainId) != 0 {
+			logger.Errorf("current chain id does not match the stored: curr=%v, stored=%v", st.cfg.UniqueChainId, stored)
 			return ErrEthChainIdUnmatchedStored
 		}
 		st.cache.ethChainId.Store(stored.Bytes())

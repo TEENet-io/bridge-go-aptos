@@ -44,7 +44,7 @@ func (ev *RedeemPreparedEvent) String() string {
 type MintedEvent struct {
 	MintTxHash common.Hash
 	BtcTxId    common.Hash
-	Receiver   common.Address
+	Receiver   []byte
 	Amount     *big.Int
 }
 

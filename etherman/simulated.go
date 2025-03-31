@@ -193,7 +193,7 @@ func (env *SimEtherman) GenMintParams(cfg *ParamConfig, btcTxId [32]byte) *MintP
 	return &MintParams{
 		BtcTxId:  btcTxId,
 		Amount:   cfg.Amount,
-		Receiver: receiver,
+		Receiver: receiver.Bytes(),
 		Rx:       rx,
 		S:        s,
 	}

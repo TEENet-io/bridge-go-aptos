@@ -40,7 +40,7 @@ func RandMint(isMinted bool) *Mint {
 	return &Mint{
 		BtcTxId:    common.RandBytes32(),
 		MintTxHash: txHash,
-		Receiver:   common.RandEthAddress(),
+		Receiver:   common.RandEthAddress().Bytes(),
 		Amount:     big.NewInt(100),
 	}
 }

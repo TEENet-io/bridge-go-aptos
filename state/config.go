@@ -3,6 +3,6 @@ package state
 import "math/big"
 
 type StateConfig struct {
-	ChannelSize int
-	EthChainId  *big.Int
+	ChannelSize   int
+	UniqueChainId *big.Int // Eth chain id (eg. 1337), aptos chain id (eg. 1)
 }

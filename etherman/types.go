@@ -13,9 +13,9 @@ import (
 type MintParams struct {
 	BtcTxId  ethcommon.Hash // bitcoin transaction hash
 	Amount   *big.Int
-	Receiver ethcommon.Address // ethereum address
-	Rx       *big.Int          // part of schnorr signature
-	S        *big.Int          // part of schnorr signature
+	Receiver []byte   // ethereum address
+	Rx       *big.Int // part of schnorr signature
+	S        *big.Int // part of schnorr signature
 }
 
 func (params *MintParams) SigningHash() ethcommon.Hash {

@@ -195,7 +195,7 @@ func (etherman *Etherman) Mint(params *MintParams) (*types.Transaction, error) {
 	return contract.Mint(
 		etherman.auth,
 		params.BtcTxId,
-		params.Receiver,
+		ethcommon.BytesToAddress(params.Receiver),
 		params.Amount,
 		params.Rx,
 		params.S,

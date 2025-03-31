@@ -47,7 +47,7 @@ func RandMintedEvent(amount int) *MintedEvent {
 	return &MintedEvent{
 		BtcTxId:    common.RandBytes32(),
 		MintTxHash: common.RandBytes32(),
-		Receiver:   common.RandEthAddress(),
+		Receiver:   common.RandEthAddress().Bytes(),
 		Amount:     big.NewInt(int64(amount)),
 	}
 }
