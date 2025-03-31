@@ -11,7 +11,7 @@ import (
 type SignatureRequest struct {
 	Id          ethcommon.Hash
 	SigningHash ethcommon.Hash
-	Outpoints   []state.Outpoint
+	Outpoints   []state.BtcOutpoint
 	Rx          *big.Int
 	S           *big.Int
 }

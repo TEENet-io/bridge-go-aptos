@@ -68,8 +68,8 @@ func (m *BtcTxManager) FindRedeemsFromState() ([]*state.Redeem, error) {
 func (m *BtcTxManager) FetchUTXOs(redeem *state.Redeem) ([]*btcvault.VaultUTXO, error) {
 	var utxos []*btcvault.VaultUTXO
 	for _, outpoint := range redeem.Outpoints {
-		clean_txid := utils.Remove0xPrefix(outpoint.TxId.String())
-		utxo, err := m.treasureVault.GetUTXODetail(clean_txid, int32(outpoint.Idx))
+		clean_txid := utils.Remove0xPrefix(outpoint.BtcTxId.String())
+		utxo, err := m.treasureVault.GetUTXODetail(clean_txid, int32(outpoint.BtcIdx))
 		if err != nil {
 			return nil, err
 		}
@@ -222,8 +222,8 @@ func (m *BtcTxManager) WithdrawLoop() {
 					"receiver":   redeem.Receiver,
 				}
 				for i, outpoint := range redeem.Outpoints {
-					fields[fmt.Sprintf("outpoint_%d_txid", i)] = common.Trim0xPrefix(outpoint.TxId.Hex())
-					fields[fmt.Sprintf("outpoint_%d_idx", i)] = outpoint.Idx
+					fields[fmt.Sprintf("outpoint_%d_txid", i)] = common.Trim0xPrefix(outpoint.BtcTxId.Hex())
+					fields[fmt.Sprintf("outpoint_%d_idx", i)] = outpoint.BtcIdx
 				}
 				logger.WithFields(fields).Errorf("build & withdraw BTC tx error: %v", err)
 				continue

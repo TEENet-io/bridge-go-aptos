@@ -226,7 +226,7 @@ func (tv *TreasureVault) GetUTXODetail(txID string, vout int32) (*VaultUTXO, err
 func (tv *TreasureVault) Request(
 	reqTxId ethcommon.Hash,
 	amount *big.Int,
-	ch chan<- []state.Outpoint,
+	ch chan<- []state.BtcOutpoint,
 ) error {
 	tv.Status() // report status
 
@@ -243,11 +243,11 @@ func (tv *TreasureVault) Request(
 		return err
 	}
 
-	outpoints := make([]state.Outpoint, len(utxos))
+	outpoints := make([]state.BtcOutpoint, len(utxos))
 	for i, utxo := range utxos {
-		outpoints[i] = state.Outpoint{
-			TxId: ethcommon.HexToHash(utxo.TxID),
-			Idx:  uint16(utxo.Vout),
+		outpoints[i] = state.BtcOutpoint{
+			BtcTxId: ethcommon.HexToHash(utxo.TxID),
+			BtcIdx:  uint16(utxo.Vout),
 		}
 	}
 
