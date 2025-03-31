@@ -14,12 +14,12 @@ type MockBtcWallet struct {
 func (w *MockBtcWallet) Request(
 	Id ethcommon.Hash,
 	amount *big.Int,
-	ch chan<- []state.Outpoint,
+	ch chan<- []state.BtcOutpoint,
 ) error {
-	outpoints := []state.Outpoint{
+	outpoints := []state.BtcOutpoint{
 		{
-			TxId: common.RandBytes32(),
-			Idx:  0,
+			BtcTxId: common.RandBytes32(),
+			BtcIdx:  0,
 		},
 	}
 

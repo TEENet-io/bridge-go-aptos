@@ -16,14 +16,14 @@ func RandRedeem(status RedeemStatus) *Redeem {
 		BtcTxId:       common.RandBytes32(),
 		Requester:     common.RandEthAddress(),
 		Amount:        big.NewInt(100),
-		Outpoints: []Outpoint{
+		Outpoints: []BtcOutpoint{
 			{
-				TxId: common.RandBytes32(),
-				Idx:  0,
+				BtcTxId: common.RandBytes32(),
+				BtcIdx:  0,
 			},
 			{
-				TxId: common.RandBytes32(),
-				Idx:  1,
+				BtcTxId: common.RandBytes32(),
+				BtcIdx:  1,
 			},
 		},
 		Receiver: "rand_btc_address",

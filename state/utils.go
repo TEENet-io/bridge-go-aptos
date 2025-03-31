@@ -6,7 +6,7 @@ import (
 	"errors"
 )
 
-func EncodeOutpoints(outpoints []Outpoint) ([]byte, error) {
+func EncodeOutpoints(outpoints []BtcOutpoint) ([]byte, error) {
 	if outpoints == nil {
 		return nil, nil
 	}
@@ -20,7 +20,7 @@ func EncodeOutpoints(outpoints []Outpoint) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func DecodeOutpoints(data []byte) ([]Outpoint, error) {
+func DecodeOutpoints(data []byte) ([]BtcOutpoint, error) {
 	if data == nil {
 		return nil, nil
 	}
@@ -30,7 +30,7 @@ func DecodeOutpoints(data []byte) ([]Outpoint, error) {
 	}
 
 	decoder := gob.NewDecoder(bytes.NewReader(data))
-	var outpoints []Outpoint
+	var outpoints []BtcOutpoint
 	if err := decoder.Decode(&outpoints); err != nil {
 		return nil, err
 	}

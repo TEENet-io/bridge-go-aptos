@@ -16,6 +16,6 @@ type BtcWallet interface {
 	Request(
 		reqTxId ethcommon.Hash, // eth requestTxHash
 		amount *big.Int,
-		ch chan<- []state.Outpoint, // this channel receives a slice of outputs.
+		ch chan<- []state.BtcOutpoint, // this channel receives a slice of outputs.
 	) error
 }

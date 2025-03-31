@@ -48,7 +48,7 @@ func (txmgr *EthTxManager) prepareRedeem(ctx context.Context, redeem *state.Rede
 	}
 
 	// request spendable outpoints from btc wallet
-	chForOutpoints := make(chan []state.Outpoint, 1)
+	chForOutpoints := make(chan []state.BtcOutpoint, 1)
 	err = txmgr.btcWallet.Request(
 		redeem.RequestTxHash,
 		redeem.Amount,
@@ -66,7 +66,7 @@ func (txmgr *EthTxManager) prepareRedeem(ctx context.Context, redeem *state.Rede
 	newLogger.WithField("num", len(outpoints)).Info("outpoints received")
 
 	// Compute the signing hash
-	redeem.Outpoints = append([]state.Outpoint{}, outpoints...)
+	redeem.Outpoints = append([]state.BtcOutpoint{}, outpoints...)
 	params := createPrepareParams(redeem)
 	signingHash := params.SigningHash()
 
@@ -98,8 +98,8 @@ func (txmgr *EthTxManager) prepareRedeem(ctx context.Context, redeem *state.Rede
 
 func (txmgr *EthTxManager) waitforOutpoints(
 	ctx context.Context,
-	ch <-chan []state.Outpoint,
-) ([]state.Outpoint, error) {
+	ch <-chan []state.BtcOutpoint,
+) ([]state.BtcOutpoint, error) {
 	newCtx, cancel := context.WithTimeout(ctx, txmgr.cfg.TimeoutOnWaitingForOutpoints)
 	defer cancel()
 
@@ -182,8 +182,8 @@ func createPrepareParams(redeem *state.Redeem) *etherman.PrepareParams {
 	outpointIdxs := []uint16{}
 
 	for _, outpoint := range redeem.Outpoints {
-		outpointTxIds = append(outpointTxIds, outpoint.TxId)
-		outpointIdxs = append(outpointIdxs, outpoint.Idx)
+		outpointTxIds = append(outpointTxIds, outpoint.BtcTxId)
+		outpointIdxs = append(outpointIdxs, outpoint.BtcIdx)
 	}
 
 	return &etherman.PrepareParams{

@@ -41,7 +41,7 @@ type Redeem struct {
 	Requester     ethcommon.Address
 	Receiver      string // receiver btc address
 	Amount        *big.Int
-	Outpoints     []Outpoint
+	Outpoints     []BtcOutpoint
 	Status        RedeemStatus
 }
 
@@ -122,11 +122,11 @@ func (r *Redeem) updateFromPreparedEvent(ev *ethsync.RedeemPreparedEvent) (*Rede
 	r.Status = RedeemStatusPrepared
 
 	// Set the outpoints
-	r.Outpoints = []Outpoint{}
+	r.Outpoints = []BtcOutpoint{}
 	for i := range ev.OutpointTxIds {
-		r.Outpoints = append(r.Outpoints, Outpoint{
-			TxId: ev.OutpointTxIds[i],
-			Idx:  ev.OutpointIdxs[i],
+		r.Outpoints = append(r.Outpoints, BtcOutpoint{
+			BtcTxId: ev.OutpointTxIds[i],
+			BtcIdx:  ev.OutpointIdxs[i],
 		})
 	}
 
@@ -150,11 +150,11 @@ func createRedeemFromPreparedEvent(ev *ethsync.RedeemPreparedEvent) (*Redeem, er
 }
 
 func (r *Redeem) MarshalJSON() ([]byte, error) {
-	jOutpoint := []JSONOutpoint{}
+	jOutpoint := []JSONBtcOutpoint{}
 	for _, outpoint := range r.Outpoints {
-		jOutpoint = append(jOutpoint, JSONOutpoint{
-			TxId: outpoint.TxId.String(),
-			Idx:  outpoint.Idx,
+		jOutpoint = append(jOutpoint, JSONBtcOutpoint{
+			BtcTxId: outpoint.BtcTxId.String(),
+			BtcIdx:  outpoint.BtcIdx,
 		})
 	}
 
@@ -185,9 +185,9 @@ func (r *Redeem) UnmarshalJSON(data []byte) error {
 	r.Status = RedeemStatus(jRedeem.Status)
 
 	for _, jOutpoint := range jRedeem.Outpoints {
-		r.Outpoints = append(r.Outpoints, Outpoint{
-			TxId: common.HexStrToBytes32(jOutpoint.TxId),
-			Idx:  jOutpoint.Idx,
+		r.Outpoints = append(r.Outpoints, BtcOutpoint{
+			BtcTxId: common.HexStrToBytes32(jOutpoint.BtcTxId),
+			BtcIdx:  jOutpoint.BtcIdx,
 		})
 	}
 
@@ -218,7 +218,7 @@ func (r *Redeem) String() string {
 		r.RequestTxHash, r.PrepareTxHash, r.BtcTxId, r.Requester.Hex(), r.Receiver, r.Amount, r.Status)
 	str += "Outpoints: [ "
 	for i, outpoint := range r.Outpoints {
-		str += fmt.Sprintf("[%d]: { TxId: 0x%x, Idx: %d }, ", i, outpoint.TxId, outpoint.Idx)
+		str += fmt.Sprintf("[%d]: { TxId: 0x%x, Idx: %d }, ", i, outpoint.BtcTxId, outpoint.BtcIdx)
 	}
 	str += " ] }"
 	return str

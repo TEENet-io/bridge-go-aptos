@@ -144,7 +144,7 @@ func TestUpdateAfterPrepared(t *testing.T) {
 	err = db.InsertAfterRequested(r1)
 	assert.NoError(t, err)
 	r1.Status = RedeemStatusPrepared
-	r1.Outpoints = []Outpoint{{TxId: common.RandBytes32(), Idx: 0}}
+	r1.Outpoints = []BtcOutpoint{{BtcTxId: common.RandBytes32(), BtcIdx: 0}}
 	err = db.UpdateAfterPrepared(r1)
 	assert.NoError(t, err)
 	actual, ok, err = db.GetRedeem(r1.RequestTxHash)

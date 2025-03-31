@@ -19,7 +19,7 @@ func Test(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, r0, r2)
 
-	r0.Outpoints = []Outpoint{{TxId: common.RandBytes32(), Idx: 0}}
+	r0.Outpoints = []BtcOutpoint{{BtcTxId: common.RandBytes32(), BtcIdx: 0}}
 	r1, err = r1.encode(r0)
 	assert.NoError(t, err)
 	r2, err = r1.decode()
