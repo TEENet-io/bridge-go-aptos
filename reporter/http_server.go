@@ -183,10 +183,14 @@ func (h *HttpReporter) Redeems(c *gin.Context) {
 		return
 	}
 
+	if !common.EnsureSafeAddressHexString(evmRequester) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "evm_requester is not a valid address string"})
+	}
+
 	logger.WithField("evmRequester", evmRequester).Info("Redeem Route")
 
 	// Fetch redeems by evm requester
-	redeems, err := h.statedb.GetRedeemsByRequester(ethcommon.HexToAddress(evmRequester))
+	redeems, err := h.statedb.GetRedeemsByRequester(common.Trim0xPrefix(evmRequester))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

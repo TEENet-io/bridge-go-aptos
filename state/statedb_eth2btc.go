@@ -3,6 +3,7 @@ package state
 import (
 	"database/sql"
 
+	"github.com/TEENet-io/bridge-go/common"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
@@ -212,7 +213,7 @@ func (stdb *StateDB) GetRedeem(requestTxHash ethcommon.Hash) (*Redeem, bool, err
 	return redeem, true, nil
 }
 
-func (stdb *StateDB) GetRedeemsByRequester(requester ethcommon.Address) ([]*Redeem, error) {
+func (stdb *StateDB) GetRedeemsByRequester(requester string) ([]*Redeem, error) {
 	query := `SELECT * FROM redeem WHERE LOWER(requester) = LOWER(?)`
 
 	stmt, err := stdb.stmtCache.Prepare(query)
@@ -221,10 +222,7 @@ func (stdb *StateDB) GetRedeemsByRequester(requester ethcommon.Address) ([]*Rede
 	}
 
 	// Strip "0x" prefix off the string.
-	requesterStr := requester.String()
-	if len(requesterStr) >= 2 && requesterStr[:2] == "0x" {
-		requesterStr = requesterStr[2:]
-	}
+	requesterStr := common.Trim0xPrefix(requester)
 
 	rows, err := stmt.Query(requesterStr)
 	if err != nil {

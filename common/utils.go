@@ -3,6 +3,7 @@ package common
 import (
 	"crypto/rand"
 	"math/big"
+	"regexp"
 	"strings"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
@@ -106,6 +107,34 @@ func CompareSlices(a, b []byte) bool {
 	}
 	for i := 0; i < len(a); i++ {
 		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func IsHexChar(c rune) bool {
+	match, _ := regexp.MatchString(`[a-fA-F0-9]`, string(c))
+	return match
+}
+
+// EnsureSafeHexString ensures that the hex string is safe to use
+// It can contain 0x as prefix or not.
+// It can contain a-f, A-F, 0-9
+// It doesn't contain any other characters
+func EnsureSafeAddressHexString(hexStr string) bool {
+	if len(hexStr) < 2 {
+		return false
+	}
+	if len(hexStr) > 100 {
+		return false
+	}
+	if strings.HasPrefix(hexStr, "0x") || strings.HasPrefix(hexStr, "0X") {
+		hexStr = hexStr[2:]
+	}
+	for _, c := range hexStr {
+		// use regex to match each charater of the string
+		if !IsHexChar(c) {
 			return false
 		}
 	}
