@@ -134,14 +134,14 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 					}).Info("RedeemRequested Event Found")
 					x := &RedeemRequestedEvent{
 						RequestTxHash:   ev.TxHash,
-						Requester:       ev.Sender,
+						Requester:       ev.Sender.Bytes(),
 						Amount:          new(big.Int).Set(ev.Amount),
 						Receiver:        ev.Receiver,
 						IsValidReceiver: common.IsValidBtcAddress(ev.Receiver, s.cfg.BtcChainConfig),
 					}
 					logger.WithFields(logger.Fields{
 						"block#":          target_blk_num,
-						"requester(evm)":  x.Requester.String(),
+						"requester(evm)":  common.Prepend0xPrefix(common.ByteSliceToPureHexStr(x.Requester)),
 						"receiver(btc)":   x.Receiver,
 						"IsValidReceiver": x.IsValidReceiver,
 					}).Debug("RedeemRequested details")
@@ -163,7 +163,7 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 					s.st.GetNewRedeemPreparedEventChannel() <- &RedeemPreparedEvent{
 						PrepareTxHash: ev.TxHash,
 						RequestTxHash: ev.EthTxHash,
-						Requester:     ev.Requester,
+						Requester:     ev.Requester.Bytes(),
 						Receiver:      ev.Receiver,
 						Amount:        new(big.Int).Set(ev.Amount),
 						OutpointTxIds: outpointTxIds,

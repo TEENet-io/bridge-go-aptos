@@ -4,14 +4,13 @@ import (
 	"math/big"
 
 	"github.com/TEENet-io/bridge-go/common"
-	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 type sqlRedeem struct {
 	RequestTxHash string
 	PrepareTxHash string
 	BtcTxId       string
-	Requester     string
+	Requester     string // only the bytes part, turn to hex representation (no 0x prefix)
 	Receiver      string
 	Amount        uint64
 	Outpoints     []byte
@@ -32,7 +31,7 @@ func (s *sqlRedeem) encode(r *Redeem) (*sqlRedeem, error) {
 	s.PrepareTxHash = r.PrepareTxHash.String()[2:]
 	// btc txid is 32bytes long, but it doesn't usually prefix with 0x
 	s.BtcTxId = r.BtcTxId.String()[2:]
-	s.Requester = r.Requester.String()[2:]
+	s.Requester = common.ByteSliceToPureHexStr(r.Requester)
 	s.Receiver = r.Receiver
 	s.Amount = r.Amount.Uint64()
 	s.Outpoints = outpoints
@@ -45,7 +44,7 @@ func (r *sqlRedeem) decode() (*Redeem, error) {
 	requestTxHash := common.HexStrToBytes32("0x" + r.RequestTxHash)
 	prepareTxHash := common.HexStrToBytes32("0x" + r.PrepareTxHash)
 	btcTxId := common.HexStrToBytes32("0x" + r.BtcTxId)
-	requester := ethcommon.HexToAddress("0x" + r.Requester)
+	requester := common.HexStrToByteSlice(r.Requester)
 	amount := new(big.Int).SetUint64(r.Amount)
 
 	outpoints, err := DecodeOutpoints(r.Outpoints)

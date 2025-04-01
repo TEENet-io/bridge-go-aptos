@@ -10,7 +10,7 @@ func RandRedeemRequestedEvent(amount int, valid bool) *RedeemRequestedEvent {
 	if valid {
 		return &RedeemRequestedEvent{
 			RequestTxHash:   common.RandBytes32(),
-			Requester:       common.RandEthAddress(),
+			Requester:       common.RandEthAddress().Bytes(),
 			Amount:          big.NewInt(int64(amount)),
 			Receiver:        "valid_btc_address",
 			IsValidReceiver: true,
@@ -19,7 +19,7 @@ func RandRedeemRequestedEvent(amount int, valid bool) *RedeemRequestedEvent {
 
 	return &RedeemRequestedEvent{
 		RequestTxHash:   common.RandBytes32(),
-		Requester:       common.RandEthAddress(),
+		Requester:       common.RandEthAddress().Bytes(),
 		Amount:          big.NewInt(int64(amount)),
 		Receiver:        "Invalid_btc_address",
 		IsValidReceiver: false,
@@ -30,7 +30,7 @@ func RandRedeemPreparedEvent(amount int, outpointNum int) *RedeemPreparedEvent {
 	ev := &RedeemPreparedEvent{
 		RequestTxHash: common.RandBytes32(),
 		PrepareTxHash: common.RandBytes32(),
-		Requester:     common.RandEthAddress(),
+		Requester:     common.RandEthAddress().Bytes(),
 		Receiver:      "valid_btc_address",
 		Amount:        big.NewInt(int64(amount)),
 	}

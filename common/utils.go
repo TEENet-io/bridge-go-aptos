@@ -40,7 +40,7 @@ func BigInt2Bytes32(bigInt *big.Int) [32]byte {
 
 // BigIntToHexStr converts a big int to hex string with prefix 0x
 func BigIntToHexStr(bigInt *big.Int) string {
-	return append0xPrefix(bigInt.Text(16))
+	return Prepend0xPrefix(bigInt.Text(16))
 }
 
 // Trim 0x or 0X prefix off the string.
@@ -49,7 +49,7 @@ func Trim0xPrefix(str string) string {
 	return strings.TrimPrefix(s, "0X")
 }
 
-func append0xPrefix(str string) string {
+func Prepend0xPrefix(str string) string {
 	if strings.HasPrefix(str, "0x") || strings.HasPrefix(str, "0X") {
 		return str
 	}
@@ -91,11 +91,23 @@ func Shorten(hexStr string, n int) string {
 	str := Trim0xPrefix(hexStr)
 
 	if len(str) <= n*2 {
-		return append0xPrefix(str)
+		return Prepend0xPrefix(str)
 	}
-	return append0xPrefix(str[:n] + "..." + hexStr[len(str)-n:])
+	return Prepend0xPrefix(str[:n] + "..." + hexStr[len(str)-n:])
 }
 
 func BigIntClone(bigInt *big.Int) *big.Int {
 	return new(big.Int).Set(bigInt)
+}
+
+func CompareSlices(a, b []byte) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := 0; i < len(a); i++ {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }

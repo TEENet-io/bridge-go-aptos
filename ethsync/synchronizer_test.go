@@ -150,7 +150,7 @@ func sendTxs(t *testing.T, env *etherman.SimEtherman) (
 
 	requestedEvs = append(requestedEvs, &RedeemRequestedEvent{
 		RequestTxHash:   tx.Hash(),
-		Requester:       env.Chain.Accounts[1].From,
+		Requester:       env.Chain.Accounts[1].From.Bytes(),
 		Amount:          new(big.Int).Set(requestParams.Amount),
 		Receiver:        string(requestParams.Receiver),
 		IsValidReceiver: true,
@@ -166,7 +166,7 @@ func sendTxs(t *testing.T, env *etherman.SimEtherman) (
 
 	requestedEvs = append(requestedEvs, &RedeemRequestedEvent{
 		RequestTxHash:   tx.Hash(),
-		Requester:       env.Chain.Accounts[1].From,
+		Requester:       env.Chain.Accounts[1].From.Bytes(),
 		Amount:          new(big.Int).Set(requestParams.Amount),
 		Receiver:        requestParams.Receiver,
 		IsValidReceiver: false,

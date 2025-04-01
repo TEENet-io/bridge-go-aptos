@@ -38,8 +38,8 @@ type Redeem struct {
 	RequestTxHash ethcommon.Hash
 	PrepareTxHash ethcommon.Hash
 	BtcTxId       ethcommon.Hash // [32]byte
-	Requester     ethcommon.Address
-	Receiver      string // receiver btc address
+	Requester     []byte         // [20]byte = ethereum address, [32]byte = aptos address
+	Receiver      string         // receiver btc address
 	Amount        *big.Int
 	Outpoints     []BtcOutpoint
 	Status        RedeemStatus
@@ -55,9 +55,9 @@ func createRedeemFromRequestedEvent(ev *ethsync.RedeemRequestedEvent) (*Redeem, 
 		return nil, ErrorRequestTxHashInvalid
 	}
 
-	if ev.Requester == [20]byte{} {
-		return nil, ErrorRequesterInvalid
-	}
+	// if ev.Requester == [20]byte{} {
+	// 	return nil, ErrorRequesterInvalid
+	// }
 
 	if ev.Amount == nil || ev.Amount.Sign() <= 0 {
 		return nil, ErrorAmountInvalid
@@ -84,7 +84,7 @@ func (r *Redeem) updateFromPreparedEvent(ev *ethsync.RedeemPreparedEvent) (*Rede
 		return nil, ErrorRequestTxHashUnmatched
 	}
 
-	if ev.Requester != r.Requester {
+	if !common.CompareSlices(ev.Requester, r.Requester) {
 		return nil, ErrorRequesterUnmatched
 	}
 
@@ -162,7 +162,7 @@ func (r *Redeem) MarshalJSON() ([]byte, error) {
 		RequestTxHash: r.RequestTxHash.String(),
 		PrepareTxHash: r.PrepareTxHash.String(),
 		BtcTxId:       r.BtcTxId.String(),
-		Requester:     r.Requester.String(),
+		Requester:     common.Prepend0xPrefix(common.ByteSliceToPureHexStr(r.Requester)),
 		Amount:        common.BigIntToHexStr(r.Amount),
 		Outpoints:     jOutpoint,
 		Receiver:      r.Receiver,
@@ -179,7 +179,7 @@ func (r *Redeem) UnmarshalJSON(data []byte) error {
 	r.RequestTxHash = common.HexStrToBytes32(jRedeem.RequestTxHash)
 	r.PrepareTxHash = common.HexStrToBytes32(jRedeem.PrepareTxHash)
 	r.BtcTxId = common.HexStrToBytes32(jRedeem.BtcTxId)
-	r.Requester = ethcommon.HexToAddress(jRedeem.Requester)
+	r.Requester = ethcommon.HexToAddress(jRedeem.Requester).Bytes()
 	r.Amount = common.HexStrToBigInt(jRedeem.Amount)
 	r.Receiver = jRedeem.Receiver
 	r.Status = RedeemStatus(jRedeem.Status)
@@ -215,7 +215,7 @@ func (r *Redeem) Clone() *Redeem {
 
 func (r *Redeem) String() string {
 	str := fmt.Sprintf("Redeem { RequestTxHash: 0x%x, PrepareTxHash: 0x%x BtcTxId: 0x%x Requester: 0x%x, Receiver: 0x%x, Amount: %v, Status: %s, ",
-		r.RequestTxHash, r.PrepareTxHash, r.BtcTxId, r.Requester.Hex(), r.Receiver, r.Amount, r.Status)
+		r.RequestTxHash, r.PrepareTxHash, r.BtcTxId, r.Requester, r.Receiver, r.Amount, r.Status)
 	str += "Outpoints: [ "
 	for i, outpoint := range r.Outpoints {
 		str += fmt.Sprintf("[%d]: { TxId: 0x%x, Idx: %d }, ", i, outpoint.BtcTxId, outpoint.BtcIdx)

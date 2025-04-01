@@ -226,7 +226,7 @@ func checkMintedEvent(t *testing.T, ev *MintedEvent, params *MintParams) {
 
 func checkPreparedEvent(t *testing.T, ev *RedeemPreparedEvent, params *PrepareParams) {
 	assert.Equal(t, ev.EthTxHash[:], params.RequestTxHash.Bytes())
-	assert.Equal(t, ev.Requester.String(), params.Requester.String())
+	assert.Equal(t, ev.Requester.String(), common.Prepend0xPrefix(common.ByteSliceToPureHexStr(params.Requester)))
 	assert.Equal(t, ev.Amount, params.Amount)
 	for i, txId := range ev.OutpointTxIds {
 		assert.Equal(t, txId[:], params.OutpointTxIds[i].Bytes())

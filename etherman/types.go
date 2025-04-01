@@ -34,9 +34,9 @@ type RequestParams struct {
 
 // Real params to call Ethereum contract Redeem's Prepare()
 type PrepareParams struct {
-	RequestTxHash ethcommon.Hash    // eth transaction id
-	Requester     ethcommon.Address // eth address
-	Receiver      string            // btc address
+	RequestTxHash ethcommon.Hash // eth transaction id
+	Requester     []byte         // [20]byte = eth address, [32]byte = aptos address
+	Receiver      string         // btc address
 	Amount        *big.Int
 	OutpointTxIds []ethcommon.Hash // btc_tx_id(s) to be spent
 	OutpointIdxs  []uint16         // corresponding output vout to btc_tx_id(s)
@@ -53,7 +53,7 @@ func (p *PrepareParams) SigningHash() ethcommon.Hash {
 
 	return crypto.Keccak256Hash(common.EncodePacked(
 		p.RequestTxHash,
-		p.Requester.String(),
+		p.Requester,
 		string(p.Receiver),
 		p.Amount,
 		p.OutpointTxIds,

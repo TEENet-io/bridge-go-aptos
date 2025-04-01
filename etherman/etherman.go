@@ -242,7 +242,7 @@ func (etherman *Etherman) RedeemPrepare(params *PrepareParams) (*types.Transacti
 	return contract.RedeemPrepare(
 		etherman.auth,
 		params.RequestTxHash,
-		params.Requester,
+		ethcommon.BytesToAddress(params.Requester),
 		string(params.Receiver),
 		params.Amount,
 		outpointTxIds,

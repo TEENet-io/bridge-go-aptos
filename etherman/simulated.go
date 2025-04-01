@@ -266,7 +266,7 @@ func (env *SimEtherman) GenPrepareParams(cfg *ParamConfig) (p *PrepareParams) {
 
 	p = &PrepareParams{
 		RequestTxHash: reqTxHash,
-		Requester:     requester,
+		Requester:     requester.Bytes(),
 		Receiver:      receiver,
 		Amount:        cfg.Amount,
 		OutpointTxIds: outpointTxIds,

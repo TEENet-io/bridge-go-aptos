@@ -18,7 +18,7 @@ type JSONRedeem struct {
 	RequestTxHash string            `json:"request_txid"`
 	PrepareTxHash string            `json:"prepare_txid"`
 	BtcTxId       string            `json:"btc_txid"`
-	Requester     string            `json:"requester"`
+	Requester     string            `json:"requester"` // include the 0x prefix
 	Amount        string            `json:"amount"`
 	Outpoints     []JSONBtcOutpoint `json:"outpoints"`
 	Receiver      string            `json:"receiver"`

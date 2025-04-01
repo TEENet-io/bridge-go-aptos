@@ -158,7 +158,7 @@ func TestErrRequestedEventInvalid(t *testing.T) {
 	ch <- ev
 	time.Sleep(100 * time.Millisecond)
 	assert.Equal(t, err.Error(), ErrRequestedEventInvalid.Error())
-	ev.Requester = common.RandEthAddress()
+	ev.Requester = common.RandEthAddress().Bytes()
 
 	// invalid amount
 	go func() { err = st.Start(ctx) }()
