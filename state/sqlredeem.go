@@ -10,7 +10,7 @@ type sqlRedeem struct {
 	RequestTxHash string
 	PrepareTxHash string
 	BtcTxId       string
-	Requester     string // only the bytes part, turn to hex representation (no 0x prefix)
+	Requester     string // hex representation of address (no 0x prefix)
 	Receiver      string
 	Amount        uint64
 	Outpoints     []byte
