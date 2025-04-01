@@ -198,7 +198,7 @@ func (h *HttpReporter) Redeems(c *gin.Context) {
 	for _, redeem := range redeems {
 		// phase one: requested
 		_resp := RedeemResponse{
-			EvmRequester:     redeem.Requester.String(),
+			EvmRequester:     common.Prepend0xPrefix(common.ByteSliceToPureHexStr(redeem.Requester)),
 			EvmRequestTxId:   redeem.RequestTxHash.String(),
 			EvmRequestAmount: redeem.Amount.Text(10),
 			Status:           "requested",

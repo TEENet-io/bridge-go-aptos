@@ -14,7 +14,7 @@ func RandRedeem(status RedeemStatus) *Redeem {
 		RequestTxHash: common.RandBytes32(),
 		PrepareTxHash: common.RandBytes32(),
 		BtcTxId:       common.RandBytes32(),
-		Requester:     common.RandEthAddress(),
+		Requester:     common.RandEthAddress().Bytes(),
 		Amount:        big.NewInt(100),
 		Outpoints: []BtcOutpoint{
 			{

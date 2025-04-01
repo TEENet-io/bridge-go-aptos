@@ -11,7 +11,7 @@ import (
 // requests a redeem (EVM2BTC).
 type RedeemRequestedEvent struct {
 	RequestTxHash   common.Hash
-	Requester       common.Address
+	Requester       []byte // [20]byte = ethereum address, [32]byte = aptos address
 	Receiver        string
 	Amount          *big.Int
 	IsValidReceiver bool
@@ -28,7 +28,7 @@ func (ev *RedeemRequestedEvent) String() string {
 type RedeemPreparedEvent struct {
 	RequestTxHash common.Hash
 	PrepareTxHash common.Hash
-	Requester     common.Address
+	Requester     []byte // [20]byte = ethereum address, [32]byte = aptos address
 	Receiver      string
 	Amount        *big.Int
 	OutpointTxIds []common.Hash

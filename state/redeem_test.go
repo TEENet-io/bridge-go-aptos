@@ -24,7 +24,7 @@ func TestJSON(t *testing.T) {
 		RequestTxHash: redeem.RequestTxHash.String(),
 		PrepareTxHash: redeem.PrepareTxHash.String(),
 		BtcTxId:       redeem.BtcTxId.String(),
-		Requester:     redeem.Requester.String(),
+		Requester:     common.Prepend0xPrefix(common.ByteSliceToPureHexStr(redeem.Requester)),
 		Amount:        common.BigIntToHexStr(redeem.Amount),
 		Outpoints:     jOutpoints,
 		Receiver:      redeem.Receiver,
@@ -80,7 +80,7 @@ func TestSetFromRequestEvent(t *testing.T) {
 	assert.Equal(t, ErrorRequesterInvalid.Error(), err.Error())
 
 	// nil amount
-	ev.Requester = common.RandEthAddress()
+	ev.Requester = common.RandEthAddress().Bytes()
 	_, err = createRedeemFromRequestedEvent(ev)
 	assert.Equal(t, ErrorAmountInvalid.Error(), err.Error())
 
@@ -105,7 +105,7 @@ func TestUpdateFromPreparedEvent(t *testing.T) {
 	}
 
 	// unmatched requester
-	prepEv.Requester = common.RandEthAddress()
+	prepEv.Requester = common.RandEthAddress().Bytes()
 	_, err := redeem.updateFromPreparedEvent(prepEv)
 	assert.Equal(t, err, ErrorRequesterUnmatched)
 	prepEv.Requester = redeem.Requester
