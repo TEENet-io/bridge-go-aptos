@@ -44,12 +44,6 @@ func CheckTWBTCBalance(client *aptos.Client, address aptos.AccountAddress, modul
 	return balance, nil
 }
 
-// // SendTWBTC sends TWBTC tokens to another account
-// func SendTWBTC(client *aptos.Client, senderAccount aptos.TransactionSigner, receiverAddress aptos.AccountAddress, amount uint64, moduleAddress string) (string, error) {
-// 	// toodo
-// 	return "", nil
-// }
-
 
 
 func initTWBTC(client *aptos.Client, account aptos.TransactionSigner, moduleAddress string) (string, error) {
@@ -115,10 +109,7 @@ func initBridge(client *aptos.Client, account aptos.TransactionSigner, moduleAdd
 	if err != nil {
 		return "", fmt.Errorf("解析地址失败: %v", err)
 	}
-	// admin: &signer,
-	// // pk: vector<u8>,
-	// fee_account: address,
-	// fee: u64
+
 	if err != nil {
 		return "", fmt.Errorf("解析地址失败: %v", err)
 	}
@@ -365,10 +356,8 @@ func redeemPrepare(client *aptos.Client, account aptos.TransactionSigner, module
         return "", fmt.Errorf("解析模块地址失败: %v", err)
     }
     
-    // 1. 正确序列化字符串：redeem_request_tx_hash
     txHashBytes := serializeString(redeem_request_tx_hash)
     
-    // 2. 正确序列化地址：requester
     requesterAddr := aptos.AccountAddress{}
     err = requesterAddr.ParseStringRelaxed(requester)
     if err != nil {
@@ -379,23 +368,19 @@ func redeemPrepare(client *aptos.Client, account aptos.TransactionSigner, module
         return "", fmt.Errorf("序列化requester地址失败: %v", err)
     }
     
-    // 3. 正确序列化字符串：receiver
     receiverBytes := serializeString(receiverAddress)
     
-    // 4. 正确序列化u64：amount
     amountBytes, err := bcs.SerializeU64(amount)
     if err != nil {
         return "", fmt.Errorf("序列化金额失败: %v", err)
     }
     
-    // 5. 转换并序列化 outpointTxIds：从 [][32]byte 到 []string 再序列化为 vector<String>
     stringTxIds := make([]string, len(outpointTxIds))
     for i, txid := range outpointTxIds {
         stringTxIds[i] = hex.EncodeToString(txid[:])
     }
     outpointTxIdsBytes := serializeStringVector(stringTxIds)
     
-    // 6. 转换并序列化 outpointIdxs：从 []uint16 到 []uint64 再序列化为 vector<u64>
     uint64Idxs := make([]uint64, len(outpointIdxs))
     for i, idx := range outpointIdxs {
         uint64Idxs[i] = uint64(idx)
@@ -454,37 +439,27 @@ func redeemPrepare(client *aptos.Client, account aptos.TransactionSigner, module
     }
 }
 
-// 序列化 Move String 类型
 func serializeString(s string) []byte {
-    // Move的String类型在BCS中是作为vector<u8>序列化的
     strLen := len(s)
     result := make([]byte, 0, strLen+1)
     
-    // ULEB128编码字符串长度
     if strLen < 128 {
         result = append(result, byte(strLen))
     } else {
-        // 对于较长的字符串需要正确实现ULEB128编码
-        // 这里是简化版，实际使用需要完整实现
         result = append(result, byte(strLen&0x7F|0x80), byte(strLen>>7))
     }
     
-    // 添加字符串内容
     result = append(result, []byte(s)...)
     return result
 }
 
-// 序列化字符串向量
 func serializeStringVector(strings []string) []byte {
-    // 先序列化向量长度
     result := make([]byte, 0)
     
-    // ULEB128编码向量长度
     vecLen := len(strings)
     if vecLen < 128 {
         result = append(result, byte(vecLen))
     } else {
-        // 对于较长的向量需要正确实现ULEB128编码
         result = append(result, byte(vecLen&0x7F|0x80), byte(vecLen>>7))
     }
     
@@ -496,21 +471,16 @@ func serializeStringVector(strings []string) []byte {
     return result
 }
 
-// 序列化u64向量
 func serializeU64Vector(nums []uint64) []byte {
-    // 先序列化向量长度
     result := make([]byte, 0)
     
-    // ULEB128编码向量长度
     vecLen := len(nums)
     if vecLen < 128 {
         result = append(result, byte(vecLen))
     } else {
-        // 对于较长的向量需要正确实现ULEB128编码
         result = append(result, byte(vecLen&0x7F|0x80), byte(vecLen>>7))
     }
     
-    // 序列化每个u64
     for _, num := range nums {
         numBytes, _ := bcs.SerializeU64(num)
         result = append(result, numBytes...)
@@ -531,24 +501,19 @@ func redeemRequest(client *aptos.Client, account aptos.TransactionSigner, module
 	}
 	
 
-	// 正确的BCS编码方式 - 首先需要编码字符串长度，然后是字符串内容
 	receiverStrLen := len(receiverAddress)
 	receiverBytes := make([]byte, 0)
 
-	// 添加字符串长度(使用LEB128编码)
 	if receiverStrLen < 128 {
 		receiverBytes = append(receiverBytes, byte(receiverStrLen))
 	} else {
-		// 处理更长的字符串...
-		// 这里简化处理，实际上应该使用LEB128编码
+
 		encodedLen := byte(receiverStrLen) | 0x80
 		receiverBytes = append(receiverBytes, encodedLen, byte(receiverStrLen>>7))
 	}
 
-	// 添加字符串内容
 	receiverBytes = append(receiverBytes, []byte(receiverAddress)...)
 
-	// 使用正确编码的String类型调用合约
 	rawTxn, err := client.BuildTransaction(account.AccountAddress(), aptos.TransactionPayload{
 		Payload: &aptos.EntryFunction{
 			Module: aptos.ModuleId{
