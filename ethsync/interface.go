@@ -10,6 +10,5 @@ type State interface {
 	GetNewRedeemRequestedEventChannel() chan<- *RedeemRequestedEvent
 	GetNewRedeemPreparedEventChannel() chan<- *RedeemPreparedEvent
 	GetNewMintedEventChannel() chan<- *MintedEvent
-
 	GetEthFinalizedBlockNumber() (*big.Int, error)
 }

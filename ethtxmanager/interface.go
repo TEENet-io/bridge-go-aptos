@@ -7,6 +7,8 @@ import (
 	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
+// This interface defines how Tx manager interact with BTC side wallet.
+// What is the expected behavior of the btc wallet from btc side
 type BtcWallet interface {
 	// Request sends a request to the wallet to get outpoints for preparing
 	// the redeem indexed by the tx hash and then return the outpoints via

@@ -8,6 +8,8 @@ import (
 	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
+// This is the type that Tx manager will expect
+// to request the signature from signature provider. (whether local or remote)
 type SignatureRequest struct {
 	Id          ethcommon.Hash
 	SigningHash ethcommon.Hash
@@ -16,6 +18,7 @@ type SignatureRequest struct {
 	S           *big.Int
 }
 
+// This is tne enum for the status of the tx submitted to the blockchain.
 type MonitoredTxStatus string
 
 const (
@@ -26,6 +29,8 @@ const (
 	Reorg    MonitoredTxStatus = "reorg"
 )
 
+// This is the type that Tx manager will continiously monitor
+// the success/failure of Tx submitted to blockchain.
 type MonitoredTx struct {
 	TxHash       ethcommon.Hash
 	Id           ethcommon.Hash // requestTxhash for redeem prepare tx and btcTxId for mint tx
@@ -35,6 +40,7 @@ type MonitoredTx struct {
 	Status       MonitoredTxStatus
 }
 
+// Store in SQLite
 type sqlMonitoredTx struct {
 	TxHash       string
 	Id           string
