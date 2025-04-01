@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/TEENet-io/bridge-go/agreement"
 	"github.com/TEENet-io/bridge-go/common"
-	"github.com/TEENet-io/bridge-go/ethsync"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
@@ -48,7 +48,7 @@ type Redeem struct {
 // Created a new Redeem object when user requests.
 // redeem.status = invalid if the receiver is invalid.
 // redeem.status = rquested if everything is okay.
-func createRedeemFromRequestedEvent(ev *ethsync.RedeemRequestedEvent) (*Redeem, error) {
+func createRedeemFromRequestedEvent(ev *agreement.RedeemRequestedEvent) (*Redeem, error) {
 	r := &Redeem{}
 
 	if ev.RequestTxHash == [32]byte{} {
@@ -79,7 +79,7 @@ func createRedeemFromRequestedEvent(ev *ethsync.RedeemRequestedEvent) (*Redeem, 
 // This function is important.
 // It updates the "Redeem" object from a "RedeemPrepared" event.
 // The "Redeem" status is switched from "requested" to "prepared".
-func (r *Redeem) updateFromPreparedEvent(ev *ethsync.RedeemPreparedEvent) (*Redeem, error) {
+func (r *Redeem) updateFromPreparedEvent(ev *agreement.RedeemPreparedEvent) (*Redeem, error) {
 	if ev.RequestTxHash != r.RequestTxHash {
 		return nil, ErrorRequestTxHashUnmatched
 	}
@@ -133,8 +133,8 @@ func (r *Redeem) updateFromPreparedEvent(ev *ethsync.RedeemPreparedEvent) (*Rede
 	return r, nil
 }
 
-func createRedeemFromPreparedEvent(ev *ethsync.RedeemPreparedEvent) (*Redeem, error) {
-	r, err := createRedeemFromRequestedEvent(&ethsync.RedeemRequestedEvent{
+func createRedeemFromPreparedEvent(ev *agreement.RedeemPreparedEvent) (*Redeem, error) {
+	r, err := createRedeemFromRequestedEvent(&agreement.RedeemRequestedEvent{
 		RequestTxHash:   ev.RequestTxHash,
 		Requester:       ev.Requester,
 		Receiver:        ev.Receiver,

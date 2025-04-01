@@ -4,6 +4,7 @@ import (
 	"context"
 	"math/big"
 
+	"github.com/TEENet-io/bridge-go/agreement"
 	"github.com/TEENet-io/bridge-go/common"
 	logger "github.com/sirupsen/logrus"
 )
@@ -13,50 +14,50 @@ const MaxEvNum = 32
 type MockState struct {
 	newEthFinalizedCh chan *big.Int
 	newBtcFinalizedCh chan *big.Int
-	mintedEvCh        chan *MintedEvent
-	requestedEvCh     chan *RedeemRequestedEvent
-	preparedEvCh      chan *RedeemPreparedEvent
+	mintedEvCh        chan *agreement.MintedEvent
+	requestedEvCh     chan *agreement.RedeemRequestedEvent
+	preparedEvCh      chan *agreement.RedeemPreparedEvent
 
 	lastEthFinalized *big.Int
 	lastBtcFinalized *big.Int
 
-	mintedEv    []*MintedEvent
-	requestedEv []*RedeemRequestedEvent
-	preparedEv  []*RedeemPreparedEvent
+	mintedEv    []*agreement.MintedEvent
+	requestedEv []*agreement.RedeemRequestedEvent
+	preparedEv  []*agreement.RedeemPreparedEvent
 }
 
 func NewMockState() *MockState {
 	return &MockState{
 		newEthFinalizedCh: make(chan *big.Int, 1),
 		newBtcFinalizedCh: make(chan *big.Int, 1),
-		mintedEvCh:        make(chan *MintedEvent, 1),
-		requestedEvCh:     make(chan *RedeemRequestedEvent, 1),
-		preparedEvCh:      make(chan *RedeemPreparedEvent, 1),
+		mintedEvCh:        make(chan *agreement.MintedEvent, 1),
+		requestedEvCh:     make(chan *agreement.RedeemRequestedEvent, 1),
+		preparedEvCh:      make(chan *agreement.RedeemPreparedEvent, 1),
 
 		lastEthFinalized: new(big.Int).Set(common.EthStartingBlock),
 		lastBtcFinalized: big.NewInt(0),
-		mintedEv:         []*MintedEvent{},
-		requestedEv:      []*RedeemRequestedEvent{},
-		preparedEv:       []*RedeemPreparedEvent{},
+		mintedEv:         []*agreement.MintedEvent{},
+		requestedEv:      []*agreement.RedeemRequestedEvent{},
+		preparedEv:       []*agreement.RedeemPreparedEvent{},
 	}
 }
 
-func (st *MockState) GetNewEthFinalizedBlockChannel() chan<- *big.Int {
+func (st *MockState) GetNewBlockChainFinalizedLedgerNumberChannel() chan<- *big.Int {
 	return st.newEthFinalizedCh
 }
 
 func (st *MockState) GetNewBtcFinalizedBlockChannel() chan<- *big.Int {
 	return st.newBtcFinalizedCh
 }
-func (st *MockState) GetNewMintedEventChannel() chan<- *MintedEvent {
+func (st *MockState) GetNewMintedEventChannel() chan<- *agreement.MintedEvent {
 	return st.mintedEvCh
 }
 
-func (st *MockState) GetNewRedeemRequestedEventChannel() chan<- *RedeemRequestedEvent {
+func (st *MockState) GetNewRedeemRequestedEventChannel() chan<- *agreement.RedeemRequestedEvent {
 	return st.requestedEvCh
 }
 
-func (st *MockState) GetNewRedeemPreparedEventChannel() chan<- *RedeemPreparedEvent {
+func (st *MockState) GetNewRedeemPreparedEventChannel() chan<- *agreement.RedeemPreparedEvent {
 	return st.preparedEvCh
 }
 

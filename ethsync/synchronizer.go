@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/TEENet-io/bridge-go/agreement"
 	"github.com/TEENet-io/bridge-go/common"
 	"github.com/TEENet-io/bridge-go/etherman"
 	ethcommon "github.com/ethereum/go-ethereum/common"
@@ -17,13 +18,13 @@ const MinTickerDuration = 100 * time.Millisecond
 type Synchronizer struct {
 	cfg           *EthSyncConfig
 	etherman      *etherman.Etherman
-	st            State
+	st            agreement.StateChannel
 	lastFinalized *big.Int
 }
 
 func New(
 	etherman *etherman.Etherman,
-	st State,
+	st agreement.StateChannel,
 	cfg *EthSyncConfig,
 ) (*Synchronizer, error) {
 	chainID, err := etherman.Client().ChainID(context.Background())
@@ -60,7 +61,7 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 		logger.Debug("stopping Eth synchronization")
 	}()
 
-	ethTicker := time.NewTicker(s.cfg.FrequencyToCheckEthFinalizedBlock)
+	ethTicker := time.NewTicker(s.cfg.IntervalCheckBlockchain)
 	defer ethTicker.Stop()
 
 	for {
@@ -89,17 +90,17 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 				continue
 			}
 
-			s.st.GetNewEthFinalizedBlockChannel() <- newFinalized
+			s.st.GetNewBlockChainFinalizedLedgerNumberChannel() <- newFinalized
 
 			// For each block with height starting from lastFinalized + 1 to newFinalized,
 			// extract all the TWBTC minted, redeem request and redeem prepared events.
 			// Send all the events to the relevant states via channels.
-			target_blk_num := new(big.Int).Add(s.lastFinalized, big.NewInt(1))
-			for target_blk_num.Cmp(newFinalized) != 1 {
-				minted, requested, prepared, err := s.etherman.GetEventLogs(target_blk_num)
+			inspecting_blk_num := new(big.Int).Add(s.lastFinalized, big.NewInt(1))
+			for inspecting_blk_num.Cmp(newFinalized) != 1 {
+				minted, requested, prepared, err := s.etherman.GetEventLogs(inspecting_blk_num)
 				if len(minted) > 0 || len(requested) > 0 || len(prepared) > 0 {
 					logger.WithFields(logger.Fields{
-						"block#":    target_blk_num,
+						"block#":    inspecting_blk_num,
 						"minted":    len(minted),
 						"requested": len(requested),
 						"prepared":  len(prepared),
@@ -111,12 +112,12 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 
 				for _, ev := range minted {
 					logger.WithFields(logger.Fields{
-						"block#":        target_blk_num,
+						"block#":        inspecting_blk_num,
 						"mintTx":        "0x" + hex.EncodeToString(ev.TxHash[:]),
 						"amount":        ev.Amount,
 						"receiver(eth)": ev.Receiver,
 					}).Info("Minted Event Found")
-					s.st.GetNewMintedEventChannel() <- &MintedEvent{
+					s.st.GetNewMintedEventChannel() <- &agreement.MintedEvent{
 						MintTxHash: ev.TxHash,
 						BtcTxId:    ev.BtcTxId,
 						Amount:     new(big.Int).Set(ev.Amount),
@@ -126,13 +127,13 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 
 				for _, ev := range requested {
 					logger.WithFields(logger.Fields{
-						"block#":        target_blk_num,
+						"block#":        inspecting_blk_num,
 						"reqTx":         "0x" + hex.EncodeToString(ev.TxHash[:]),
 						"amount":        ev.Amount,
 						"receiver(btc)": ev.Receiver,
 						"sender(evm)":   ev.Sender.String(),
 					}).Info("RedeemRequested Event Found")
-					x := &RedeemRequestedEvent{
+					x := &agreement.RedeemRequestedEvent{
 						RequestTxHash:   ev.TxHash,
 						Requester:       ev.Sender.Bytes(),
 						Amount:          new(big.Int).Set(ev.Amount),
@@ -140,7 +141,7 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 						IsValidReceiver: common.IsValidBtcAddress(ev.Receiver, s.cfg.BtcChainConfig),
 					}
 					logger.WithFields(logger.Fields{
-						"block#":          target_blk_num,
+						"block#":          inspecting_blk_num,
 						"requester(evm)":  common.Prepend0xPrefix(common.ByteSliceToPureHexStr(x.Requester)),
 						"receiver(btc)":   x.Receiver,
 						"IsValidReceiver": x.IsValidReceiver,
@@ -150,7 +151,7 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 
 				for _, ev := range prepared {
 					logger.WithFields(logger.Fields{
-						"block#":         target_blk_num,
+						"block#":         inspecting_blk_num,
 						"prepTx":         "0x" + hex.EncodeToString(ev.TxHash[:]),
 						"reqTx":          "0x" + hex.EncodeToString(ev.EthTxHash[:]),
 						"requester(evm)": ev.Requester.String(),
@@ -160,7 +161,7 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 					for _, txid := range ev.OutpointTxIds {
 						outpointTxIds = append(outpointTxIds, txid)
 					}
-					s.st.GetNewRedeemPreparedEventChannel() <- &RedeemPreparedEvent{
+					s.st.GetNewRedeemPreparedEventChannel() <- &agreement.RedeemPreparedEvent{
 						PrepareTxHash: ev.TxHash,
 						RequestTxHash: ev.EthTxHash,
 						Requester:     ev.Requester.Bytes(),
@@ -171,7 +172,7 @@ func (s *Synchronizer) Sync(ctx context.Context) error {
 					}
 				}
 
-				target_blk_num.Add(target_blk_num, big.NewInt(1))
+				inspecting_blk_num.Add(inspecting_blk_num, big.NewInt(1))
 			}
 
 			s.lastFinalized = new(big.Int).Set(newFinalized)

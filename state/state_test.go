@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/TEENet-io/bridge-go/agreement"
 	"github.com/TEENet-io/bridge-go/common"
 	"github.com/TEENet-io/bridge-go/ethsync"
 	"github.com/stretchr/testify/assert"
@@ -109,7 +110,7 @@ func TestWhenNewFBNLessThanStored(t *testing.T) {
 
 	// no change when the new finalized block number is equal or less than the stored one
 	minusOne := new(big.Int).Sub(stored, big.NewInt(1))
-	st.GetNewEthFinalizedBlockChannel() <- minusOne
+	st.GetNewBlockChainFinalizedLedgerNumberChannel() <- minusOne
 	time.Sleep(100 * time.Millisecond)
 	curr, err := st.GetEthFinalizedBlockNumber()
 	assert.NoError(t, err)
@@ -128,7 +129,7 @@ func TestWhenNewFBNLargerThanStored(t *testing.T) {
 
 	// new = stored + 1
 	plusOne := new(big.Int).Add(stored, big.NewInt(1))
-	st.GetNewEthFinalizedBlockChannel() <- plusOne
+	st.GetNewBlockChainFinalizedLedgerNumberChannel() <- plusOne
 	time.Sleep(100 * time.Millisecond)
 	curr, err := st.GetEthFinalizedBlockNumber()
 	assert.NoError(t, err)
@@ -144,7 +145,7 @@ func TestErrRequestedEventInvalid(t *testing.T) {
 
 	var err error
 
-	ev := &ethsync.RedeemRequestedEvent{}
+	ev := &agreement.RedeemRequestedEvent{}
 
 	// empty requestTxHash
 	go func() { err = st.Start(ctx) }()
@@ -209,7 +210,7 @@ func TestErrUpdateInvalidRedeem(t *testing.T) {
 	prepCh := st.GetNewRedeemPreparedEventChannel()
 
 	reqEv := ethsync.RandRedeemRequestedEvent(100, false)
-	prepEv := &ethsync.RedeemPreparedEvent{
+	prepEv := &agreement.RedeemPreparedEvent{
 		RequestTxHash: reqEv.RequestTxHash,
 	}
 
@@ -253,7 +254,7 @@ func TestNewRedeemPreparedEvent(t *testing.T) {
 
 	// update with a corresponding request redeem stored
 	ev2 := ethsync.RandRedeemPreparedEvent(200, 1)
-	ev3 := &ethsync.RedeemRequestedEvent{
+	ev3 := &agreement.RedeemRequestedEvent{
 		RequestTxHash:   ev2.RequestTxHash,
 		Requester:       ev2.Requester,
 		Amount:          ev2.Amount,

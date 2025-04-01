@@ -5,8 +5,8 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/TEENet-io/bridge-go/agreement"
 	"github.com/TEENet-io/bridge-go/common"
-	"github.com/TEENet-io/bridge-go/ethsync"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/stretchr/testify/assert"
 )
@@ -69,7 +69,7 @@ func TestHasCompleted(t *testing.T) {
 }
 
 func TestSetFromRequestEvent(t *testing.T) {
-	ev := &ethsync.RedeemRequestedEvent{}
+	ev := &agreement.RedeemRequestedEvent{}
 
 	_, err := createRedeemFromRequestedEvent(ev)
 	assert.Equal(t, ErrorRequestTxHashInvalid.Error(), err.Error())
@@ -100,7 +100,7 @@ func TestSetFromRequestEvent(t *testing.T) {
 
 func TestUpdateFromPreparedEvent(t *testing.T) {
 	redeem := RandRedeem(RedeemStatusRequested)
-	prepEv := &ethsync.RedeemPreparedEvent{
+	prepEv := &agreement.RedeemPreparedEvent{
 		RequestTxHash: redeem.RequestTxHash,
 	}
 

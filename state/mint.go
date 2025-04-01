@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/TEENet-io/bridge-go/agreement"
 	"github.com/TEENet-io/bridge-go/common"
-	"github.com/TEENet-io/bridge-go/ethsync"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
@@ -23,7 +23,7 @@ func (m *Mint) String() string {
 }
 
 // convert MintedEvent to Mint.
-func createMintFromMintedEvent(ev *ethsync.MintedEvent) *Mint {
+func createMintFromMintedEvent(ev *agreement.MintedEvent) *Mint {
 	return &Mint{
 		BtcTxId:    ev.BtcTxId,
 		MintTxHash: ev.MintTxHash,

@@ -1,4 +1,6 @@
-package ethsync
+// Golbal Agreement on types
+
+package agreement
 
 import (
 	"fmt"
@@ -6,6 +8,19 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 )
+
+// MintedEvent reqpresents when TWBTC is minted
+// on ETH side.
+type MintedEvent struct {
+	MintTxHash common.Hash
+	BtcTxId    common.Hash
+	Receiver   []byte
+	Amount     *big.Int
+}
+
+func (ev *MintedEvent) String() string {
+	return fmt.Sprintf("%+v", *ev)
+}
 
 // RedeemRequestedEvent is the event when user
 // requests a redeem (EVM2BTC).
@@ -17,6 +32,7 @@ type RedeemRequestedEvent struct {
 	IsValidReceiver bool
 }
 
+// Debug
 func (ev *RedeemRequestedEvent) String() string {
 	return fmt.Sprintf("%+v", *ev)
 }
@@ -36,18 +52,5 @@ type RedeemPreparedEvent struct {
 }
 
 func (ev *RedeemPreparedEvent) String() string {
-	return fmt.Sprintf("%+v", *ev)
-}
-
-// MintedEvent reqpresents when TWBTC is minted
-// on ETH side.
-type MintedEvent struct {
-	MintTxHash common.Hash
-	BtcTxId    common.Hash
-	Receiver   []byte
-	Amount     *big.Int
-}
-
-func (ev *MintedEvent) String() string {
 	return fmt.Sprintf("%+v", *ev)
 }

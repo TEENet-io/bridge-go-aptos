@@ -6,8 +6,8 @@ import (
 	"math/big"
 	"sync/atomic"
 
+	"github.com/TEENet-io/bridge-go/agreement"
 	"github.com/TEENet-io/bridge-go/common"
-	"github.com/TEENet-io/bridge-go/ethsync"
 	"github.com/ethereum/go-ethereum/crypto"
 	logger "github.com/sirupsen/logrus"
 
@@ -47,9 +47,9 @@ type State struct {
 
 	newEthFinalizedBlockCh chan *big.Int
 	newBtcFinalizedBlockCh chan *big.Int
-	newMintedEventCh       chan *ethsync.MintedEvent
-	newRedeemRequestedEvCh chan *ethsync.RedeemRequestedEvent
-	newRedeemPreparedEvCh  chan *ethsync.RedeemPreparedEvent
+	newMintedEventCh       chan *agreement.MintedEvent
+	newRedeemRequestedEvCh chan *agreement.RedeemRequestedEvent
+	newRedeemPreparedEvCh  chan *agreement.RedeemPreparedEvent
 
 	// temp, in-meory cache
 	cache struct {
@@ -65,9 +65,9 @@ func New(statedb *StateDB, cfg *StateConfig) (*State, error) {
 		statedb:                statedb,
 		newEthFinalizedBlockCh: make(chan *big.Int, 1),
 		newBtcFinalizedBlockCh: make(chan *big.Int, 1),
-		newMintedEventCh:       make(chan *ethsync.MintedEvent, cfg.ChannelSize),
-		newRedeemRequestedEvCh: make(chan *ethsync.RedeemRequestedEvent, cfg.ChannelSize),
-		newRedeemPreparedEvCh:  make(chan *ethsync.RedeemPreparedEvent, cfg.ChannelSize),
+		newMintedEventCh:       make(chan *agreement.MintedEvent, cfg.ChannelSize),
+		newRedeemRequestedEvCh: make(chan *agreement.RedeemRequestedEvent, cfg.ChannelSize),
+		newRedeemPreparedEvCh:  make(chan *agreement.RedeemPreparedEvent, cfg.ChannelSize),
 	}
 
 	if err := st.initEthFinalizedBlock(); err != nil {
@@ -330,7 +330,7 @@ func (st *State) SetBtcFinalizedBlockNumber(fbNum *big.Int) error {
 }
 
 // Return a channel
-func (st *State) GetNewEthFinalizedBlockChannel() chan<- *big.Int {
+func (st *State) GetNewBlockChainFinalizedLedgerNumberChannel() chan<- *big.Int {
 	return st.newEthFinalizedBlockCh
 }
 
@@ -340,17 +340,17 @@ func (st *State) GetNewBtcFinalizedBlockChannel() chan<- *big.Int {
 }
 
 // Return a channel
-func (st *State) GetNewRedeemRequestedEventChannel() chan<- *ethsync.RedeemRequestedEvent {
+func (st *State) GetNewRedeemRequestedEventChannel() chan<- *agreement.RedeemRequestedEvent {
 	return st.newRedeemRequestedEvCh
 }
 
 // Return a channel
-func (st *State) GetNewRedeemPreparedEventChannel() chan<- *ethsync.RedeemPreparedEvent {
+func (st *State) GetNewRedeemPreparedEventChannel() chan<- *agreement.RedeemPreparedEvent {
 	return st.newRedeemPreparedEvCh
 }
 
 // Return a channel
-func (st *State) GetNewMintedEventChannel() chan<- *ethsync.MintedEvent {
+func (st *State) GetNewMintedEventChannel() chan<- *agreement.MintedEvent {
 	return st.newMintedEventCh
 }
 
