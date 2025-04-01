@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/TEENet-io/bridge-go/agreement"
 	"github.com/TEENet-io/bridge-go/common"
 	"github.com/TEENet-io/bridge-go/etherman"
 	"github.com/TEENet-io/bridge-go/multisig_client"
@@ -38,9 +39,9 @@ func TestSync(t *testing.T) {
 	st := NewMockState()
 
 	cfg := &EthSyncConfig{
-		FrequencyToCheckEthFinalizedBlock: 500 * time.Millisecond,
-		BtcChainConfig:                    common.MainNetParams(),
-		EthChainID:                        chainID,
+		IntervalCheckBlockchain: 500 * time.Millisecond,
+		BtcChainConfig:          common.MainNetParams(),
+		EthChainID:              chainID,
 	}
 
 	synchronizer, err := New(env.Etherman, st, cfg)
@@ -96,9 +97,9 @@ func TestSync(t *testing.T) {
 // 4. Request 80 TWBTC for account [1] with a valid btc address
 // 5. Request 20 TWBTC for account [1] with an invalid btc address
 func sendTxs(t *testing.T, env *etherman.SimEtherman) (
-	mintedEvs []*MintedEvent,
-	requestedEvs []*RedeemRequestedEvent,
-	preparedEvs []*RedeemPreparedEvent,
+	mintedEvs []*agreement.MintedEvent,
+	requestedEvs []*agreement.RedeemRequestedEvent,
+	preparedEvs []*agreement.RedeemPreparedEvent,
 ) {
 	// 1
 	mintParams := env.GenMintParams(
@@ -110,7 +111,7 @@ func sendTxs(t *testing.T, env *etherman.SimEtherman) (
 		t.Fatal(err)
 	}
 
-	mintedEvs = append(mintedEvs, &MintedEvent{
+	mintedEvs = append(mintedEvs, &agreement.MintedEvent{
 		MintTxHash: tx.Hash(),
 		BtcTxId:    mintParams.BtcTxId,
 		Amount:     new(big.Int).Set(mintParams.Amount),
@@ -125,7 +126,7 @@ func sendTxs(t *testing.T, env *etherman.SimEtherman) (
 	time.Sleep(200 * time.Millisecond)
 	env.Chain.Backend.Commit()
 
-	preparedEvs = append(preparedEvs, &RedeemPreparedEvent{
+	preparedEvs = append(preparedEvs, &agreement.RedeemPreparedEvent{
 		PrepareTxHash: tx.Hash(),
 		RequestTxHash: prepareParams.RequestTxHash,
 		Amount:        new(big.Int).Set(prepareParams.Amount),
@@ -148,7 +149,7 @@ func sendTxs(t *testing.T, env *etherman.SimEtherman) (
 	time.Sleep(200 * time.Millisecond)
 	env.Chain.Backend.Commit()
 
-	requestedEvs = append(requestedEvs, &RedeemRequestedEvent{
+	requestedEvs = append(requestedEvs, &agreement.RedeemRequestedEvent{
 		RequestTxHash:   tx.Hash(),
 		Requester:       env.Chain.Accounts[1].From.Bytes(),
 		Amount:          new(big.Int).Set(requestParams.Amount),
@@ -164,7 +165,7 @@ func sendTxs(t *testing.T, env *etherman.SimEtherman) (
 	time.Sleep(200 * time.Millisecond)
 	env.Chain.Backend.Commit()
 
-	requestedEvs = append(requestedEvs, &RedeemRequestedEvent{
+	requestedEvs = append(requestedEvs, &agreement.RedeemRequestedEvent{
 		RequestTxHash:   tx.Hash(),
 		Requester:       env.Chain.Accounts[1].From.Bytes(),
 		Amount:          new(big.Int).Set(requestParams.Amount),

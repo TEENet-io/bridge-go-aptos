@@ -185,10 +185,10 @@ func NewBridgeServer(bsc *BridgeServerConfig, ctx context.Context, wg *sync.Wait
 		myEtherman,
 		myState,
 		&ethsync.EthSyncConfig{
-			FrequencyToCheckEthFinalizedBlock: frequencyToCheckEthFinalizedBlock,
-			BtcChainConfig:                    bsc.BtcChainConfig,
-			EthChainID:                        realEth.ChainId,
-			EthRetroScanBlkNum:                bsc.EthRetroScanBlk,
+			IntervalCheckBlockchain: frequencyToCheckEthFinalizedBlock,
+			BtcChainConfig:          bsc.BtcChainConfig,
+			EthChainID:              realEth.ChainId,
+			EthRetroScanBlkNum:      bsc.EthRetroScanBlk,
 		},
 	)
 	if err != nil {

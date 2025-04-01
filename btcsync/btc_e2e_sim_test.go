@@ -283,9 +283,9 @@ func newTestEnv(t *testing.T, file string, btcChainConfig *chaincfg.Params, btcW
 		sim.Etherman,
 		st,
 		&ethsync.EthSyncConfig{
-			FrequencyToCheckEthFinalizedBlock: frequencyToCheckEthFinalizedBlock,
-			BtcChainConfig:                    btcChainConfig,
-			EthChainID:                        chainID,
+			IntervalCheckBlockchain: frequencyToCheckEthFinalizedBlock,
+			BtcChainConfig:          btcChainConfig,
+			EthChainID:              chainID,
 		},
 	)
 	assert.NoError(t, err)

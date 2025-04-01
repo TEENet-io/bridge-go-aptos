@@ -81,7 +81,7 @@ func newTestEnv(t *testing.T, file string, btcChainConfig *chaincfg.Params) *tes
 		sim.Etherman,
 		st,
 		&ethsync.EthSyncConfig{
-			FrequencyToCheckEthFinalizedBlock: frequencyToCheckEthFinalizedBlock,
+			IntervalCheckBlockchain: frequencyToCheckEthFinalizedBlock,
 			// TODO, can be other network params.
 			BtcChainConfig: btcChainConfig,
 			EthChainID:     chainID,
