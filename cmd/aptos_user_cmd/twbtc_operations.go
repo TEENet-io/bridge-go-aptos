@@ -6,9 +6,10 @@ import (
 	"math/big"
 	"net/http"
 	"io/ioutil"
-	"time"
 	"github.com/aptos-labs/aptos-go-sdk"
 	"github.com/aptos-labs/aptos-go-sdk/bcs"
+	"strconv"
+	"encoding/hex"
 )
 
 // CheckTWBTCBalance checks the TWBTC token balance for an account
@@ -339,6 +340,185 @@ func mintTWBTC(client *aptos.Client, account aptos.TransactionSigner, moduleAddr
 }
 
 
+func string_to_bytes(str string) []byte {
+	len := len(str)
+	bytes := make([]byte, 0)
+	if len < 128 {
+		bytes = append(bytes, byte(len))
+	} else {
+		encodedLen := byte(len) | 0x80
+		bytes = append(bytes, encodedLen, byte(len>>7))
+	}
+	bytes = append(bytes, []byte(str)...)
+
+	
+	return bytes
+}
+
+// 修改 redeemPrepare 函数签名，使其接受 [][32]byte 和 []uint16 类型参数
+func redeemPrepare(client *aptos.Client, account aptos.TransactionSigner, moduleAddress string, 
+                  redeem_request_tx_hash string, requester string, receiverAddress string, 
+                  amount uint64, outpointTxIds [][32]byte, outpointIdxs []uint16) (string, error) {
+    address := aptos.AccountAddress{}
+    err := address.ParseStringRelaxed(moduleAddress)
+    if err != nil {
+        return "", fmt.Errorf("解析模块地址失败: %v", err)
+    }
+    
+    // 1. 正确序列化字符串：redeem_request_tx_hash
+    txHashBytes := serializeString(redeem_request_tx_hash)
+    
+    // 2. 正确序列化地址：requester
+    requesterAddr := aptos.AccountAddress{}
+    err = requesterAddr.ParseStringRelaxed(requester)
+    if err != nil {
+        return "", fmt.Errorf("解析requester地址失败: %v", err)
+    }
+    requesterBytes, err := bcs.Serialize(&requesterAddr)
+    if err != nil {
+        return "", fmt.Errorf("序列化requester地址失败: %v", err)
+    }
+    
+    // 3. 正确序列化字符串：receiver
+    receiverBytes := serializeString(receiverAddress)
+    
+    // 4. 正确序列化u64：amount
+    amountBytes, err := bcs.SerializeU64(amount)
+    if err != nil {
+        return "", fmt.Errorf("序列化金额失败: %v", err)
+    }
+    
+    // 5. 转换并序列化 outpointTxIds：从 [][32]byte 到 []string 再序列化为 vector<String>
+    stringTxIds := make([]string, len(outpointTxIds))
+    for i, txid := range outpointTxIds {
+        stringTxIds[i] = hex.EncodeToString(txid[:])
+    }
+    outpointTxIdsBytes := serializeStringVector(stringTxIds)
+    
+    // 6. 转换并序列化 outpointIdxs：从 []uint16 到 []uint64 再序列化为 vector<u64>
+    uint64Idxs := make([]uint64, len(outpointIdxs))
+    for i, idx := range outpointIdxs {
+        uint64Idxs[i] = uint64(idx)
+    }
+    outpointIdxsBytes := serializeU64Vector(uint64Idxs)
+    
+    // 构建交易
+    rawTxn, err := client.BuildTransaction(account.AccountAddress(), aptos.TransactionPayload{
+        Payload: &aptos.EntryFunction{
+            Module: aptos.ModuleId{
+                Address: address,
+                Name:    "btc_bridgev3",
+            },
+            Function: "redeem_prepare",
+            ArgTypes: []aptos.TypeTag{},
+            Args:     [][]byte{txHashBytes, requesterBytes, receiverBytes, amountBytes, outpointTxIdsBytes, outpointIdxsBytes},
+        },
+    })
+    
+    if err != nil {
+        return "", fmt.Errorf("构建交易失败: %v", err)
+    }
+    
+    signedTxn, err := rawTxn.SignedTransaction(account)
+    if err != nil {
+        return "", fmt.Errorf("签名交易失败: %v", err)
+    }
+    
+    submitResult, err := client.SubmitTransaction(signedTxn)
+    if err != nil {
+        return "", fmt.Errorf("提交交易失败: %v", err)
+    }
+    
+    txnHash := submitResult.Hash
+    
+    _, err = client.WaitForTransaction(txnHash)
+    if err != nil {
+        return "", fmt.Errorf("等待交易确认失败: %v", err)
+    }
+    
+    // 验证交易是否成功
+    txnInfo, err := client.TransactionByHash(txnHash)
+    if err != nil {
+        return "", fmt.Errorf("获取交易信息失败: %v", err)
+    }
+    
+    userTxn, err := txnInfo.UserTransaction()
+    if err != nil {
+        return "", fmt.Errorf("解析用户交易信息失败: %v", err)
+    }
+    
+    if userTxn.Success {
+        return txnHash, nil
+    } else {
+        return "", fmt.Errorf("交易执行失败: %s", userTxn.VmStatus)
+    }
+}
+
+// 序列化 Move String 类型
+func serializeString(s string) []byte {
+    // Move的String类型在BCS中是作为vector<u8>序列化的
+    strLen := len(s)
+    result := make([]byte, 0, strLen+1)
+    
+    // ULEB128编码字符串长度
+    if strLen < 128 {
+        result = append(result, byte(strLen))
+    } else {
+        // 对于较长的字符串需要正确实现ULEB128编码
+        // 这里是简化版，实际使用需要完整实现
+        result = append(result, byte(strLen&0x7F|0x80), byte(strLen>>7))
+    }
+    
+    // 添加字符串内容
+    result = append(result, []byte(s)...)
+    return result
+}
+
+// 序列化字符串向量
+func serializeStringVector(strings []string) []byte {
+    // 先序列化向量长度
+    result := make([]byte, 0)
+    
+    // ULEB128编码向量长度
+    vecLen := len(strings)
+    if vecLen < 128 {
+        result = append(result, byte(vecLen))
+    } else {
+        // 对于较长的向量需要正确实现ULEB128编码
+        result = append(result, byte(vecLen&0x7F|0x80), byte(vecLen>>7))
+    }
+    
+    // 序列化每个字符串
+    for _, s := range strings {
+        result = append(result, serializeString(s)...)
+    }
+    
+    return result
+}
+
+// 序列化u64向量
+func serializeU64Vector(nums []uint64) []byte {
+    // 先序列化向量长度
+    result := make([]byte, 0)
+    
+    // ULEB128编码向量长度
+    vecLen := len(nums)
+    if vecLen < 128 {
+        result = append(result, byte(vecLen))
+    } else {
+        // 对于较长的向量需要正确实现ULEB128编码
+        result = append(result, byte(vecLen&0x7F|0x80), byte(vecLen>>7))
+    }
+    
+    // 序列化每个u64
+    for _, num := range nums {
+        numBytes, _ := bcs.SerializeU64(num)
+        result = append(result, numBytes...)
+    }
+    
+    return result
+}
+
 func redeemRequest(client *aptos.Client, account aptos.TransactionSigner, moduleAddress string, receiverAddress string, amount uint64) (string, error) {
 	address := aptos.AccountAddress{}
 	err := address.ParseStringRelaxed(moduleAddress)
@@ -419,28 +599,6 @@ func redeemRequest(client *aptos.Client, account aptos.TransactionSigner, module
 	return txnHash, nil
 }
 
-// 定义事件结构体，与Move合约中的事件结构匹配
-// TokenMintEvent 对应 btc_tokenv3::MintEvent
-type TokenMintEvent struct {
-	Amount    uint64 `json:"amount"`
-	Recipient string `json:"recipient"`
-	BtcTxId   string `json:"btc_txid"`
-}
-
-// TokenBurnEvent 对应 btc_tokenv3::BurnEvent
-type TokenBurnEvent struct {
-	Amount     uint64 `json:"amount"`
-	Burner     string `json:"burner"`
-	BtcAddress string `json:"btc_address"`
-}
-
-// BridgeMintEvent 对应 btc_bridgev3::MintEvent
-type BridgeMintEvent struct {
-	BtcTxId  string `json:"btc_tx_id"`
-	Receiver string `json:"receiver"`
-	Amount   uint64 `json:"amount"`
-}
-
 // RedeemRequestEvent 对应 btc_bridgev3::RedeemRequestEvent
 type RedeemRequestEvent struct {
 	Sender   string `json:"sender"`
@@ -465,8 +623,6 @@ func GetBridgeConfig(client *aptos.Client, moduleAddress string) (map[string]int
 	if err != nil {
 		return nil, fmt.Errorf("解析模块地址失败: %v", err)
 	}
-
-	// 获取BridgeConfig资源
 	resourceType := fmt.Sprintf("%s::btc_bridgev3::BridgeConfig", address.String())
 	resource, err := client.AccountResource(address, resourceType)
 	if err != nil {
@@ -476,189 +632,68 @@ func GetBridgeConfig(client *aptos.Client, moduleAddress string) (map[string]int
 	return resource, nil
 }
 
-// GetBridgeMintEvents 获取桥铸币事件
-func GetBridgeMintEvents(client *aptos.Client, moduleAddress string, limit uint64) ([]BridgeMintEvent, error) {
+
+func GetBridgeEvents(client *aptos.Client, moduleAddress string, eventType string) (map[string]interface{}, error) {
 	address := aptos.AccountAddress{}
 	err := address.ParseStringRelaxed(moduleAddress)
 	if err != nil {
 		return nil, fmt.Errorf("解析模块地址失败: %v", err)
 	}
 
-	// 获取BridgeEvents资源
 	resourceType := fmt.Sprintf("%s::btc_bridgev3::BridgeEvents", address.String())
 	resource, err := client.AccountResource(address, resourceType)
 	if err != nil {
 		return nil, fmt.Errorf("获取桥事件资源失败: %v", err)
 	}
-	// fmt.Println(resource) 
-	// map[data:map[mint_events:map[counter:1 guid:map[id:map[addr:0x1319db9743efbef92e2ed32e122a4690f466fbbb8e34cd6ccffb93e8cb68447d creation_num:8]]] redeem_prepare_events:map[counter:0 guid:map[id:map[addr:0x1319db9743efbef92e2ed32e122a4690f466fbbb8e34cd6ccffb93e8cb68447d creation_num:10]]] redeem_request_events:map[counter:2 guid:map[id:map[addr:0x1319db9743efbef92e2ed32e122a4690f466fbbb8e34cd6ccffb93e8cb68447d creation_num:9]]]] type:0x1319db9743efbef92e2ed32e122a4690f466fbbb8e34cd6ccffb93e8cb68447d::btc_bridgev3::BridgeEvents]
-	// 直接访问map
-	eventsData, ok := resource["data"].(map[string]interface{})["mint_events"]
+
+	eventsData, ok := resource["data"].(map[string]interface{})[eventType]
 	if !ok {
-		return nil, fmt.Errorf("资源中未找到mint_events字段")
+		return nil, fmt.Errorf("资源中未找到%s字段", eventType)
 	}
 
 	eventsMap, ok := eventsData.(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("mint_events字段格式不正确")
+	if !ok {	
+		return nil, fmt.Errorf("资源数据格式不正确")
 	}
 
-	counterStr, ok := eventsMap["counter"].(string)
-	if !ok {
-		return nil, fmt.Errorf("未找到counter字段")
-	}
-
-	counter, ok := new(big.Int).SetString(counterStr, 10)
-	if !ok {
-		return nil, fmt.Errorf("counter字段解析失败")
-	}
-
-	// 如果没有事件，直接返回空数组
-	if counter.Cmp(big.NewInt(0)) == 0 {
-		return []BridgeMintEvent{}, nil
-	}
-
-	// 计算查询范围
-	start := uint64(0)
-	if counter.Uint64() > limit {
-		start = counter.Uint64() - limit
-	}
-
-	// 获取事件句柄
-	guidStr, ok := eventsMap["guid"].(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("未找到guid字段")
-	}
-
-	// creationNumStr, ok := guidStr["id"].(map[string]interface{})["creation_num"].(string)
-	// if !ok {
-	// 	return nil, fmt.Errorf("未找到creation_num字段")
-	// }
-
-	accountAddressStr, ok := guidStr["id"].(map[string]interface{})["addr"].(string)
-	if !ok {
-		return nil, fmt.Errorf("未找到addr字段")
-	}
-
-	accountAddress := aptos.AccountAddress{}
-	err = accountAddress.ParseStringRelaxed(accountAddressStr)
-	if err != nil {
-		return nil, fmt.Errorf("解析账户地址失败: %v", err)
-	}
-
-	// creationNum, ok := new(big.Int).SetString(creationNumStr, 10)
-	// if !ok {
-	// 	return nil, fmt.Errorf("creation_num字段解析失败")
-	// }
-
-	// 使用硬编码的API URL
-	baseURL := "https://fullnode.devnet.aptoslabs.com" // 默认使用devnet
-	
-	// 构建完整的URL - 使用Aptos REST API格式
-	fullURL := fmt.Sprintf("%s/v1/accounts/%s/events/%s", 
-		baseURL,
-		accountAddress.String(),
-		resourceType + "/mint_events")
-	// 添加查询参数
-	req, err := http.NewRequest("GET", fullURL, nil)
-	if err != nil {
-		return nil, fmt.Errorf("创建HTTP请求失败: %v", err)
-	}
-	
-	q := req.URL.Query()
-	q.Add("start", fmt.Sprintf("%d", start))
-	q.Add("limit", fmt.Sprintf("%d", limit))
-	req.URL.RawQuery = q.Encode()
-	
-	// 发送请求
-	httpClient := &http.Client{}
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("发送HTTP请求失败: %v", err)
-	}
-	defer resp.Body.Close()
-	
-	// 读取响应
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("读取响应失败: %v", err)
-	}
-	// 检查响应状态码
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API请求失败: 状态码 %d, 响应体: %s", resp.StatusCode, string(body))
-	}
-	
-	// 解析响应
-	var events []struct {
-		Data    map[string]interface{} `json:"data"`
-		Version string                 `json:"version"`
-		Guid    map[string]interface{} `json:"guid"`
-		Type    string                 `json:"type"`
-	}
-	
-	err = json.Unmarshal(body, &events)
-	if err != nil {
-		return nil, fmt.Errorf("解析响应失败: %v", err)
-	}
-	
-	// 处理事件数据
-	var mintEvents []BridgeMintEvent
-	for _, event := range events {
-		var mintEvent BridgeMintEvent
-		
-		// 从event.Data中提取字段并正确转换类型
-		if amountStr, ok := event.Data["amount"].(string); ok {
-			// 将字符串转换为uint64
-			amountBig, ok := new(big.Int).SetString(amountStr, 10)
-			if !ok {
-				return nil, fmt.Errorf("解析事件数据失败: 无法将amount转换为数字: %s", amountStr)
-			}
-			mintEvent.Amount = amountBig.Uint64()
-		}
-		
-		if btcTxID, ok := event.Data["btc_tx_id"].(string); ok {
-			mintEvent.BtcTxId = btcTxID
-		}
-		
-		if receiver, ok := event.Data["receiver"].(string); ok {
-			mintEvent.Receiver = receiver
-		}
-		
-		mintEvents = append(mintEvents, mintEvent)
-	}
-
-	return mintEvents, nil
+	return eventsMap, nil
 }
-// GetRedeemRequestEvents 获取赎回请求事件
-func GetRedeemRequestEvents(client *aptos.Client, moduleAddress string, limit uint64) ([]RedeemRequestEvent, error) {
+
+
+
+
+// https://api.devnet.aptoslabs.com/v1/accounts/0x1319db9743efbef92e2ed32e122a4690f466fbbb8e34cd6ccffb93e8cb68447d/events/0x1319db9743efbef92e2ed32e122a4690f466fbbb8e34cd6ccffb93e8cb68447d::btc_bridgev3::BridgeEvents/redeem_request_events?start=1
+// GetEvents 获取事件
+func GetEvents(client *aptos.Client, moduleAddress string, events_field string, limit uint64, start uint64) ([]map[string]interface{}, error) {
 	address := aptos.AccountAddress{}
 	err := address.ParseStringRelaxed(moduleAddress)
 	if err != nil {
-		return nil, fmt.Errorf("解析模块地址失败: %v", err)
+		return nil, fmt.Errorf("Parse module address failed: %v", err)
 	}
 
 	// 获取BridgeEvents资源
 	resourceType := fmt.Sprintf("%s::btc_bridgev3::BridgeEvents", address.String())
 	resource, err := client.AccountResource(address, resourceType)
 	if err != nil {
-		return nil, fmt.Errorf("获取桥事件资源失败: %v", err)
+		return nil, fmt.Errorf("Get bridge events resource failed: %v", err)
 	}
 
 	// 从资源数据中获取redeem_request_events
 	data, ok := resource["data"].(map[string]interface{})
 	if !ok {
-		return nil, fmt.Errorf("资源数据格式不正确")
+		return nil, fmt.Errorf("Resource data format is incorrect")
 	}
 
-	eventsData, ok := data["redeem_request_events"]
+	eventsData, ok := data[events_field]
 	if !ok {
-		return nil, fmt.Errorf("资源中未找到redeem_request_events字段")
+		dataBytes, _ := json.MarshalIndent(data, "", "  ")
+		return nil, fmt.Errorf("Field '%s' not found in contract data: %s", events_field, string(dataBytes))
 	}
 
 	// 解析事件数据
 	eventsMap, ok := eventsData.(map[string]interface{})
 	if !ok {
-		return nil, fmt.Errorf("redeem_request_events字段格式不正确")
+		return nil, fmt.Errorf("Resource data format is incorrect")
 	}
 
 	// 获取事件计数器
@@ -674,7 +709,7 @@ func GetRedeemRequestEvents(client *aptos.Client, moduleAddress string, limit ui
 
 	// 如果没有事件，直接返回空数组
 	if counter.Cmp(big.NewInt(0)) == 0 {
-		return []RedeemRequestEvent{}, nil
+		return []map[string]interface{}{}, nil
 	}
 
 	// 获取事件句柄信息
@@ -687,7 +722,6 @@ func GetRedeemRequestEvents(client *aptos.Client, moduleAddress string, limit ui
 	if !ok {
 		return nil, fmt.Errorf("未找到id字段")
 	}
-
 
 	// 获取账户地址
 	accountAddressStr, ok := idData["addr"].(string)
@@ -702,22 +736,15 @@ func GetRedeemRequestEvents(client *aptos.Client, moduleAddress string, limit ui
 		return nil, fmt.Errorf("解析账户地址失败: %v", err)
 	}
 
-	// // 计算查询范围
-	// start := uint64(0)
-	// if counter.Uint64() > limit {
-	// 	start = counter.Uint64() - limit
-	// }
-
 	// 使用硬编码的API URL
 	baseURL := "https://fullnode.devnet.aptoslabs.com" // 默认使用devnet
 	
 	// 正确构建事件API路径
-	// https://api.devnet.aptoslabs.com/v1/accounts/0x1319db9743efbef92e2ed32e122a4690f466fbbb8e34cd6ccffb93e8cb68447d/events/0x1319db9743efbef92e2ed32e122a4690f466fbbb8e34cd6ccffb93e8cb68447d::btc_bridgev3::BridgeEvents/mint_events
 	fullURL := fmt.Sprintf("%s/v1/accounts/%s/events/%s/%s", 
 		baseURL,
 		accountAddress.String(),
 		resourceType,
-		"redeem_request_events")
+		events_field)
 	
 	// 添加查询参数
 	req, err := http.NewRequest("GET", fullURL, nil)
@@ -728,6 +755,9 @@ func GetRedeemRequestEvents(client *aptos.Client, moduleAddress string, limit ui
 	q := req.URL.Query()
 	if limit > 0 {
 		q.Add("limit", fmt.Sprintf("%d", limit))
+	}
+	if start > 0 {
+		q.Add("start", fmt.Sprintf("%d", start))
 	}
 	req.URL.RawQuery = q.Encode()
 	
@@ -751,444 +781,139 @@ func GetRedeemRequestEvents(client *aptos.Client, moduleAddress string, limit ui
 	}
 	
 	// 解析响应
-	var events []struct {
-		Version string                 `json:"version"`
-		Key     string                 `json:"key"`
-		Guid    map[string]interface{} `json:"guid"`
-		Data    map[string]interface{} `json:"data"`
-		SequenceNumber string          `json:"sequence_number"`
-	}
+	var events []map[string]interface{}
 	
 	err = json.Unmarshal(body, &events)
 	if err != nil {
 		return nil, fmt.Errorf("解析响应失败: %v", err)
 	}
 	
-	// 处理事件数据
-	var redeemEvents []RedeemRequestEvent
-	for _, event := range events {
-		var redeemEvent RedeemRequestEvent
-		
-		// 从event.Data中提取字段并正确转换类型
-		if amountStr, ok := event.Data["amount"].(string); ok {
-			// 将字符串转换为uint64
-			amountBig, ok := new(big.Int).SetString(amountStr, 10)
-			if !ok {
-				return nil, fmt.Errorf("解析事件数据失败: 无法将amount转换为数字: %s", amountStr)
-			}
-			redeemEvent.Amount = amountBig.Uint64()
-		}
-		
-		if sender, ok := event.Data["sender"].(string); ok {
-			redeemEvent.Sender = sender
-		}
-		
-		if receiver, ok := event.Data["receiver"].(string); ok {
-			redeemEvent.Receiver = receiver
-		}
-		
-		redeemEvents = append(redeemEvents, redeemEvent)
-	}
-
-	return redeemEvents, nil
+	return events, nil
 }
 
+//https://api.devnet.aptoslabs.com/v1/accounts/0x1319db9743efbef92e2ed32e122a4690f466fbbb8e34cd6ccffb93e8cb68447d/events/0x1319db9743efbef92e2ed32e122a4690f466fbbb8e34cd6ccffb93e8cb68447d::btc_bridgev3::BridgeEvents/redeem_prepare_events?limit=1&start=0
 // GetRedeemPrepareEvents 获取赎回准备事件
-func GetRedeemPrepareEvents(client *aptos.Client, moduleAddress string, limit uint64) ([]RedeemPrepareEvent, error) {
-	address := aptos.AccountAddress{}
-	err := address.ParseStringRelaxed(moduleAddress)
+func GetRedeemPrepareEvents(client *aptos.Client, moduleAddress string, limit uint64, start uint64) ([]RedeemPrepareEvent, error) {
+	events, err := GetEvents(client, moduleAddress, "redeem_prepare_events", limit, start)
 	if err != nil {
-		return nil, fmt.Errorf("解析模块地址失败: %v", err)
-	}
-
-	// 使用硬编码的API URL
-	baseURL := "https://fullnode.devnet.aptoslabs.com" // 默认使用devnet
-	
-	// 正确构建事件API路径
-	resourceType := fmt.Sprintf("%s::btc_bridgev3::BridgeEvents", address.String())
-	eventPath := fmt.Sprintf("%s/redeem_prepare_events", resourceType)
-	
-	// 构建完整的URL
-	fullURL := fmt.Sprintf("%s/v1/accounts/%s/events/%s", 
-		baseURL,
-		address.String(),
-		eventPath)
-	
-	// 添加查询参数
-	req, err := http.NewRequest("GET", fullURL, nil)
-	if err != nil {
-		return nil, fmt.Errorf("创建HTTP请求失败: %v", err)
+		return nil, err
 	}
 	
-	q := req.URL.Query()
-	if limit > 0 {
-		q.Add("limit", fmt.Sprintf("%d", limit))
-	}
-	req.URL.RawQuery = q.Encode()
-	
-	// 发送请求
-	httpClient := &http.Client{}
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("发送HTTP请求失败: %v", err)
-	}
-	defer resp.Body.Close()
-	
-	// 读取响应
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("读取响应失败: %v", err)
+	type EventResponse struct {
+		Version        string `json:"version"`
+		Guid           struct {
+			CreationNumber string `json:"creation_number"`
+			AccountAddress string `json:"account_address"`
+		} `json:"guid"`
+		SequenceNumber string `json:"sequence_number"`
+		Type           string `json:"type"`
+		Data           struct {
+			Amount         string   `json:"amount"`
+			EthTxHash      string   `json:"eth_tx_hash"`
+			OutpointIdxs   []string `json:"outpoint_idxs"`
+			OutpointTxIds  []string `json:"outpoint_tx_ids"`
+			Receiver       string   `json:"receiver"`
+			Requester      string   `json:"requester"`
+		} `json:"data"`
 	}
 	
-	// 检查响应状态码
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API请求失败: 状态码 %d, 响应体: %s", resp.StatusCode, string(body))
-	}
-	
-	// 解析响应
-	var events []struct {
-		Version string                 `json:"version"`
-		Key     string                 `json:"key"`
-		Guid    map[string]interface{} `json:"guid"`
-		Data    map[string]interface{} `json:"data"`
-		SequenceNumber string          `json:"sequence_number"`
-	}
-	
-	err = json.Unmarshal(body, &events)
-	if err != nil {
-		return nil, fmt.Errorf("解析响应失败: %v", err)
-	}
-	
-	// 处理事件数据
 	var prepareEvents []RedeemPrepareEvent
 	for _, event := range events {
-		var prepareEvent RedeemPrepareEvent
-		data, err := json.Marshal(event.Data)
+		// 将map转换为JSON
+		eventData, err := json.Marshal(event)
 		if err != nil {
-			return nil, fmt.Errorf("序列化事件数据失败: %v", err)
+			return nil, fmt.Errorf("serialize event data failed: %v", err)
 		}
 
-		err = json.Unmarshal(data, &prepareEvent)
-		if err != nil {
-			return nil, fmt.Errorf("解析事件数据失败: %v", err)
+		// 解析为临时结构体
+		var eventResponse EventResponse
+		if err := json.Unmarshal(eventData, &eventResponse); err != nil {
+			return nil, fmt.Errorf("parse event data failed: %v", err)
 		}
+
+		// 将数据转换为RedeemPrepareEvent
+		var prepareEvent RedeemPrepareEvent
+		prepareEvent.EthTxHash = eventResponse.Data.EthTxHash
+		prepareEvent.Requester = eventResponse.Data.Requester
+		prepareEvent.Receiver = eventResponse.Data.Receiver
+		prepareEvent.OutpointTxIds = eventResponse.Data.OutpointTxIds
+		
+		// 将amount从字符串转换为uint64
+		amount, err := strconv.ParseUint(eventResponse.Data.Amount, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("parse amount failed: %v", err)
+		}
+		prepareEvent.Amount = amount
+		
+		// 将outpoint_idxs从字符串数组转换为uint64数组
+		outpointIdxs := make([]uint64, len(eventResponse.Data.OutpointIdxs))
+		for i, idxStr := range eventResponse.Data.OutpointIdxs {
+			idx, err := strconv.ParseUint(idxStr, 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("parse outpoint_idxs failed: %v", err)
+			}
+			outpointIdxs[i] = idx
+		}
+		prepareEvent.OutpointIdxs = outpointIdxs
 
 		prepareEvents = append(prepareEvents, prepareEvent)
 	}
-
+	
+	// fmt.Println("prepareEvents", prepareEvents)
 	return prepareEvents, nil
 }
-
-// GetTokenMintEvents 获取代币铸造事件
-func GetTokenMintEvents(client *aptos.Client, moduleAddress string, limit uint64) ([]TokenMintEvent, error) {
-	address := aptos.AccountAddress{}
-	err := address.ParseStringRelaxed(moduleAddress)
+// GetRedeemRequestEvents 获取赎回请求事件
+func GetRedeemRequestEvents(client *aptos.Client, moduleAddress string, limit uint64, start uint64) ([]RedeemRequestEvent, error) {
+	events, err := GetEvents(client, moduleAddress, "redeem_request_events", limit, start)
 	if err != nil {
-		return nil, fmt.Errorf("解析模块地址失败: %v", err)
+		return nil, err
 	}
 
-	// 使用硬编码的API URL
-	baseURL := "https://fullnode.devnet.aptoslabs.com" // 默认使用devnet
-	
-	// 正确构建事件API路径
-	resourceType := fmt.Sprintf("%s::btc_tokenv3::BridgeEvents", address.String())
-	eventPath := fmt.Sprintf("%s/mint_events", resourceType)
-	
-	// 构建完整的URL
-	fullURL := fmt.Sprintf("%s/v1/accounts/%s/events/%s", 
-		baseURL,
-		address.String(),
-		eventPath)
-	
-	// 添加查询参数
-	req, err := http.NewRequest("GET", fullURL, nil)
-	if err != nil {
-		return nil, fmt.Errorf("创建HTTP请求失败: %v", err)
+	type EventResponse struct {
+		Version        string `json:"version"`
+		Guid           struct {
+			CreationNumber string `json:"creation_number"`
+			AccountAddress string `json:"account_address"`
+		} `json:"guid"`
+		SequenceNumber string `json:"sequence_number"`
+		Type           string `json:"type"`
+		Data           struct {
+			Sender   string `json:"sender"`
+			Amount   string `json:"amount"`
+			Receiver string `json:"receiver"`
+		} `json:"data"`
 	}
-	
-	q := req.URL.Query()
-	if limit > 0 {
-		q.Add("limit", fmt.Sprintf("%d", limit))
-	}
-	req.URL.RawQuery = q.Encode()
-	
-	// 发送请求
-	httpClient := &http.Client{}
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("发送HTTP请求失败: %v", err)
-	}
-	defer resp.Body.Close()
-	
-	// 读取响应
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("读取响应失败: %v", err)
-	}
-	
-	// 检查响应状态码
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API请求失败: 状态码 %d, 响应体: %s", resp.StatusCode, string(body))
-	}
-	
-	// 解析响应
-	var events []struct {
-		Version string                 `json:"version"`
-		Key     string                 `json:"key"`
-		Guid    map[string]interface{} `json:"guid"`
-		Data    map[string]interface{} `json:"data"`
-		SequenceNumber string          `json:"sequence_number"`
-	}
-	
-	err = json.Unmarshal(body, &events)
-	if err != nil {
-		return nil, fmt.Errorf("解析响应失败: %v", err)
-	}
-	
-	// 处理事件数据
-	var mintEvents []TokenMintEvent
+
+	var redeemEvents []RedeemRequestEvent
 	for _, event := range events {
-		var mintEvent TokenMintEvent
-		data, err := json.Marshal(event.Data)
+		// 将map转换为JSON
+		eventData, err := json.Marshal(event)
 		if err != nil {
-			return nil, fmt.Errorf("序列化事件数据失败: %v", err)
+			return nil, fmt.Errorf("serialize event data failed: %v", err)
 		}
 
-		err = json.Unmarshal(data, &mintEvent)
-		if err != nil {
-			return nil, fmt.Errorf("解析事件数据失败: %v", err)
+		// 解析为临时结构体
+		var eventResponse EventResponse
+		if err := json.Unmarshal(eventData, &eventResponse); err != nil {
+			return nil, fmt.Errorf("parse event data failed: %v", err)
 		}
 
-		mintEvents = append(mintEvents, mintEvent)
-	}
-
-	return mintEvents, nil
-}
-
-// GetTokenBurnEvents 获取代币燃烧事件
-func GetTokenBurnEvents(client *aptos.Client, moduleAddress string, limit uint64) ([]TokenBurnEvent, error) {
-	address := aptos.AccountAddress{}
-	err := address.ParseStringRelaxed(moduleAddress)
-	if err != nil {
-		return nil, fmt.Errorf("解析模块地址失败: %v", err)
-	}
-
-	// 使用硬编码的API URL
-	baseURL := "https://fullnode.devnet.aptoslabs.com" // 默认使用devnet
-	
-	// 正确构建事件API路径
-	resourceType := fmt.Sprintf("%s::btc_tokenv3::BridgeEvents", address.String())
-	eventPath := fmt.Sprintf("%s/burn_events", resourceType)
-	
-	// 构建完整的URL
-	fullURL := fmt.Sprintf("%s/v1/accounts/%s/events/%s", 
-		baseURL,
-		address.String(),
-		eventPath)
-	
-	// 添加查询参数
-	req, err := http.NewRequest("GET", fullURL, nil)
-	if err != nil {
-		return nil, fmt.Errorf("创建HTTP请求失败: %v", err)
-	}
-	
-	q := req.URL.Query()
-	if limit > 0 {
-		q.Add("limit", fmt.Sprintf("%d", limit))
-	}
-	req.URL.RawQuery = q.Encode()
-	
-	// 发送请求
-	httpClient := &http.Client{}
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("发送HTTP请求失败: %v", err)
-	}
-	defer resp.Body.Close()
-	
-	// 读取响应
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("读取响应失败: %v", err)
-	}
-	
-	// 检查响应状态码
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API请求失败: 状态码 %d, 响应体: %s", resp.StatusCode, string(body))
-	}
-	
-	// 解析响应
-	var events []struct {
-		Version string                 `json:"version"`
-		Key     string                 `json:"key"`
-		Guid    map[string]interface{} `json:"guid"`
-		Data    map[string]interface{} `json:"data"`
-		SequenceNumber string          `json:"sequence_number"`
-	}
-	
-	err = json.Unmarshal(body, &events)
-	if err != nil {
-		return nil, fmt.Errorf("解析响应失败: %v", err)
-	}
-	
-	// 处理事件数据
-	var burnEvents []TokenBurnEvent
-	for _, event := range events {
-		var burnEvent TokenBurnEvent
-		data, err := json.Marshal(event.Data)
-		if err != nil {
-			return nil, fmt.Errorf("序列化事件数据失败: %v", err)
-		}
-
-		err = json.Unmarshal(data, &burnEvent)
-		if err != nil {
-			return nil, fmt.Errorf("解析事件数据失败: %v", err)
-		}
-
-		burnEvents = append(burnEvents, burnEvent)
-	}
-
-	return burnEvents, nil
-}
-
-// GetPreparedRedeems 获取已准备的赎回列表
-func GetPreparedRedeems(client *aptos.Client, moduleAddress string) ([]string, error) {
-	address := aptos.AccountAddress{}
-	err := address.ParseStringRelaxed(moduleAddress)
-	if err != nil {
-		return nil, fmt.Errorf("解析模块地址失败: %v", err)
-	}
-
-	// 获取PreparedRedeems资源
-	resourceType := fmt.Sprintf("%s::btc_bridgev3::PreparedRedeems", address.String())
-	resource, err := client.AccountResource(address, resourceType)
-	if err != nil {
-		return nil, fmt.Errorf("获取已准备赎回列表失败: %v", err)
-	}
-
-	// 修复: 直接访问map
-	preparedData, ok := resource["prepared"]
-	if !ok {
-		return nil, fmt.Errorf("资源中未找到prepared字段")
-	}
-
-	// 解析prepared列表
-	var prepared []string
-	preparedList, ok := preparedData.([]interface{})
-	if !ok {
-		return nil, fmt.Errorf("prepared字段格式不正确")
-	}
-
-	for _, tx := range preparedList {
-		txStr, ok := tx.(string)
-		if !ok {
-			return nil, fmt.Errorf("交易ID格式不正确")
-		}
-		prepared = append(prepared, txStr)
-	}
-
-	return prepared, nil
-}
-
-// GetUsedBtcTxIds 获取已使用的BTC交易ID列表
-func GetUsedBtcTxIds(client *aptos.Client, moduleAddress string) ([]string, error) {
-	address := aptos.AccountAddress{}
-	err := address.ParseStringRelaxed(moduleAddress)
-	if err != nil {
-		return nil, fmt.Errorf("解析模块地址失败: %v", err)
-	}
-
-	// 获取UsedBtcTxIds资源
-	resourceType := fmt.Sprintf("%s::btc_bridgev3::UsedBtcTxIds", address.String())
-	resource, err := client.AccountResource(address, resourceType)
-	if err != nil {
-		return nil, fmt.Errorf("获取已使用交易ID列表失败: %v", err)
-	}
-
-	// 修复: 直接访问map
-	usedData, ok := resource["used"]
-	if !ok {
-		return nil, fmt.Errorf("资源中未找到used字段")
-	}
-
-	// 解析used列表
-	var used []string
-	usedList, ok := usedData.([]interface{})
-	if !ok {
-		return nil, fmt.Errorf("used字段格式不正确")
-	}
-
-	for _, tx := range usedList {
-		txStr, ok := tx.(string)
-		if !ok {
-			return nil, fmt.Errorf("交易ID格式不正确")
-		}
-		used = append(used, txStr)
-	}
-
-	return used, nil
-}
-
-// QueryBridgeStatus 查询桥的状态信息
-func QueryBridgeStatus(client *aptos.Client, moduleAddress string, checkLoopTime int) error {
-	// 查询桥配置
-	config, err := GetBridgeConfig(client, moduleAddress)
-	if err != nil {
-		return fmt.Errorf("获取桥配置失败: %v", err)
-	}
-	
-	// 打印配置信息
-	fmt.Println("===== 桥配置信息 =====")
-	// fmt.Println(config) // map[data:map[admin:0x1319db9743efbef92e2ed32e122a4690f466fbbb8e34cd6ccffb93e8cb68447d fee:2 fee_account:0xa2184ca989d7741a463c0a77f0283aab71c86410f6596a814b217329573488ee] type:0x1319db9743efbef92e2ed32e122a4690f466fbbb8e34cd6ccffb93e8cb68447d::btc_bridgev3::BridgeConfig]
-	adminStr := config["data"].(map[string]interface{})["admin"].(string)
-	feeStr := config["data"].(map[string]interface{})["fee"].(string)
-	feeAccountStr := config["data"].(map[string]interface{})["fee_account"].(string)
-	
-	fmt.Printf("管理员地址: %s\n", adminStr)
-	fee, _ := new(big.Int).SetString(feeStr, 10)
-	fmt.Printf("交易费用: %d (satoshi)\n", fee)
-	fmt.Printf("费用接收地址: %s\n", feeAccountStr)
-	for {
-		// 显示当前查询时间
-		currentTime := time.Now().Format("2006-01-02 15:04:05")
-		fmt.Printf("\n===== 查询时间: %s =====\n", currentTime)
+		// 将数据转换为RedeemRequestEvent
+		var redeemEvent RedeemRequestEvent
+		redeemEvent.Sender = eventResponse.Data.Sender
+		redeemEvent.Receiver = eventResponse.Data.Receiver
 		
-		// 查询最近的铸币事件
-		mintEvents, err := GetBridgeMintEvents(client, moduleAddress, 5)
+		// 将amount从字符串转换为uint64
+		amount, err := strconv.ParseUint(eventResponse.Data.Amount, 10, 64)
 		if err != nil {
-			fmt.Printf("获取铸币事件失败: %v\n", err)
-		} else {
-			fmt.Println("\n===== 最近5个铸币事件 =====")
-			if len(mintEvents) == 0 {
-				fmt.Println("暂无铸币事件")
-			}
-			for i, event := range mintEvents {
-				fmt.Printf("%d. 交易ID: %s, 接收者: %s, 金额: %d\n", 
-					i+1, event.BtcTxId, event.Receiver, event.Amount)
-			}
+			return nil, fmt.Errorf("parse amount failed: %v", err)
 		}
-		
-		// 查询最近的赎回请求事件
-		redeemEvents, err := GetRedeemRequestEvents(client, moduleAddress, 5)
-		if err != nil {
-			fmt.Printf("获取赎回请求事件失败: %v\n", err)
-		} else {
-			fmt.Println("\n===== 最近5个赎回请求事件 =====")
-			if len(redeemEvents) == 0 {
-				fmt.Println("暂无赎回请求事件")
-			}
-			for i, event := range redeemEvents {
-				fmt.Printf("%d. 发送者: %s, 接收者: %s, 金额: %d\n", 
-					i+1, event.Sender, event.Receiver, event.Amount)
-			}
-		}
-		
-		fmt.Printf("\n等待 %d 秒后进行下一次查询...\n", checkLoopTime)
-		time.Sleep(time.Duration(checkLoopTime) * time.Second)
+		redeemEvent.Amount = amount
+
+		redeemEvents = append(redeemEvents, redeemEvent)
 	}
 
-	
-	return nil
+	// fmt.Println("redeemEvents", redeemEvents)
+	return redeemEvents, nil
 }
-
 

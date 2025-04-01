@@ -11,7 +11,8 @@ import (
 	"strings"
 	"syscall"
 	"github.com/spf13/viper"
-
+	"crypto/rand"
+	
 	"github.com/aptos-labs/aptos-go-sdk"
 )
 
@@ -37,20 +38,20 @@ func logWarning(message string) {
 
 // 打印主菜单选项
 func printMainMenu() {
-	fmt.Println("\n===== APTOS TWBTC工具 =====")
-	fmt.Println("1) 检查APT余额")
-	fmt.Println("2) 发送APT")
-	fmt.Println("3) 创建Aptos账户")
-	fmt.Println("4) 水龙头获取APT")
-	fmt.Println("5) 检查TWBTC余额")
-	fmt.Println("6) 初始化TWBTC")
-	fmt.Println("7) 初始化桥接")
-	fmt.Println("8) 注册账户TWBTC")
-	fmt.Println("9) 发起赎回请求")
-	fmt.Println("10) 铸币")
-	fmt.Println("11) 查询事件")
-	fmt.Println("0) 退出程序")
-	fmt.Print("请输入选项编号: ")
+	fmt.Println("\n===== APTOS TWBTC Tool =====")
+	fmt.Println("1) checkAPT balance")
+	fmt.Println("2) sendAPT")
+	fmt.Println("3) createAptosAccount")
+	fmt.Println("4) getFaucetAPT")
+	fmt.Println("5) checkTWBTC balance")
+	fmt.Println("6) initTWBTC")
+	fmt.Println("7) initBridge")
+	fmt.Println("8) registerTWBTC")
+	fmt.Println("9) redeemRequest")
+	fmt.Println("10) redeemPrepare")
+	fmt.Println("11) queryEvents")
+	fmt.Println("0) exit")
+	fmt.Print("Please enter the option number: ")
 }
 
 func main() {
@@ -375,7 +376,7 @@ func main() {
 			logSuccess(fmt.Sprintf("Successfully sent redemption request for %d Satoshis to BTC address %s", amount, receiverStr))
 			logSuccess(fmt.Sprintf("Transaction hash: %s", txHash))
 			
-		case "10": // Mint
+		case "10": // Redeem prepare
 			if moduleAddress == "" {
 				logError("Module address is not set, cannot perform this operation")
 				continue
@@ -385,38 +386,69 @@ func main() {
 				logError("Need to load account to perform this operation")
 				continue
 			}
-			
-			fmt.Print("Enter the BTC transaction ID: ")
+
+			fmt.Print("Enter the redeem request tx hash: ")
 			scanner.Scan()
-			btcTxId := strings.TrimSpace(scanner.Text())
+			redeemRequestTxHash := strings.TrimSpace(scanner.Text())
 			
-			fmt.Print("Enter the recipient address: ")
+			fmt.Print("Enter the requester address: ")
+			scanner.Scan()
+			requesterStr := strings.TrimSpace(scanner.Text())
+
+			fmt.Print("Enter the BTC receiver address: ")
 			scanner.Scan()
 			receiverStr := strings.TrimSpace(scanner.Text())
 			
-			fmt.Print("Enter the mint amount (satoshi): ")
+			fmt.Print("Enter the redemption amount (satoshi): ")
 			scanner.Scan()
 			amountStr := strings.TrimSpace(scanner.Text())
-			
-			receiverAddress := aptos.AccountAddress{}
-			err := receiverAddress.ParseStringRelaxed(receiverStr)
-			if err != nil {
-				logError(fmt.Sprintf("Failed to parse receiver address: %v", err))
-				continue
-			}
-			
+
 			amount, err := strconv.ParseUint(amountStr, 10, 64)
 			if err != nil {
 				logError(fmt.Sprintf("Failed to parse amount: %v", err))
 				continue
 			}
 			
-			txHash, err := mintTWBTC(client, account, moduleAddress, receiverAddress, amount, btcTxId)
+			// Generate random outpoint transaction IDs and indices
+			outpointNum := 1 // Using just one outpoint for simplicity
+			outpointTxIds := make([][32]byte, outpointNum)
+			outpointIdxs := make([]uint16, outpointNum)
+			
+			// Generate random transaction ID and index
+			for i := 0; i < outpointNum; i++ {
+				// Generate random bytes for transaction ID
+				randBytes := make([]byte, 32)
+				_, err := rand.Read(randBytes)
+				if err != nil {
+					logError(fmt.Sprintf("Failed to generate random bytes: %v", err))
+					continue
+				}
+				copy(outpointTxIds[i][:], randBytes)
+				
+				// Generate random index between 0 and 10
+				// Generate a random number between 0 and 9 for the index
+				randIdxBytes := make([]byte, 2)
+				_, err = rand.Read(randIdxBytes)
+				if err != nil {
+					logError(fmt.Sprintf("Failed to generate random index: %v", err))
+					continue
+				}
+				// Use modulo to get a number between 0 and 9
+				outpointIdxs[i] = uint16(int(randIdxBytes[0]) % 10)
+			}
+			
+			// Log the generated values
+			logInfo("Generated random BTC transaction ID for outpoint:")
+			for i, txid := range outpointTxIds {
+				logInfo(fmt.Sprintf("  Outpoint %d: %x (index: %d)", i, txid, outpointIdxs[i]))
+			}
+			
+			txHash, err := redeemPrepare(client, account, moduleAddress, redeemRequestTxHash, requesterStr, receiverStr, amount, outpointTxIds, outpointIdxs)
 			if err != nil {
-				logError(fmt.Sprintf("Failed to mint: %v", err))
+				logError(fmt.Sprintf("Failed to redeem prepare: %v", err))
 				continue
 			}
-			logSuccess(fmt.Sprintf("Successfully minted %d Satoshis to address %s", amount, receiverStr))
+			logSuccess(fmt.Sprintf("Successfully prepared redemption for %d Satoshis to BTC address %s", amount, receiverStr))
 			logSuccess(fmt.Sprintf("Transaction hash: %s", txHash))
 			
 		case "11": // Query events
@@ -425,26 +457,71 @@ func main() {
 				continue
 			}
 			
-			fmt.Print("Enter the query interval time (seconds, default 60): ")
+			fmt.Println("\n===== Event Query Options =====")
+			fmt.Println("1) Query redeem request events")
+			fmt.Println("2) Query redeem prepare events")
+			fmt.Print("Please select the event type to query: ")
 			scanner.Scan()
-			intervalStr := strings.TrimSpace(scanner.Text())
+			eventTypeStr := strings.TrimSpace(scanner.Text())
 			
-			interval := 60
-			if intervalStr != "" {
+			eventType := 0
+			if eventTypeStr != "" {
 				var err error
-				interval, err = strconv.Atoi(intervalStr)
+				eventType, err = strconv.Atoi(eventTypeStr)
+				if err != nil || eventType < 1 || eventType > 3 {
+					logError("Invalid event type selection")
+					continue
+				}
+			} else {
+				logError("Must select event type")
+				continue
+			}
+			
+			fmt.Print("Limit (default 10): ")
+			scanner.Scan()
+			limitStr := strings.TrimSpace(scanner.Text())
+			limit := uint64(10) // 默认值
+			if limitStr != "" {
+				var err error
+				limit, err = strconv.ParseUint(limitStr, 10, 64)
 				if err != nil {
-					logError("Invalid time interval, using default value 60 seconds")
-					interval = 60
+					logError(fmt.Sprintf("Failed to parse limit: %v", err))
+					continue
+				}
+			}
+
+			fmt.Print("Start (default 1): ")
+			scanner.Scan()
+			startStr := strings.TrimSpace(scanner.Text())
+			start := uint64(0) // 默认值
+			if startStr != "" {
+				var err error
+				start, err = strconv.ParseUint(startStr, 10, 64)
+				if err != nil {
+					logError(fmt.Sprintf("Failed to parse start: %v", err))
+					continue
 				}
 			}
 			
-			fmt.Println("Starting to query events, press Ctrl+C to exit...")
-			err := QueryBridgeStatus(client, moduleAddress, interval)
-			if err != nil {
-				logError(fmt.Sprintf("Failed to query events: %v", err))
+			switch eventType {
+			case 1:
+				result, err := GetRedeemRequestEvents(client, moduleAddress, limit, start)
+				if err != nil {
+					logError(fmt.Sprintf("Failed to get redeem request events: %v", err))
+					continue
+				}
+				fmt.Println(result)
+			case 2:
+				result, err := GetRedeemPrepareEvents(client, moduleAddress, limit, start)
+				if err != nil {
+					logError(fmt.Sprintf("Failed to get redeem prepare events: %v", err))
+					continue
+				}
+				fmt.Println(result)
+			default:
+				logError("Invalid event type selection")
 			}
-
+			
 		default:
 			logError("Invalid option, please try again")
 		}
