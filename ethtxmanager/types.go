@@ -1,22 +1,9 @@
 package ethtxmanager
 
 import (
-	"math/big"
-
-	"github.com/TEENet-io/bridge-go/agreement"
 	"github.com/TEENet-io/bridge-go/common"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 )
-
-// This is the type that Tx manager will expect
-// to request the signature from signature provider. (whether local or remote)
-type SignatureRequest struct {
-	Id          ethcommon.Hash
-	SigningHash ethcommon.Hash
-	Outpoints   []agreement.BtcOutpoint
-	Rx          *big.Int
-	S           *big.Int
-}
 
 // This is tne enum for the status of the tx submitted to the blockchain.
 type MonitoredTxStatus string

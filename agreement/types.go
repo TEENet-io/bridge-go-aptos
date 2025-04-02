@@ -64,3 +64,13 @@ type JSONBtcOutpoint struct {
 	BtcTxId string `json:"txid"`
 	BtcIdx  uint16 `json:"idx"`
 }
+
+// This is the type that Tx manager will expect
+// to request the signature from signature provider. (whether local or remote)
+type SignatureRequest struct {
+	Id          common.Hash
+	SigningHash common.Hash
+	Outpoints   []BtcOutpoint
+	Rx          *big.Int
+	S           *big.Int
+}

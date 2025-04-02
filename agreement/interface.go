@@ -37,8 +37,16 @@ type BtcUTXOResponder interface {
 	// the provided channel. The btc utxo responder should temporarily lock the
 	// outpoints with a timeout.
 	Request(
-		reqTxId []byte, // the request Tx on other blockchain that associated with this request of UTXO(s)
+		reqTxId []byte, // the request Tx on other blockchain that associated with this request of UTXO
 		amount *big.Int,
 		ch chan<- []BtcOutpoint, // this channel receives a slice of outputs.
 	) error
+}
+
+// Any Async (Schnorr) Singer shall implement this.
+type SchnorrAsyncSigner interface {
+
+	// Call this function with a 'request' object, and a channel.
+	// Please fill and return a SignatureRequest object in the channel.
+	SignAsync(request *SignatureRequest, ch chan<- *SignatureRequest) error
 }

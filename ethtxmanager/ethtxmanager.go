@@ -20,12 +20,32 @@ var (
 	ErrDBOpGetUnMinted        = errors.New("failed to get unminted")
 )
 
+// EthTxMgr's configuration
+type EthTxMgrConfig struct {
+	// Frequency to get all the requested redeems that have not been prepared
+	IntervalToPrepareRedeem time.Duration
+
+	// Frequency to monitor pending transactions
+	IntervalToMonitorPendingTxs time.Duration
+
+	IntervalToMint time.Duration
+
+	// Timeout on waiting for a schnorr threshold signature
+	TimeoutOnWaitingForSignature time.Duration
+
+	// Timeout on waiting for the spendable outpoints from BTC wallet
+	TimeoutOnWaitingForOutpoints time.Duration
+
+	// Timeout on waiting for the "monitored Tx" to be mined
+	TimeoutOnMonitoringPendingTxs uint64
+}
+
 type EthTxManager struct {
 	cfg              *EthTxMgrConfig
 	etherman         *etherman.Etherman
 	statedb          *state.StateDB
 	mgrdb            *EthTxManagerDB
-	schnorrWallet    SchnorrAsyncSigner
+	schnorrWallet    agreement.SchnorrAsyncSigner
 	btcUTXOResponder agreement.BtcUTXOResponder
 
 	// public key of the schnorr threshold signature
@@ -41,7 +61,7 @@ func NewEthTxManager(
 	etherman *etherman.Etherman,
 	statedb *state.StateDB,
 	mgrdb *EthTxManagerDB,
-	schnorrWallet SchnorrAsyncSigner,
+	schnorrWallet agreement.SchnorrAsyncSigner,
 	btcUTXOResponder agreement.BtcUTXOResponder,
 ) (*EthTxManager, error) {
 	// Get the public key of the schnorr threshold signature
