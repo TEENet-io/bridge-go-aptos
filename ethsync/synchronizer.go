@@ -55,7 +55,7 @@ func New(
 	}, nil
 }
 
-func (s *Synchronizer) Sync(ctx context.Context) error {
+func (s *Synchronizer) Loop(ctx context.Context) error {
 	logger.Debug("starting Eth synchronization")
 	defer func() {
 		logger.Debug("stopping Eth synchronization")

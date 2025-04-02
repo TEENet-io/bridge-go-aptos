@@ -363,12 +363,12 @@ func TestDeposit(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		ethEnv.mgr.Start(ctx) // eth-side manager
+		ethEnv.mgr.Loop(ctx) // eth-side manager
 	}()
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		ethEnv.sync.Sync(ctx) // eth-side synchronizer
+		ethEnv.sync.Loop(ctx) // eth-side synchronizer
 	}()
 
 	time.Sleep(1 * time.Second)
