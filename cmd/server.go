@@ -27,6 +27,7 @@ import (
 	"github.com/TEENet-io/bridge-go/ethtxmanager"
 	"github.com/TEENet-io/bridge-go/multisig_client"
 	"github.com/TEENet-io/bridge-go/reporter"
+	"github.com/TEENet-io/bridge-go/signers"
 	"github.com/TEENet-io/bridge-go/state"
 )
 
@@ -207,7 +208,7 @@ func NewBridgeServer(bsc *BridgeServerConfig, ctx context.Context, wg *sync.Wait
 
 	// well, eth tx mgr doesn't recognize signer.
 	// wrap the signer into "async schnorr wallet".
-	_schnorrAsyncWallet := ethtxmanager.NewMockedSchnorrAsyncSigner(bsc.MSchnorrSigner)
+	_schnorrAsyncWallet := signers.NewMockedSchnorrAsyncSigner(bsc.MSchnorrSigner)
 
 	myEthTxMgr, err := ethtxmanager.NewEthTxManager(
 		_eth_tx_mgr_cfg,

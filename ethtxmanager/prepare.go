@@ -75,9 +75,9 @@ func (txmgr *EthTxManager) prepareRedeem(ctx context.Context, redeem *state.Rede
 	signingHash := params.SigningHash()
 
 	// request signature
-	chForSignature := make(chan *SignatureRequest, 1)
+	chForSignature := make(chan *agreement.SignatureRequest, 1)
 	err = txmgr.schnorrWallet.SignAsync(
-		&SignatureRequest{
+		&agreement.SignatureRequest{
 			Id:          redeem.RequestTxHash,
 			SigningHash: signingHash,
 		},
@@ -123,8 +123,8 @@ func (txmgr *EthTxManager) waitforOutpoints(
 func (txmgr *EthTxManager) waitForSignature(
 	ctx context.Context,
 	signingHash [32]byte,
-	ch <-chan *SignatureRequest,
-) (*SignatureRequest, error) {
+	ch <-chan *agreement.SignatureRequest,
+) (*agreement.SignatureRequest, error) {
 	newCtx, cancel := context.WithTimeout(ctx, txmgr.cfg.TimeoutOnWaitingForSignature)
 	defer cancel()
 

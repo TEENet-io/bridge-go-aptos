@@ -31,6 +31,7 @@ import (
 	"github.com/TEENet-io/bridge-go/agreement"
 	"github.com/TEENet-io/bridge-go/logconfig"
 	"github.com/TEENet-io/bridge-go/reporter"
+	"github.com/TEENet-io/bridge-go/signers"
 	logger "github.com/sirupsen/logrus"
 
 	"github.com/TEENet-io/bridge-go/btcaction"
@@ -302,7 +303,7 @@ func newTestEnv(t *testing.T, file string, btcChainConfig *chaincfg.Params, btcU
 	}
 	// TODO change to network-based, multi-party schnorr wallet
 	// schnorrWallet := &ethtxmanager.MockSchnorrThresholdWallet{Sim: sim}
-	schnorrWallet := ethtxmanager.NewMockedSchnorrAsyncSigner(ss)
+	schnorrWallet := signers.NewMockedSchnorrAsyncSigner(ss)
 
 	mgr, err := ethtxmanager.NewEthTxManager(cfg, sim.Etherman, statedb, mgrdb, schnorrWallet, btcUTXOResponder)
 	assert.NoError(t, err)

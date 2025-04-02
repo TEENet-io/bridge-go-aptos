@@ -1,22 +1,12 @@
 // This file contains
-// 1. SchnorrThresholdSigner interface
-// 2. MockedSchnorrThresholdSigner (local version) that implements the interface
-// 3. RemoteSchnorrThresholdSigner (remote version) that implements the interface
-package ethtxmanager
+// MockedSchnorrThresholdSigner (local version) that implements the SchnorrThresholdSigner interface
+// RemoteSchnorrThresholdSigner (remote version) that implements the SchnorrThresholdSigner interface
+package signers
 
 import (
+	"github.com/TEENet-io/bridge-go/agreement"
 	m "github.com/TEENet-io/bridge-go/multisig_client"
 )
-
-// This interface is used by eth tx manager
-// to interact with the schnorr signer for signing.
-// It uses a channel to perform async signing operation.
-// It uses an underlying ACTUAL signer to do the job.
-type SchnorrAsyncSigner interface {
-	// Sign sends a request to the signer to sign on the signing hash
-	// and return the signature via the provided channel
-	SignAsync(request *SignatureRequest, ch chan<- *SignatureRequest) error
-}
 
 // Implementation: Local single key schnorr signer
 type MockedSchnorrAsyncSigner struct {
@@ -40,8 +30,8 @@ func NewMockedSchnorrAsyncSigner(ss m.SchnorrSigner) *MockedSchnorrAsyncSigner {
 
 // Implementation: Perform Async Signing.
 func (mstw *MockedSchnorrAsyncSigner) SignAsync(
-	request *SignatureRequest,
-	ch chan<- *SignatureRequest,
+	request *agreement.SignatureRequest,
+	ch chan<- *agreement.SignatureRequest,
 ) error {
 	_sig, err := mstw.ss.Sign(request.SigningHash[:])
 
@@ -54,7 +44,7 @@ func (mstw *MockedSchnorrAsyncSigner) SignAsync(
 		return err
 	}
 
-	ch <- &SignatureRequest{
+	ch <- &agreement.SignatureRequest{
 		Id:          request.Id,
 		SigningHash: request.SigningHash,
 		Rx:          rx,
@@ -76,8 +66,8 @@ func NewRemoteSchnorrAsyncSigner(ss m.SchnorrSigner) *RemoteSchnorrAsyncSigner {
 
 // Implementation: Perform Async Signing.
 func (rstw *RemoteSchnorrAsyncSigner) SignAsync(
-	request *SignatureRequest,
-	ch chan<- *SignatureRequest,
+	request *agreement.SignatureRequest,
+	ch chan<- *agreement.SignatureRequest,
 ) error {
 	_sig, err := rstw.ss.Sign(request.SigningHash[:])
 
@@ -90,7 +80,7 @@ func (rstw *RemoteSchnorrAsyncSigner) SignAsync(
 		return err
 	}
 
-	ch <- &SignatureRequest{
+	ch <- &agreement.SignatureRequest{
 		Id:          request.Id,
 		SigningHash: request.SigningHash,
 		Rx:          rx,

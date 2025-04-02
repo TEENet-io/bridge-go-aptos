@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/TEENet-io/bridge-go/agreement"
 	"github.com/TEENet-io/bridge-go/common"
 	"github.com/TEENet-io/bridge-go/etherman"
 	"github.com/TEENet-io/bridge-go/state"
@@ -43,9 +44,9 @@ func (txmgr *EthTxManager) mint(ctx context.Context, mint *state.Mint) error {
 	signingHash := params.SigningHash()
 
 	// request signature
-	chForSignature := make(chan *SignatureRequest, 1)
+	chForSignature := make(chan *agreement.SignatureRequest, 1)
 	err = txmgr.schnorrWallet.SignAsync(
-		&SignatureRequest{
+		&agreement.SignatureRequest{
 			Id:          mint.BtcTxId,
 			SigningHash: signingHash,
 		},

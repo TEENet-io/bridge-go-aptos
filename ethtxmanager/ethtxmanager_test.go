@@ -13,6 +13,7 @@ import (
 	"github.com/TEENet-io/bridge-go/etherman"
 	"github.com/TEENet-io/bridge-go/ethsync"
 	"github.com/TEENet-io/bridge-go/multisig_client"
+	"github.com/TEENet-io/bridge-go/signers"
 	"github.com/TEENet-io/bridge-go/state"
 	"github.com/btcsuite/btcd/chaincfg"
 	ethcommon "github.com/ethereum/go-ethereum/common"
@@ -101,7 +102,7 @@ func newTestEnv(t *testing.T, file string, btcChainConfig *chaincfg.Params) *tes
 
 	btcUTXOResponder := &MockBtcWallet{}
 
-	schnorrWallet, _ := NewRandomMockedSchnorrAsyncSigner()
+	schnorrWallet, _ := signers.NewRandomMockedSchnorrAsyncSigner()
 	mgr, err := NewEthTxManager(cfg, sim.Etherman, statedb, mgrdb, schnorrWallet, btcUTXOResponder)
 	assert.NoError(t, err)
 

@@ -45,7 +45,8 @@ func NewChainSync(cfg *ChainSyncConfig, syncWorker SyncWorker) (*ChainSync, erro
 	}, nil
 }
 
-func (cs *ChainSync) Sync(ctx context.Context) error {
+// The Big Loop!
+func (cs *ChainSync) Loop(ctx context.Context) error {
 	// Ticker
 	scanTicker := time.NewTicker(cs.IntervalCheckBlockchain)
 	defer scanTicker.Stop()
