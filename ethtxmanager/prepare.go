@@ -25,7 +25,10 @@ var (
 	ErrInvalidSchnorrSignature                = errors.New("invalid schnorr signature")
 )
 
+// Check on Ethereum if the Tx is prepared.
 // prepareRedeem select UTXOs to satisfy the redeem.
+// Get signature
+// Call sub-function to send the Tx on Ethereum.
 func (txmgr *EthTxManager) prepareRedeem(ctx context.Context, redeem *state.Redeem) (*ethcommon.Hash, error) {
 	// lock the request tx hash to prevent multiple routines from handling
 	// the same redeem when entering.
@@ -138,6 +141,7 @@ func (txmgr *EthTxManager) waitForSignature(
 	}
 }
 
+// Send Tx on Ethereum.
 // Return the *(redeem prepare tx Hash) + error
 func (txmgr *EthTxManager) createRedeemPrepareTx(
 	params *etherman.PrepareParams,

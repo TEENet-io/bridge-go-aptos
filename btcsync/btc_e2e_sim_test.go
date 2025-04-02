@@ -302,7 +302,7 @@ func newTestEnv(t *testing.T, file string, btcChainConfig *chaincfg.Params, btcW
 	}
 	// TODO change to network-based, multi-party schnorr wallet
 	// schnorrWallet := &ethtxmanager.MockSchnorrThresholdWallet{Sim: sim}
-	schnorrWallet := ethtxmanager.NewMockedSchnorrAsyncWallet(ss)
+	schnorrWallet := ethtxmanager.NewMockedSchnorrAsyncSigner(ss)
 
 	mgr, err := ethtxmanager.NewEthTxManager(cfg, sim.Etherman, statedb, mgrdb, schnorrWallet, btcWallet)
 	assert.NoError(t, err)

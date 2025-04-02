@@ -207,7 +207,7 @@ func NewBridgeServer(bsc *BridgeServerConfig, ctx context.Context, wg *sync.Wait
 
 	// well, eth tx mgr doesn't recognize signer.
 	// wrap the signer into "async schnorr wallet".
-	_schnorrAsyncWallet := ethtxmanager.NewMockedSchnorrAsyncWallet(bsc.MSchnorrSigner)
+	_schnorrAsyncWallet := ethtxmanager.NewMockedSchnorrAsyncSigner(bsc.MSchnorrSigner)
 
 	myEthTxMgr, err := ethtxmanager.NewEthTxManager(
 		_eth_tx_mgr_cfg,

@@ -1,7 +1,5 @@
 # Important Files
 
-`interface.go` > Agreement with EXTERNAL components
-
 `types.go` > Agreement with INTERNAL components
 
 # Tx Manager's Job

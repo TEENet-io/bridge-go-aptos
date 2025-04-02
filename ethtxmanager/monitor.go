@@ -20,8 +20,8 @@ var (
 
 // monitor monitors the tx until it is mined or timeout
 // Monitoring procedure:
-// 1. Check if the tx is mined, if mined, update its status to either "success" or "reverted"
-// 2. Check if the tx is timeout for monitoring, if yes, update its status to "timeout"
+// 1. Check on Ethereum if the tx is mined, if mined, update its status to either "success" or "reverted"
+// 2. Check if the tx is timeout for monitoring update its status to "timeout"
 func (txmgr *EthTxManager) monitorPendingTxs(ctx context.Context, mtx *MonitoredTx) error {
 	newLogger := logger.WithFields(logger.Fields{
 		"txHash": mtx.TxHash.String(),

@@ -25,12 +25,13 @@ type EthTxManager struct {
 	etherman      *etherman.Etherman
 	statedb       *state.StateDB
 	mgrdb         *EthTxManagerDB
-	schnorrWallet SchnorrAsyncWallet
+	schnorrWallet SchnorrAsyncSigner
 	btcWallet     agreement.BtcWallet
 
 	// public key of the schnorr threshold signature
 	pubKey ethcommon.Hash
 
+	// Lock to prevent race conditions
 	redeemLock sync.Map
 	mintLock   sync.Map
 }
@@ -40,7 +41,7 @@ func NewEthTxManager(
 	etherman *etherman.Etherman,
 	statedb *state.StateDB,
 	mgrdb *EthTxManagerDB,
-	schnorrWallet SchnorrAsyncWallet,
+	schnorrWallet SchnorrAsyncSigner,
 	btcWallet agreement.BtcWallet,
 ) (*EthTxManager, error) {
 	// Get the public key of the schnorr threshold signature
@@ -208,6 +209,10 @@ func (txmgr *EthTxManager) Start(ctx context.Context) error {
 				}()
 			}
 			wg.Wait()
+
+		// Read state, to find Mints to send.
+		// Read mgr db, filter Mints that are already sent (and tracking in mrg db)
+		// Open a new Go routine to send Mints.
 		case <-tickerToMint.C:
 			mintReqs, err := txmgr.statedb.GetUnMinted()
 			if err != nil {

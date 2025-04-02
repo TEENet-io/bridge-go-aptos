@@ -70,6 +70,7 @@ func (txmgr *EthTxManager) mint(ctx context.Context, mint *state.Mint) error {
 	return txmgr.createMintTx(params, newLogger)
 }
 
+// Create Mint Tx, then Send Mint Tx, Then Insert Mint Tx in mgr db
 func (txmgr *EthTxManager) createMintTx(
 	params *etherman.MintParams,
 	logger *logger.Entry,
