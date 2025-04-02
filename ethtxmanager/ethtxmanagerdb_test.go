@@ -35,12 +35,12 @@ func TestInsertPendingMonitoredTx(t *testing.T) {
 	err := etm.InsertPendingMonitoredTx(mt)
 	assert.NoError(t, err)
 
-	chk, err := etm.GetMonitoredTxsById(mt.Id)
+	chk, err := etm.GetMonitoredTxsById(mt.RefIdentifier)
 	assert.NoError(t, err)
 	assert.Len(t, chk, 1)
 
 	assert.Equal(t, mt.TxHash, chk[0].TxHash)
-	assert.Equal(t, mt.Id, chk[0].Id)
+	assert.Equal(t, mt.RefIdentifier, chk[0].RefIdentifier)
 	assert.Equal(t, mt.SentAfter, chk[0].SentAfter)
 
 	assert.Equal(t, common.EmptyHash, chk[0].MinedAt)
@@ -98,7 +98,7 @@ func TestUpdateMonitoredTxStatus(t *testing.T) {
 	err = etm.UpdateMonitoredTxStatus(mt.TxHash, Success)
 	assert.NoError(t, err)
 
-	chk, err := etm.GetMonitoredTxsById(mt.Id)
+	chk, err := etm.GetMonitoredTxsById(mt.RefIdentifier)
 	assert.NoError(t, err)
 	mt.Status = Success
 	assert.Equal(t, mt, chk[0])
@@ -118,7 +118,7 @@ func TestUpdateMonitoredTxAfterMined(t *testing.T) {
 	err = etm.UpdateMonitoredTxAfterMined(mt.TxHash, minedAt, Success)
 	assert.NoError(t, err)
 
-	chk, err := etm.GetMonitoredTxsById(mt.Id)
+	chk, err := etm.GetMonitoredTxsById(mt.RefIdentifier)
 	assert.NoError(t, err)
 	assert.Len(t, chk, 1)
 	assert.Equal(t, mt, chk[0])
@@ -132,13 +132,13 @@ func TestGetMonitoredTxsById(t *testing.T) {
 		RandMonitoredTx(Pending, 1),
 		RandMonitoredTx(Timeout, 2),
 	}
-	mts[1].Id = mts[0].Id
+	mts[1].RefIdentifier = mts[0].RefIdentifier
 	for _, mt := range mts {
 		err := etm.InsertMonitoredTx(mt)
 		assert.NoError(t, err)
 	}
 
-	chk, err := etm.GetMonitoredTxsById(mts[0].Id)
+	chk, err := etm.GetMonitoredTxsById(mts[0].RefIdentifier)
 	assert.NoError(t, err)
 	assert.Len(t, chk, 2)
 	assert.Equal(t, mts[0], chk[0])

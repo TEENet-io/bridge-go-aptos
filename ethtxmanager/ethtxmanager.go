@@ -21,12 +21,12 @@ var (
 )
 
 type EthTxManager struct {
-	cfg           *EthTxMgrConfig
-	etherman      *etherman.Etherman
-	statedb       *state.StateDB
-	mgrdb         *EthTxManagerDB
-	schnorrWallet SchnorrAsyncSigner
-	btcWallet     agreement.BtcWallet
+	cfg              *EthTxMgrConfig
+	etherman         *etherman.Etherman
+	statedb          *state.StateDB
+	mgrdb            *EthTxManagerDB
+	schnorrWallet    SchnorrAsyncSigner
+	btcUTXOResponder agreement.BtcUTXOResponder
 
 	// public key of the schnorr threshold signature
 	pubKey ethcommon.Hash
@@ -42,7 +42,7 @@ func NewEthTxManager(
 	statedb *state.StateDB,
 	mgrdb *EthTxManagerDB,
 	schnorrWallet SchnorrAsyncSigner,
-	btcWallet agreement.BtcWallet,
+	btcUTXOResponder agreement.BtcUTXOResponder,
 ) (*EthTxManager, error) {
 	// Get the public key of the schnorr threshold signature
 	pk, err := etherman.GetPublicKey()
@@ -53,15 +53,14 @@ func NewEthTxManager(
 	pubKey := common.BigInt2Bytes32(pk)
 
 	return &EthTxManager{
-		etherman:      etherman,
-		statedb:       statedb,
-		cfg:           cfg,
-		mgrdb:         mgrdb,
-		pubKey:        pubKey,
-		schnorrWallet: schnorrWallet,
-		btcWallet:     btcWallet,
+		etherman:         etherman,
+		statedb:          statedb,
+		cfg:              cfg,
+		mgrdb:            mgrdb,
+		pubKey:           pubKey,
+		schnorrWallet:    schnorrWallet,
+		btcUTXOResponder: btcUTXOResponder,
 	}, nil
-
 }
 
 func (txmgr *EthTxManager) Start(ctx context.Context) error {

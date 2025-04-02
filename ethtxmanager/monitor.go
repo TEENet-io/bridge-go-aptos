@@ -25,7 +25,7 @@ var (
 func (txmgr *EthTxManager) monitorPendingTxs(ctx context.Context, mtx *MonitoredTx) error {
 	newLogger := logger.WithFields(logger.Fields{
 		"txHash": mtx.TxHash.String(),
-		"Id":     mtx.Id.String(),
+		"Id":     mtx.RefIdentifier.String(),
 	})
 
 	// get transaction receipt

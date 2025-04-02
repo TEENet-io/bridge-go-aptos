@@ -2,13 +2,11 @@ package agreement
 
 import (
 	"math/big"
-
-	"github.com/ethereum/go-ethereum/common"
 )
 
-// StateChannel is the interface that the core state should implement.
+// StateChannel is the interface that the "state" should implement.
 // Each call of following function retuns a channel that accept corresponding variable.
-// (and core state shall store or act upon the variable when it is received)
+// (and "state" shall act upon the variable when it is received)
 type StateChannel interface {
 	// Channel
 	// on eth it is finalized block number, on aptos it is the ledger version number.
@@ -27,20 +25,19 @@ type StateChannel interface {
 	// If you found new Minted Event, fill in this channel
 	GetNewMintedEventChannel() chan<- *MintedEvent
 
-	// This is NOT a channel, it reads the Finalized Block Number from state.
+	// This is <NOT> a channel, it reads the finalized block/ledger number from state.
 	GetEthFinalizedBlockNumber() (*big.Int, error)
 }
 
-// This interface defines how Tx manager interact with BTC wallet (from BTC side).
-// What is the expected behavior of the btc wallet from btc side
-type BtcWallet interface {
-	// Request sends a request to the wallet to get outpoints for preparing
+// This interface defines how Tx manager interact with BTC UTXO responder (from BTC side).
+// This function query for enough UTXO(s) to satisfy the amount.
+type BtcUTXOResponder interface {
+	// Request sends a request to the responder to get outpoints for preparing
 	// the redeem indexed by the tx hash and then return the outpoints via
-	// the provided channel. The btc wallet should temporarily lock the
-	// outpoints with a timeout. It should also monitor the RedeemPrepared
-	// events emitted from the bridge for permanent locking.
+	// the provided channel. The btc utxo responder should temporarily lock the
+	// outpoints with a timeout.
 	Request(
-		reqTxId common.Hash, // eth requestTxHash
+		reqTxId []byte, // the request Tx on other blockchain that associated with this request of UTXO(s)
 		amount *big.Int,
 		ch chan<- []BtcOutpoint, // this channel receives a slice of outputs.
 	) error

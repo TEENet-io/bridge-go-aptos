@@ -13,7 +13,7 @@ BTC Vault tracks the UTXOs that a specific BTC wallet can use.
 Shall implement the following interface:
 
 ```go
-type BtcWallet interface {
+type BtcUTXOResponder interface {
 	Request(
 		Id ethcommon.Hash, // eth requestTxHash
 		amount *big.Int,

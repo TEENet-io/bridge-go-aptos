@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/TEENet-io/bridge-go/agreement"
+	"github.com/TEENet-io/bridge-go/common"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	logger "github.com/sirupsen/logrus"
 )
@@ -216,14 +217,14 @@ func (tv *TreasureVault) GetUTXODetail(txID string, vout int32) (*VaultUTXO, err
 	return utxo, nil
 }
 
-// Implement BtcWallet interface to interact with eth_tx_manager
+// Implement BtcUTXOResponder interface to interact with eth_tx_manager
 // eth_tx_manager will request and lock (write in smart contract)
 // about the UTXOs that are collected to satisify the redeem.
 // We can't collect just "barely" enough UTXOs to satisfy,
 // Indeed we need to estamate the btc tx fee and add to it.
 // at least leave some safe margin.
 func (tv *TreasureVault) Request(
-	reqTxId ethcommon.Hash,
+	reqTxId []byte,
 	amount *big.Int,
 	ch chan<- []agreement.BtcOutpoint,
 ) error {
@@ -232,12 +233,12 @@ func (tv *TreasureVault) Request(
 	safe_amount := amount.Int64() + SAFE_MARGIN
 	// if not enough utxos, return error
 	logger.WithFields(logger.Fields{
-		"req_tx_id":   reqTxId.Hex(),
+		"req_tx_id":   common.ByteSliceToPureHexStr(reqTxId),
 		"req_amount":  amount,
 		"safe_amount": safe_amount,
 	}).Info("Query UTXOs for redeem")
 
-	utxos, err := tv.ChooseAndLock(safe_amount, reqTxId.Hex())
+	utxos, err := tv.ChooseAndLock(safe_amount, common.ByteSliceToPureHexStr(reqTxId))
 	if err != nil {
 		return err
 	}

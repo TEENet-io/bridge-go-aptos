@@ -235,7 +235,7 @@ type testEnv struct {
 }
 
 // Setup ETH side facilities
-func newTestEnv(t *testing.T, file string, btcChainConfig *chaincfg.Params, btcWallet agreement.BtcWallet) *testEnv {
+func newTestEnv(t *testing.T, file string, btcChainConfig *chaincfg.Params, btcUTXOResponder agreement.BtcUTXOResponder) *testEnv {
 
 	// General type to hold the signer!
 	var ss multisig_client.SchnorrSigner
@@ -304,7 +304,7 @@ func newTestEnv(t *testing.T, file string, btcChainConfig *chaincfg.Params, btcW
 	// schnorrWallet := &ethtxmanager.MockSchnorrThresholdWallet{Sim: sim}
 	schnorrWallet := ethtxmanager.NewMockedSchnorrAsyncSigner(ss)
 
-	mgr, err := ethtxmanager.NewEthTxManager(cfg, sim.Etherman, statedb, mgrdb, schnorrWallet, btcWallet)
+	mgr, err := ethtxmanager.NewEthTxManager(cfg, sim.Etherman, statedb, mgrdb, schnorrWallet, btcUTXOResponder)
 	assert.NoError(t, err)
 
 	return &testEnv{sim, sqldb, statedb, st, mgrdb, mgr, sync}

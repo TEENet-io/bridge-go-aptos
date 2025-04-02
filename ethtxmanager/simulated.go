@@ -5,14 +5,12 @@ import (
 
 	"github.com/TEENet-io/bridge-go/agreement"
 	"github.com/TEENet-io/bridge-go/common"
-	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
-type MockBtcWallet struct {
-}
+type MockBtcWallet struct{}
 
 func (w *MockBtcWallet) Request(
-	Id ethcommon.Hash,
+	reqId []byte,
 	amount *big.Int,
 	ch chan<- []agreement.BtcOutpoint,
 ) error {
@@ -36,12 +34,12 @@ func RandMonitoredTx(status MonitoredTxStatus, outpointNum int) *MonitoredTx {
 	}
 
 	mt := &MonitoredTx{
-		TxHash:       common.RandBytes32(),
-		Id:           common.RandBytes32(),
-		SentAfter:    common.RandBytes32(),
-		SentAfterBlk: 0,
-		MinedAt:      minedAt,
-		Status:       status,
+		TxHash:        common.RandBytes32(),
+		RefIdentifier: common.RandBytes32(),
+		SentAfter:     common.RandBytes32(),
+		SentAfterBlk:  0,
+		MinedAt:       minedAt,
+		Status:        status,
 	}
 
 	return mt

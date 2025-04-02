@@ -94,10 +94,10 @@ func (txmgr *EthTxManager) createMintTx(
 
 	// Save the monitored tx
 	mt := &MonitoredTx{
-		TxHash:       tx.Hash(),
-		Id:           params.BtcTxId,
-		SentAfter:    latest_header.Hash(), // interesting, using block hash as sendAfter not block number.
-		SentAfterBlk: latest_header.Number.Int64(),
+		TxHash:        tx.Hash(),
+		RefIdentifier: params.BtcTxId,
+		SentAfter:     latest_header.Hash(), // interesting, using block hash as sendAfter not block number.
+		SentAfterBlk:  latest_header.Number.Int64(),
 	}
 	logger.WithField("hash", latest_header.Hash()).WithField("num", latest_header.Number).Debug("latest block (eth)")
 	err = txmgr.mgrdb.InsertPendingMonitoredTx(mt)

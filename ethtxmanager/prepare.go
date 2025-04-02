@@ -53,8 +53,8 @@ func (txmgr *EthTxManager) prepareRedeem(ctx context.Context, redeem *state.Rede
 
 	// request spendable outpoints from btc wallet
 	chForOutpoints := make(chan []agreement.BtcOutpoint, 1)
-	err = txmgr.btcWallet.Request(
-		redeem.RequestTxHash,
+	err = txmgr.btcUTXOResponder.Request(
+		redeem.RequestTxHash.Bytes(),
 		redeem.Amount,
 		chForOutpoints,
 	)
@@ -166,10 +166,10 @@ func (txmgr *EthTxManager) createRedeemPrepareTx(
 	newLogger.Info("prepare redeem tx sent")
 
 	mt := &MonitoredTx{
-		TxHash:       tx.Hash(),
-		Id:           params.RequestTxHash,
-		SentAfter:    latest.Hash(),
-		SentAfterBlk: latest.Number.Int64(),
+		TxHash:        tx.Hash(),
+		RefIdentifier: params.RequestTxHash,
+		SentAfter:     latest.Hash(),
+		SentAfterBlk:  latest.Number.Int64(),
 	}
 	err = txmgr.mgrdb.InsertPendingMonitoredTx(mt)
 	if err != nil {
