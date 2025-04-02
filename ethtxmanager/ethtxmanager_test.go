@@ -98,11 +98,11 @@ func newTestEnv(t *testing.T, file string, btcChainConfig *chaincfg.Params) *tes
 		TimeoutOnWaitingForOutpoints:  timtoutOnWaitingForOutpoints,
 		TimeoutOnMonitoringPendingTxs: timeoutOnMonitoringPendingTxs,
 	}
-	// TODO use our btc wallet instead
-	btcWallet := &MockBtcWallet{}
+
+	btcUTXOResponder := &MockBtcWallet{}
 
 	schnorrWallet, _ := NewRandomMockedSchnorrAsyncSigner()
-	mgr, err := NewEthTxManager(cfg, sim.Etherman, statedb, mgrdb, schnorrWallet, btcWallet)
+	mgr, err := NewEthTxManager(cfg, sim.Etherman, statedb, mgrdb, schnorrWallet, btcUTXOResponder)
 	assert.NoError(t, err)
 
 	return &testEnv{sim, sqldb, statedb, st, mgrdb, mgr, sync}
@@ -193,9 +193,9 @@ func TestOnCheckBeforeMint(t *testing.T) {
 	// prepare a redeem when there are associated monitored tx in the table.
 	// Not all the tx are with status Timeout, so no new monitored tx should be added
 	mt1 := RandMonitoredTx(Pending, 1)
-	mt1.Id = unMinted.BtcTxId
+	mt1.RefIdentifier = unMinted.BtcTxId
 	mt2 := RandMonitoredTx(Timeout, 1)
-	mt2.Id = unMinted.BtcTxId
+	mt2.RefIdentifier = unMinted.BtcTxId
 	err = env.mgrdb.InsertMonitoredTx(mt1)
 	assert.NoError(t, err)
 	err = env.mgrdb.InsertMonitoredTx(mt2)
@@ -215,7 +215,7 @@ func TestOnCheckBeforeMint(t *testing.T) {
 	// prepare a redeem when there is an associated monitored tx in the table.
 	// The status of the tx is Timeout, so a new monitored tx should be added
 	mt := RandMonitoredTx(Timeout, 1)
-	mt.Id = unMinted.BtcTxId
+	mt.RefIdentifier = unMinted.BtcTxId
 	err = env.mgrdb.InsertMonitoredTx(mt)
 	assert.NoError(t, err)
 	ctx, cancel = context.WithCancel(context.Background())
@@ -229,7 +229,7 @@ func TestOnCheckBeforeMint(t *testing.T) {
 		if m.Status == Timeout {
 			assert.Equal(t, mt, m)
 		} else {
-			assert.Equal(t, unMinted.BtcTxId, m.Id)
+			assert.Equal(t, unMinted.BtcTxId, m.RefIdentifier)
 		}
 	}
 }
@@ -300,16 +300,16 @@ func TestOnCheckBeforePrepare(t *testing.T) {
 	mts, err := env.mgrdb.GetMonitoredTxsById(redeem.RequestTxHash)
 	assert.NoError(t, err)
 	assert.Len(t, mts, 1)
-	assert.Equal(t, redeem.RequestTxHash, mts[0].Id)
+	assert.Equal(t, redeem.RequestTxHash, mts[0].RefIdentifier)
 	err = env.mgrdb.DeleteMonitoredTxByTxHash(mts[0].TxHash)
 	assert.NoError(t, err)
 
 	// prepare a redeem when there are associated monitored tx in the table.
 	// Not all the tx are with status Timeout, so no new monitored tx should be added
 	mt1 := RandMonitoredTx(Pending, 1)
-	mt1.Id = redeem.RequestTxHash
+	mt1.RefIdentifier = redeem.RequestTxHash
 	mt2 := RandMonitoredTx(Timeout, 1)
-	mt2.Id = redeem.RequestTxHash
+	mt2.RefIdentifier = redeem.RequestTxHash
 	err = env.mgrdb.InsertMonitoredTx(mt1)
 	assert.NoError(t, err)
 	err = env.mgrdb.InsertMonitoredTx(mt2)
@@ -329,7 +329,7 @@ func TestOnCheckBeforePrepare(t *testing.T) {
 	// prepare a redeem when there is an associated monitored tx in the table.
 	// The status of the tx is Timeout, so a new monitored tx should be added
 	mt := RandMonitoredTx(Timeout, 1)
-	mt.Id = redeem.RequestTxHash
+	mt.RefIdentifier = redeem.RequestTxHash
 	err = env.mgrdb.InsertMonitoredTx(mt)
 	assert.NoError(t, err)
 	ctx, cancel = context.WithCancel(context.Background())
@@ -343,7 +343,7 @@ func TestOnCheckBeforePrepare(t *testing.T) {
 		if m.Status == Timeout {
 			assert.Equal(t, mt, m)
 		} else {
-			assert.Equal(t, redeem.RequestTxHash, m.Id)
+			assert.Equal(t, redeem.RequestTxHash, m.RefIdentifier)
 		}
 	}
 }
@@ -380,7 +380,7 @@ func TestMonitorOnTimeout(t *testing.T) {
 	cancel()
 
 	// status set as Timeout
-	mts, err := env.mgrdb.GetMonitoredTxsById(mt.Id)
+	mts, err := env.mgrdb.GetMonitoredTxsById(mt.RefIdentifier)
 	assert.NoError(t, err)
 	assert.Equal(t, Timeout, mts[0].Status)
 }
