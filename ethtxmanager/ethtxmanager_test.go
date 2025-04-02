@@ -155,7 +155,7 @@ func TestOnIsMinted(t *testing.T) {
 	// 2) track the tx.
 	// 2) update mgrdb about sucessful minted evm tx.
 	ctx, cancel := context.WithCancel(context.Background())
-	go func() { err = env.mgr.Start(ctx) }()
+	go func() { err = env.mgr.Loop(ctx) }()
 	time.Sleep(frequencyToMint * 2)
 	cancel()
 
@@ -182,7 +182,7 @@ func TestOnCheckBeforeMint(t *testing.T) {
 	assert.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	go func() { err = env.mgr.Start(ctx) }()
+	go func() { err = env.mgr.Loop(ctx) }()
 	time.Sleep(frequencyToMint * 2)
 	cancel()
 	mts, err := env.mgrdb.GetMonitoredTxsById(unMinted.BtcTxId)
@@ -202,7 +202,7 @@ func TestOnCheckBeforeMint(t *testing.T) {
 	err = env.mgrdb.InsertMonitoredTx(mt2)
 	assert.NoError(t, err)
 	ctx, cancel = context.WithCancel(context.Background())
-	go func() { err = env.mgr.Start(ctx) }()
+	go func() { err = env.mgr.Loop(ctx) }()
 	time.Sleep(frequencyToPrepareRedeem * 2)
 	cancel()
 	mts, err = env.mgrdb.GetMonitoredTxsById(unMinted.BtcTxId)
@@ -220,7 +220,7 @@ func TestOnCheckBeforeMint(t *testing.T) {
 	err = env.mgrdb.InsertMonitoredTx(mt)
 	assert.NoError(t, err)
 	ctx, cancel = context.WithCancel(context.Background())
-	go func() { err = env.mgr.Start(ctx) }()
+	go func() { err = env.mgr.Loop(ctx) }()
 	time.Sleep(frequencyToPrepareRedeem * 2)
 	cancel()
 	mts, err = env.mgrdb.GetMonitoredTxsById(unMinted.BtcTxId)
@@ -265,7 +265,7 @@ func TestIsPrepared(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	go func() { err = env.mgr.Start(ctx) }()
+	go func() { err = env.mgr.Loop(ctx) }()
 
 	time.Sleep(frequencyToPrepareRedeem * 2)
 	cancel()
@@ -295,7 +295,7 @@ func TestOnCheckBeforePrepare(t *testing.T) {
 	// prepare a redeem when no associated monitored tx in the table
 	// expected to find a new monitored tx added to the table
 	ctx, cancel := context.WithCancel(context.Background())
-	go func() { err = env.mgr.Start(ctx) }()
+	go func() { err = env.mgr.Loop(ctx) }()
 	time.Sleep(frequencyToPrepareRedeem * 2)
 	cancel()
 	mts, err := env.mgrdb.GetMonitoredTxsById(redeem.RequestTxHash)
@@ -316,7 +316,7 @@ func TestOnCheckBeforePrepare(t *testing.T) {
 	err = env.mgrdb.InsertMonitoredTx(mt2)
 	assert.NoError(t, err)
 	ctx, cancel = context.WithCancel(context.Background())
-	go func() { err = env.mgr.Start(ctx) }()
+	go func() { err = env.mgr.Loop(ctx) }()
 	time.Sleep(frequencyToPrepareRedeem * 2)
 	cancel()
 	mts, err = env.mgrdb.GetMonitoredTxsById(redeem.RequestTxHash)
@@ -334,7 +334,7 @@ func TestOnCheckBeforePrepare(t *testing.T) {
 	err = env.mgrdb.InsertMonitoredTx(mt)
 	assert.NoError(t, err)
 	ctx, cancel = context.WithCancel(context.Background())
-	go func() { err = env.mgr.Start(ctx) }()
+	go func() { err = env.mgr.Loop(ctx) }()
 	time.Sleep(frequencyToPrepareRedeem * 2)
 	cancel()
 	mts, err = env.mgrdb.GetMonitoredTxsById(redeem.RequestTxHash)
@@ -370,7 +370,7 @@ func TestMonitorOnTimeout(t *testing.T) {
 	assert.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	go func() { err = env.mgr.Start(ctx) }()
+	go func() { err = env.mgr.Loop(ctx) }()
 
 	// generate [timeout + 1] blocks to trigger timeout
 	for i := 0; i <= timeoutOnMonitoringPendingTxs; i++ {
@@ -428,12 +428,12 @@ func TestMainRoutine(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		env.mgr.Start(ctx)
+		env.mgr.Loop(ctx)
 	}()
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		env.sync.Sync(ctx)
+		env.sync.Loop(ctx)
 	}()
 
 	time.Sleep(1 * time.Second)

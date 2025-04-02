@@ -50,7 +50,7 @@ func TestSync(t *testing.T) {
 	// No event should be sent since the finalized block number is too small
 	ctx1, cancel1 := context.WithCancel(context.Background())
 	go st.Start(ctx1)
-	go synchronizer.Sync(ctx1)
+	go synchronizer.Loop(ctx1)
 	sendTxs(t, env)
 	time.Sleep(500 * time.Millisecond)
 	cancel1()
@@ -72,7 +72,7 @@ func TestSync(t *testing.T) {
 		synchronizer.lastFinalized.Add(synchronizer.lastFinalized, big.NewInt(1)))
 
 	go st.Start(ctx2)
-	go synchronizer.Sync(ctx2)
+	go synchronizer.Loop(ctx2)
 
 	mintedEvs, reqeustedEvs, preparedEvs := sendTxs(t, env)
 	time.Sleep(200 * time.Millisecond)

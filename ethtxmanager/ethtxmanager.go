@@ -83,7 +83,7 @@ func NewEthTxManager(
 	}, nil
 }
 
-func (txmgr *EthTxManager) Start(ctx context.Context) error {
+func (txmgr *EthTxManager) Loop(ctx context.Context) error {
 	logger.Debug("starting eth tx manager")
 	defer logger.Debug("stopping eth tx manager")
 
