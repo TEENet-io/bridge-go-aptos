@@ -3,8 +3,8 @@ package ethtxmanager
 import (
 	"math/big"
 
+	"github.com/TEENet-io/bridge-go/agreement"
 	"github.com/TEENet-io/bridge-go/common"
-	"github.com/TEENet-io/bridge-go/state"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
@@ -13,7 +13,7 @@ import (
 type SignatureRequest struct {
 	Id          ethcommon.Hash
 	SigningHash ethcommon.Hash
-	Outpoints   []state.BtcOutpoint
+	Outpoints   []agreement.BtcOutpoint
 	Rx          *big.Int
 	S           *big.Int
 }

@@ -28,6 +28,7 @@ import (
 
 	"math/big"
 
+	"github.com/TEENet-io/bridge-go/agreement"
 	"github.com/TEENet-io/bridge-go/logconfig"
 	"github.com/TEENet-io/bridge-go/reporter"
 	logger "github.com/sirupsen/logrus"
@@ -234,7 +235,7 @@ type testEnv struct {
 }
 
 // Setup ETH side facilities
-func newTestEnv(t *testing.T, file string, btcChainConfig *chaincfg.Params, btcWallet ethtxmanager.BtcWallet) *testEnv {
+func newTestEnv(t *testing.T, file string, btcChainConfig *chaincfg.Params, btcWallet agreement.BtcWallet) *testEnv {
 
 	// General type to hold the signer!
 	var ss multisig_client.SchnorrSigner
@@ -292,9 +293,9 @@ func newTestEnv(t *testing.T, file string, btcChainConfig *chaincfg.Params, btcW
 
 	// create a eth tx manager
 	cfg := &ethtxmanager.EthTxMgrConfig{
-		FrequencyToPrepareRedeem:      frequencyToPrepareRedeem,
-		FrequencyToMint:               frequencyToMint,
-		FrequencyToMonitorPendingTxs:  frequencyToMonitorPendingTxs,
+		IntervalToPrepareRedeem:       frequencyToPrepareRedeem,
+		IntervalToMint:                frequencyToMint,
+		IntervalToMonitorPendingTxs:   frequencyToMonitorPendingTxs,
 		TimeoutOnWaitingForSignature:  timeoutOnWaitingForSignature,
 		TimeoutOnWaitingForOutpoints:  timtoutOnWaitingForOutpoints,
 		TimeoutOnMonitoringPendingTxs: timeoutOnMonitoringPendingTxs,

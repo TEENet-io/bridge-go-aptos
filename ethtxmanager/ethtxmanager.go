@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/TEENet-io/bridge-go/agreement"
 	"github.com/TEENet-io/bridge-go/common"
 	"github.com/TEENet-io/bridge-go/etherman"
 	"github.com/TEENet-io/bridge-go/state"
@@ -25,7 +26,7 @@ type EthTxManager struct {
 	statedb       *state.StateDB
 	mgrdb         *EthTxManagerDB
 	schnorrWallet SchnorrAsyncWallet
-	btcWallet     BtcWallet
+	btcWallet     agreement.BtcWallet
 
 	// public key of the schnorr threshold signature
 	pubKey ethcommon.Hash
@@ -40,7 +41,7 @@ func NewEthTxManager(
 	statedb *state.StateDB,
 	mgrdb *EthTxManagerDB,
 	schnorrWallet SchnorrAsyncWallet,
-	btcWallet BtcWallet,
+	btcWallet agreement.BtcWallet,
 ) (*EthTxManager, error) {
 	// Get the public key of the schnorr threshold signature
 	pk, err := etherman.GetPublicKey()
@@ -66,13 +67,13 @@ func (txmgr *EthTxManager) Start(ctx context.Context) error {
 	logger.Debug("starting eth tx manager")
 	defer logger.Debug("stopping eth tx manager")
 
-	tickerToPrepare := time.NewTicker(txmgr.cfg.FrequencyToPrepareRedeem)
+	tickerToPrepare := time.NewTicker(txmgr.cfg.IntervalToPrepareRedeem)
 	defer tickerToPrepare.Stop()
 
-	tickerToMonitor := time.NewTicker(txmgr.cfg.FrequencyToMonitorPendingTxs)
+	tickerToMonitor := time.NewTicker(txmgr.cfg.IntervalToMonitorPendingTxs)
 	defer tickerToMonitor.Stop()
 
-	tickerToMint := time.NewTicker(txmgr.cfg.FrequencyToMint)
+	tickerToMint := time.NewTicker(txmgr.cfg.IntervalToMint)
 	defer tickerToMint.Stop()
 
 	errCh := make(chan error, 1)

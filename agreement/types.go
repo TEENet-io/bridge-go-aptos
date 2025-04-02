@@ -54,3 +54,13 @@ type RedeemPreparedEvent struct {
 func (ev *RedeemPreparedEvent) String() string {
 	return fmt.Sprintf("%+v", *ev)
 }
+
+type BtcOutpoint struct {
+	BtcTxId common.Hash
+	BtcIdx  uint16
+}
+
+type JSONBtcOutpoint struct {
+	BtcTxId string `json:"txid"`
+	BtcIdx  uint16 `json:"idx"`
+}

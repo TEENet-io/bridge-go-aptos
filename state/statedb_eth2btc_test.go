@@ -4,6 +4,7 @@ import (
 	"log"
 	"testing"
 
+	"github.com/TEENet-io/bridge-go/agreement"
 	"github.com/TEENet-io/bridge-go/common"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	_ "github.com/mattn/go-sqlite3"
@@ -144,7 +145,7 @@ func TestUpdateAfterPrepared(t *testing.T) {
 	err = db.InsertAfterRequested(r1)
 	assert.NoError(t, err)
 	r1.Status = RedeemStatusPrepared
-	r1.Outpoints = []BtcOutpoint{{BtcTxId: common.RandBytes32(), BtcIdx: 0}}
+	r1.Outpoints = []agreement.BtcOutpoint{{BtcTxId: common.RandBytes32(), BtcIdx: 0}}
 	err = db.UpdateAfterPrepared(r1)
 	assert.NoError(t, err)
 	actual, ok, err = db.GetRedeem(r1.RequestTxHash)

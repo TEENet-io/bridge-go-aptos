@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"math/big"
 
+	"github.com/TEENet-io/bridge-go/agreement"
 	"github.com/TEENet-io/bridge-go/common"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	logger "github.com/sirupsen/logrus"
@@ -16,7 +17,7 @@ func RandRedeem(status RedeemStatus) *Redeem {
 		BtcTxId:       common.RandBytes32(),
 		Requester:     common.RandEthAddress().Bytes(),
 		Amount:        big.NewInt(100),
-		Outpoints: []BtcOutpoint{
+		Outpoints: []agreement.BtcOutpoint{
 			{
 				BtcTxId: common.RandBytes32(),
 				BtcIdx:  0,

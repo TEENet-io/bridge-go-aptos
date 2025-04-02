@@ -41,7 +41,7 @@ type Redeem struct {
 	Requester     []byte         // [20]byte = ethereum address, [32]byte = aptos address
 	Receiver      string         // receiver btc address
 	Amount        *big.Int
-	Outpoints     []BtcOutpoint
+	Outpoints     []agreement.BtcOutpoint
 	Status        RedeemStatus
 }
 
@@ -122,9 +122,9 @@ func (r *Redeem) updateFromPreparedEvent(ev *agreement.RedeemPreparedEvent) (*Re
 	r.Status = RedeemStatusPrepared
 
 	// Set the outpoints
-	r.Outpoints = []BtcOutpoint{}
+	r.Outpoints = []agreement.BtcOutpoint{}
 	for i := range ev.OutpointTxIds {
-		r.Outpoints = append(r.Outpoints, BtcOutpoint{
+		r.Outpoints = append(r.Outpoints, agreement.BtcOutpoint{
 			BtcTxId: ev.OutpointTxIds[i],
 			BtcIdx:  ev.OutpointIdxs[i],
 		})
@@ -150,9 +150,9 @@ func createRedeemFromPreparedEvent(ev *agreement.RedeemPreparedEvent) (*Redeem, 
 }
 
 func (r *Redeem) MarshalJSON() ([]byte, error) {
-	jOutpoint := []JSONBtcOutpoint{}
+	jOutpoint := []agreement.JSONBtcOutpoint{}
 	for _, outpoint := range r.Outpoints {
-		jOutpoint = append(jOutpoint, JSONBtcOutpoint{
+		jOutpoint = append(jOutpoint, agreement.JSONBtcOutpoint{
 			BtcTxId: outpoint.BtcTxId.String(),
 			BtcIdx:  outpoint.BtcIdx,
 		})
@@ -185,7 +185,7 @@ func (r *Redeem) UnmarshalJSON(data []byte) error {
 	r.Status = RedeemStatus(jRedeem.Status)
 
 	for _, jOutpoint := range jRedeem.Outpoints {
-		r.Outpoints = append(r.Outpoints, BtcOutpoint{
+		r.Outpoints = append(r.Outpoints, agreement.BtcOutpoint{
 			BtcTxId: common.HexStrToBytes32(jOutpoint.BtcTxId),
 			BtcIdx:  jOutpoint.BtcIdx,
 		})

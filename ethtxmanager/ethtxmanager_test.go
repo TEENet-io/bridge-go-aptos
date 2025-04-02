@@ -91,9 +91,9 @@ func newTestEnv(t *testing.T, file string, btcChainConfig *chaincfg.Params) *tes
 
 	// create a eth tx manager
 	cfg := &EthTxMgrConfig{
-		FrequencyToPrepareRedeem:      frequencyToPrepareRedeem,
-		FrequencyToMint:               frequencyToMint,
-		FrequencyToMonitorPendingTxs:  frequencyToMonitorPendingTxs,
+		IntervalToPrepareRedeem:       frequencyToPrepareRedeem,
+		IntervalToMint:                frequencyToMint,
+		IntervalToMonitorPendingTxs:   frequencyToMonitorPendingTxs,
 		TimeoutOnWaitingForSignature:  timeoutOnWaitingForSignature,
 		TimeoutOnWaitingForOutpoints:  timtoutOnWaitingForOutpoints,
 		TimeoutOnMonitoringPendingTxs: timeoutOnMonitoringPendingTxs,

@@ -13,9 +13,9 @@ import (
 
 func TestJSON(t *testing.T) {
 	redeem := RandRedeem(RedeemStatusCompleted)
-	jOutpoints := []JSONBtcOutpoint{}
+	jOutpoints := []agreement.JSONBtcOutpoint{}
 	for _, outpoint := range redeem.Outpoints {
-		jOutpoints = append(jOutpoints, JSONBtcOutpoint{
+		jOutpoints = append(jOutpoints, agreement.JSONBtcOutpoint{
 			BtcTxId: outpoint.BtcTxId.String(),
 			BtcIdx:  outpoint.BtcIdx,
 		})

@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"encoding/gob"
 	"errors"
+
+	"github.com/TEENet-io/bridge-go/agreement"
 )
 
-func EncodeOutpoints(outpoints []BtcOutpoint) ([]byte, error) {
+func EncodeOutpoints(outpoints []agreement.BtcOutpoint) ([]byte, error) {
 	if outpoints == nil {
 		return nil, nil
 	}
@@ -20,7 +22,7 @@ func EncodeOutpoints(outpoints []BtcOutpoint) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func DecodeOutpoints(data []byte) ([]BtcOutpoint, error) {
+func DecodeOutpoints(data []byte) ([]agreement.BtcOutpoint, error) {
 	if data == nil {
 		return nil, nil
 	}
@@ -30,7 +32,7 @@ func DecodeOutpoints(data []byte) ([]BtcOutpoint, error) {
 	}
 
 	decoder := gob.NewDecoder(bytes.NewReader(data))
-	var outpoints []BtcOutpoint
+	var outpoints []agreement.BtcOutpoint
 	if err := decoder.Decode(&outpoints); err != nil {
 		return nil, err
 	}
