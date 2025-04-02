@@ -101,7 +101,7 @@ func newTestEnv(t *testing.T, file string, btcChainConfig *chaincfg.Params) *tes
 	// TODO use our btc wallet instead
 	btcWallet := &MockBtcWallet{}
 
-	schnorrWallet, _ := NewRandomMockedSchnorrAsyncWallet()
+	schnorrWallet, _ := NewRandomMockedSchnorrAsyncSigner()
 	mgr, err := NewEthTxManager(cfg, sim.Etherman, statedb, mgrdb, schnorrWallet, btcWallet)
 	assert.NoError(t, err)
 

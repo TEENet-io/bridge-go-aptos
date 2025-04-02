@@ -17,5 +17,6 @@ type EthTxMgrConfig struct {
 	// Timeout on waiting for the spendable outpoints from BTC wallet
 	TimeoutOnWaitingForOutpoints time.Duration
 
-	TimeoutOnMonitoringPendingTxs uint64 // in blocks
+	// Timeout on waiting for the "monitored Tx" to be mined
+	TimeoutOnMonitoringPendingTxs uint64
 }
