@@ -197,9 +197,9 @@ func NewBridgeServer(bsc *BridgeServerConfig, ctx context.Context, wg *sync.Wait
 	}
 
 	_eth_tx_mgr_cfg := &ethtxmanager.EthTxMgrConfig{
-		FrequencyToPrepareRedeem:      frequencyToPrepareRedeem,
-		FrequencyToMint:               frequencyToMint,
-		FrequencyToMonitorPendingTxs:  frequencyToMonitorPendingTxs,
+		IntervalToPrepareRedeem:       frequencyToPrepareRedeem,
+		IntervalToMint:                frequencyToMint,
+		IntervalToMonitorPendingTxs:   frequencyToMonitorPendingTxs,
 		TimeoutOnWaitingForSignature:  timeoutOnWaitingForSignature,
 		TimeoutOnWaitingForOutpoints:  timtoutOnWaitingForOutpoints,
 		TimeoutOnMonitoringPendingTxs: timeoutOnMonitoringPendingTxs,

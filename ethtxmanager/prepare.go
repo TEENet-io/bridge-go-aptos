@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/TEENet-io/bridge-go/agreement"
 	"github.com/TEENet-io/bridge-go/common"
 	"github.com/TEENet-io/bridge-go/etherman"
 	"github.com/TEENet-io/bridge-go/state"
@@ -48,7 +49,7 @@ func (txmgr *EthTxManager) prepareRedeem(ctx context.Context, redeem *state.Rede
 	}
 
 	// request spendable outpoints from btc wallet
-	chForOutpoints := make(chan []state.BtcOutpoint, 1)
+	chForOutpoints := make(chan []agreement.BtcOutpoint, 1)
 	err = txmgr.btcWallet.Request(
 		redeem.RequestTxHash,
 		redeem.Amount,
@@ -66,7 +67,7 @@ func (txmgr *EthTxManager) prepareRedeem(ctx context.Context, redeem *state.Rede
 	newLogger.WithField("num", len(outpoints)).Info("outpoints received")
 
 	// Compute the signing hash
-	redeem.Outpoints = append([]state.BtcOutpoint{}, outpoints...)
+	redeem.Outpoints = append([]agreement.BtcOutpoint{}, outpoints...)
 	params := createPrepareParams(redeem)
 	signingHash := params.SigningHash()
 
@@ -98,8 +99,8 @@ func (txmgr *EthTxManager) prepareRedeem(ctx context.Context, redeem *state.Rede
 
 func (txmgr *EthTxManager) waitforOutpoints(
 	ctx context.Context,
-	ch <-chan []state.BtcOutpoint,
-) ([]state.BtcOutpoint, error) {
+	ch <-chan []agreement.BtcOutpoint,
+) ([]agreement.BtcOutpoint, error) {
 	newCtx, cancel := context.WithTimeout(ctx, txmgr.cfg.TimeoutOnWaitingForOutpoints)
 	defer cancel()
 

@@ -3,8 +3,8 @@ package ethtxmanager
 import (
 	"math/big"
 
+	"github.com/TEENet-io/bridge-go/agreement"
 	"github.com/TEENet-io/bridge-go/common"
-	"github.com/TEENet-io/bridge-go/state"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
@@ -14,9 +14,9 @@ type MockBtcWallet struct {
 func (w *MockBtcWallet) Request(
 	Id ethcommon.Hash,
 	amount *big.Int,
-	ch chan<- []state.BtcOutpoint,
+	ch chan<- []agreement.BtcOutpoint,
 ) error {
-	outpoints := []state.BtcOutpoint{
+	outpoints := []agreement.BtcOutpoint{
 		{
 			BtcTxId: common.RandBytes32(),
 			BtcIdx:  0,

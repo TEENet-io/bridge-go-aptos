@@ -7,8 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/TEENet-io/bridge-go/state"
-
+	"github.com/TEENet-io/bridge-go/agreement"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	logger "github.com/sirupsen/logrus"
 )
@@ -226,7 +225,7 @@ func (tv *TreasureVault) GetUTXODetail(txID string, vout int32) (*VaultUTXO, err
 func (tv *TreasureVault) Request(
 	reqTxId ethcommon.Hash,
 	amount *big.Int,
-	ch chan<- []state.BtcOutpoint,
+	ch chan<- []agreement.BtcOutpoint,
 ) error {
 	tv.Status() // report status
 
@@ -243,9 +242,9 @@ func (tv *TreasureVault) Request(
 		return err
 	}
 
-	outpoints := make([]state.BtcOutpoint, len(utxos))
+	outpoints := make([]agreement.BtcOutpoint, len(utxos))
 	for i, utxo := range utxos {
-		outpoints[i] = state.BtcOutpoint{
+		outpoints[i] = agreement.BtcOutpoint{
 			BtcTxId: ethcommon.HexToHash(utxo.TxID),
 			BtcIdx:  uint16(utxo.Vout),
 		}
