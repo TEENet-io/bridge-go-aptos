@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"math/big"
 
+	mycommon "github.com/TEENet-io/bridge-go/common"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // MintedEvent reqpresents when TWBTC is minted
@@ -73,4 +75,23 @@ type SignatureRequest struct {
 	Outpoints   []BtcOutpoint
 	Rx          *big.Int
 	S           *big.Int
+}
+
+// To mint on chain (eth/aptos),
+// Following params are needed to provide info.
+type MintParameter struct {
+	BtcTxId  common.Hash // bitcoin transaction hash is always 32 byte
+	Amount   *big.Int
+	Receiver []byte   // ethereum address
+	Rx       *big.Int // part of schnorr signature
+	S        *big.Int // part of schnorr signature
+}
+
+// The msg-hash for sign
+func (params *MintParameter) GenerateSigningHash() common.Hash {
+	return crypto.Keccak256Hash(mycommon.EncodePacked(
+		params.BtcTxId,
+		params.Receiver,
+		params.Amount,
+	))
 }
