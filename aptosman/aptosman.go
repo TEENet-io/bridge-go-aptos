@@ -12,16 +12,19 @@ import (
 
 	"github.com/aptos-labs/aptos-go-sdk"
 	"github.com/aptos-labs/aptos-go-sdk/bcs"
+	"github.com/btcsuite/btcd/chaincfg"
 	logger "github.com/sirupsen/logrus"
 )
 
 // Aptosman 是与Aptos区块链交互的核心结构体
 type Aptosman struct {
-	aptosClient   *aptos.Client
-	cfg           *AptosmanConfig
-	account       *aptos.Account
-	moduleAddress aptos.AccountAddress
-	mu            sync.Mutex
+	aptosClient    *aptos.Client
+	cfg            *AptosmanConfig
+	account        *aptos.Account
+	moduleAddress  aptos.AccountAddress
+	mu             sync.Mutex
+	BtcChainConfig *chaincfg.Params // 添加比特币网络配置
+
 }
 
 // NewAptosman 创建新的Aptosman实例
@@ -839,4 +842,14 @@ func (aptman *Aptosman) MintTokensToContract(amount uint64) (string, error) {
 
 	// 执行铸币操作
 	return aptman.Mint(params)
+}
+
+// NewSyncWorker 创建一个新的同步工作器
+func (aptman *Aptosman) NewSyncWorker() *AptosSyncWorker {
+	return NewAptosSyncWorker(aptman)
+}
+
+// NewMgrWorker 创建一个新的管理工作器
+func (aptman *Aptosman) NewMgrWorker() *AptosMgrWorker {
+	return NewAptosMgrWorker(aptman)
 }
