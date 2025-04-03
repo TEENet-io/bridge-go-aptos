@@ -525,7 +525,7 @@ func (ctm *ChainTxMgr) procedureMarkTxStatus() error {
 		txId := pendingTx.TxIdentifier
 
 		// 2. For each pending tx, check the tx status on chain
-		status, err := ctm.chainWorker.GetTxStatus(txId)
+		status, ledger_num, err := ctm.chainWorker.GetTxStatus(txId)
 		if err != nil {
 			logger.Errorf("failed to get tx status on chain: err=%v", err)
 			continue
@@ -542,7 +542,15 @@ func (ctm *ChainTxMgr) procedureMarkTxStatus() error {
 
 		// 4. If the tx takes too long to be accepted to blockchain, we consider it is timeout.
 		included_statuses := []agreement.MonitoredTxStatus{agreement.Success, agreement.Reverted}
-		if !agreement.UtilContains(included_statuses, status) {
+		// If the tx is included in a block, we set the found ledger number
+		if agreement.UtilContains(included_statuses, status) {
+			pendingTx.FoundBlockchainLedgerNumber = common.BigIntClone(ledger_num)
+			err = ctm.mgrdb.UpdateFound(txId, pendingTx.FoundBlockchainLedgerNumber)
+			if err != nil {
+				logger.Errorf("failed to update found ledger number in mgr db: err=%v", err)
+				continue
+			}
+		} else { // if Tx is not included in a block yet, may be timeout?
 			latestLedgerNumber, err := ctm.chainWorker.GetLatestLedgerNumber()
 			if err != nil {
 				logger.Errorf("failed to get latest ledger number: err=%v", err)

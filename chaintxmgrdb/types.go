@@ -40,15 +40,15 @@ type ChainTxMgrDB interface {
 	// You can feed in a list of statuses like ['limbo', 'reverted']
 	GetMonitoredTxByStatus(status []agreement.MonitoredTxStatus) ([]*MonitoredTx, error)
 
-	// Update refIdentifier
+	// Update refIdentifier field
 	UpdateRef(identifier []byte, refIdentifier []byte) error
 
-	// Update SentBlockchainLedgerNumber
+	// Update SentBlockchainLedgerNumber field
 	UpdateSent(identifier []byte, sentAt *big.Int) error
 
-	// Update FoundBlockchainLedgerNumber
+	// Update FoundBlockchainLedgerNumber field
 	UpdateFound(identifier []byte, foundAt *big.Int) error
 
-	// Update Status
+	// Update Status field
 	UpdateTxStatus(identifier []byte, status agreement.MonitoredTxStatus) error
 }

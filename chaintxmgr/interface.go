@@ -37,5 +37,9 @@ type MgrWorker interface {
 	// Check Tx Status on Chain
 	// Each transaction is to commit a change to blockchain,
 	// Naturally, the status of the transaction can be 'success' or 'reverted'
-	GetTxStatus(txId []byte) (agreement.MonitoredTxStatus, error)
+	// return value is (tx_status, ledger_number/block_number, error)
+	// For example, if a tx is inlucded (whether success or reverted) at block x,
+	// Then block_number is x.
+	// If a tx is not included in any block yet, then block_number is nil.
+	GetTxStatus(txId []byte) (agreement.MonitoredTxStatus, *big.Int, error)
 }
