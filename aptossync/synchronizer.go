@@ -78,7 +78,7 @@ func New(
 		"config":   fmt.Sprintf("%+v", cfg),
 	}).Debug("Creating new synchronizer")
 
-	blkNumberStored, err := st.GetEthFinalizedBlockNumber()
+	blkNumberStored, err := st.GetBlockchainFinalizedBlockNumber()
 	if err != nil {
 		logger.Error("failed to get aptos finalized version from database when initializing aptos synchronizer")
 		return nil, err

@@ -26,7 +26,7 @@ type StateChannel interface {
 	GetNewMintedEventChannel() chan<- *MintedEvent
 
 	// This is <NOT> a channel, it reads the finalized block/ledger number from state.
-	GetEthFinalizedBlockNumber() (*big.Int, error)
+	GetBlockchainFinalizedBlockNumber() (*big.Int, error)
 }
 
 // This interface defines how Tx manager interact with BTC UTXO responder (from BTC side).

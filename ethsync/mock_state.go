@@ -61,7 +61,7 @@ func (st *MockState) GetNewRedeemPreparedEventChannel() chan<- *agreement.Redeem
 	return st.preparedEvCh
 }
 
-func (st *MockState) GetEthFinalizedBlockNumber() (*big.Int, error) {
+func (st *MockState) GetBlockchainFinalizedBlockNumber() (*big.Int, error) {
 	return st.lastEthFinalized, nil
 }
 

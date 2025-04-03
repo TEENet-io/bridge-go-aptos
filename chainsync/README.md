@@ -1,10 +1,16 @@
-Defines what a "synchronizer" of a ETH/APTOS/other chain should do.
+# Synchronizer's job
 
-According to design document, a chain synchronizer shall:
+A synchronizer shall:
 
-1. Monitor blockchain and capture `Mint`/`RedeemRequest`/`RedeepPrepare` Event.
-2. Use an instance of `state`, and notify `state` about the events.
+1. Monitor blockchain blocks, and capture `Mint`/`RedeemRequest`/`RedeepPrepare` Event.
+2. Notify `state` database about the captured events.
 
-What you can do
+# For Developers
 
-Implement `SyncWorker` interface.
+Implement `SyncWorker` interface (see `interface.go`).
+
+# Files
+
+`syncer.go` - Main function body of Sychronizer.
+
+`interface.go` - Interfaces of chain's worker. Shall implement those to work with Synchronizer.

@@ -78,7 +78,7 @@ func TestNewStateWithoutStored(t *testing.T) {
 	st, err := New(statedb, &StateConfig{ChannelSize: 1})
 	assert.NoError(t, err)
 
-	finalized, err := st.GetEthFinalizedBlockNumber()
+	finalized, err := st.GetBlockchainFinalizedBlockNumber()
 	assert.NoError(t, err)
 	assert.Equal(t, finalized, common.EthStartingBlock)
 }
@@ -103,7 +103,7 @@ func TestWhenNewFBNLessThanStored(t *testing.T) {
 	defer close()
 	defer cancel()
 
-	stored, err := st.GetEthFinalizedBlockNumber()
+	stored, err := st.GetBlockchainFinalizedBlockNumber()
 	assert.NoError(t, err)
 
 	go st.Start(ctx)
@@ -112,7 +112,7 @@ func TestWhenNewFBNLessThanStored(t *testing.T) {
 	minusOne := new(big.Int).Sub(stored, big.NewInt(1))
 	st.GetNewBlockChainFinalizedLedgerNumberChannel() <- minusOne
 	time.Sleep(100 * time.Millisecond)
-	curr, err := st.GetEthFinalizedBlockNumber()
+	curr, err := st.GetBlockchainFinalizedBlockNumber()
 	assert.NoError(t, err)
 	assert.Equal(t, curr, stored)
 }
@@ -122,7 +122,7 @@ func TestWhenNewFBNLargerThanStored(t *testing.T) {
 	defer close()
 	defer cancel()
 
-	stored, err := st.GetEthFinalizedBlockNumber()
+	stored, err := st.GetBlockchainFinalizedBlockNumber()
 	assert.NoError(t, err)
 
 	go st.Start(ctx)
@@ -131,7 +131,7 @@ func TestWhenNewFBNLargerThanStored(t *testing.T) {
 	plusOne := new(big.Int).Add(stored, big.NewInt(1))
 	st.GetNewBlockChainFinalizedLedgerNumberChannel() <- plusOne
 	time.Sleep(100 * time.Millisecond)
-	curr, err := st.GetEthFinalizedBlockNumber()
+	curr, err := st.GetBlockchainFinalizedBlockNumber()
 	assert.NoError(t, err)
 	assert.Equal(t, curr, plusOne)
 }

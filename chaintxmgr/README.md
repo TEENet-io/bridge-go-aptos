@@ -1,4 +1,4 @@
-TxMgr shall do following jobs:
+# TxMgr's jobs:
 
 ### 1) Maintain `MgrState` database (not `State` database)
 
@@ -20,4 +20,14 @@ The state tracks txs and their post-status, whether txs is mined by the blockcha
 
 ### 4) Monitor Tx status
 
-See if "pending" tx is "success", or "rejected", or tx has timed out etc.
+See if "pending" tx is "success", or "rejected", or tx has "timeout" etc.
+
+# For Developers
+
+Implement `MgrWorker` interface (See `interface.go` file)
+
+# Files
+
+`mgr.go` - the main function body of TxMgr.
+
+`interface.go` - Interfaces of specific chain's worker. Shall implement those to work with TxMgr.
