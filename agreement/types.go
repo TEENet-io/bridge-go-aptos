@@ -88,10 +88,56 @@ type MintParameter struct {
 }
 
 // The msg-hash for sign
-func (params *MintParameter) GenerateSigningHash() common.Hash {
+func (params *MintParameter) GenerateMsgHash() common.Hash {
 	return crypto.Keccak256Hash(mycommon.EncodePacked(
 		params.BtcTxId,
 		params.Receiver,
 		params.Amount,
 	))
+}
+
+// To Prepare a redeem on chain (eth/aptos),
+// Following params are needed to provide info.
+// Real params to call Ethereum contract Redeem's Prepare()
+type PrepareParameter struct {
+	RequestTxHash common.Hash // [32]byte
+	Requester     []byte      // [20]byte = eth address, [32]byte = aptos address
+	Receiver      string      // btc address, cannot be represented in bytes...
+	Amount        *big.Int
+	OutpointTxIds []common.Hash // each is [32]byte
+	OutpointIdxs  []uint16      // corresponding output's vout to btc_tx_id(s)
+	Rx            *big.Int
+	S             *big.Int
+}
+
+// Serialize the parameters and create a hash
+func (p *PrepareParameter) GenerateMsgHash() common.Hash {
+	outpointIdxs := []*big.Int{}
+	for _, idx := range p.OutpointIdxs {
+		outpointIdxs = append(outpointIdxs, big.NewInt(int64(idx)))
+	}
+
+	return crypto.Keccak256Hash(mycommon.EncodePacked(
+		p.RequestTxHash,
+		p.Requester,
+		string(p.Receiver),
+		p.Amount,
+		p.OutpointTxIds,
+		outpointIdxs,
+	))
+}
+
+// Create RedeemPrepare Tx needed params from state.redeem object.
+// This is a Helper function for Redeem's prepare.
+// TODO: Unify the BTC UTXO's representation of TXId + Vout
+func ConvertOutpoints(bop []BtcOutpoint) ([]common.Hash, []uint16) {
+	outpointTxIds := []common.Hash{}
+	outpointIdxs := []uint16{}
+
+	for _, outpoint := range bop {
+		outpointTxIds = append(outpointTxIds, outpoint.BtcTxId)
+		outpointIdxs = append(outpointIdxs, outpoint.BtcIdx)
+	}
+
+	return outpointTxIds, outpointIdxs
 }

@@ -41,7 +41,7 @@ type ChainTxMgr struct {
 
 	mgrdbLock  sync.Mutex // Prevent race condition, both read/write lock to db.
 	mintLock   sync.Mutex // Prevent race condition
-	redeemLock sync.Map   // Prevent race condition
+	redeemLock sync.Mutex // Prevent race condition
 }
 
 // The Big Loop!
@@ -64,7 +64,12 @@ func (ctm *ChainTxMgr) Loop(ctx context.Context) error {
 				logger.Errorf("failed to process mint: err=%v", mint_err)
 			}
 			// do the redeemPrepare
-			// do the Tx status
+
+			prepare_err := ctm.procedurePrepare(ctx)
+			if prepare_err != nil {
+				logger.Errorf("failed to process prepare: err=%v", prepare_err)
+			}
+			// do the Tx status monitoring
 		}
 	}
 }
@@ -164,11 +169,11 @@ func (ctm *ChainTxMgr) QueryMints() ([]*state.Mint, error) {
 }
 
 // Filter mints, drop off those already minted (tracked in mgr db)
-func (cmt *ChainTxMgr) FilterMints(mints []*state.Mint) ([]*state.Mint, error) {
+func (ctm *ChainTxMgr) FilterMints(mints []*state.Mint) ([]*state.Mint, error) {
 	_mints := []*state.Mint{}
 	for _, mint := range mints {
 		_refId := mint.BtcTxId.Bytes()
-		_hits, err := cmt.mgrdb.GetMonitoredTxByRefIdentifier(_refId)
+		_hits, err := ctm.mgrdb.GetMonitoredTxByRefIdentifier(_refId)
 		if err != nil {
 			logger.Errorf("failed to get monitored tx by ref id: err=%v", err)
 			continue
@@ -181,9 +186,9 @@ func (cmt *ChainTxMgr) FilterMints(mints []*state.Mint) ([]*state.Mint, error) {
 }
 
 // Double check the mint status on chain, drop off those already minted (success minted on chain)
-func (cmt *ChainTxMgr) IsDoubleMint(mint *state.Mint) (bool, error) {
+func (ctm *ChainTxMgr) IsDoubleMint(mint *state.Mint) (bool, error) {
 	// Check if the mint is already minted on chain
-	found, err := cmt.chainWorker.IsMinted(mint.BtcTxId)
+	found, err := ctm.chainWorker.IsMinted(mint.BtcTxId)
 	if err != nil {
 		logger.Errorf("failed to check if minted: err=%v", err)
 		return false, err
@@ -197,17 +202,17 @@ func (cmt *ChainTxMgr) IsDoubleMint(mint *state.Mint) (bool, error) {
 }
 
 // Prepare mint params (this step contains the schnorr signature request)
-func (cmt *ChainTxMgr) PrepareMint(ctx context.Context, mint *state.Mint) (*agreement.MintParameter, error) {
+func (ctm *ChainTxMgr) PrepareMint(ctx context.Context, mint *state.Mint) (*agreement.MintParameter, error) {
 	mp := &agreement.MintParameter{
 		BtcTxId:  mint.BtcTxId,
 		Receiver: mint.Receiver,
 		Amount:   common.BigIntClone(mint.Amount),
 	}
-	msgHash := mp.GenerateSigningHash()
+	msgHash := mp.GenerateMsgHash()
 
 	// request signature from schnorr signer
 	_channel := make(chan *agreement.SignatureRequest, 1)
-	err := cmt.schnorrParty.SignAsync(
+	err := ctm.schnorrParty.SignAsync(
 		&agreement.SignatureRequest{
 			Id:          mint.BtcTxId,
 			SigningHash: msgHash,
@@ -220,7 +225,7 @@ func (cmt *ChainTxMgr) PrepareMint(ctx context.Context, mint *state.Mint) (*agre
 	}
 
 	// wait for the signature to be sent by the schnorr wallet
-	req, err := cmt.waitAndVerifySignature(ctx, msgHash, _channel)
+	req, err := ctm.waitAndVerifySignature(ctx, msgHash, _channel)
 	if err != nil {
 		return nil, err
 	}
@@ -235,9 +240,9 @@ func (cmt *ChainTxMgr) PrepareMint(ctx context.Context, mint *state.Mint) (*agre
 
 // Call the actual mint() function on chain
 // Return the (tx_id, sent_at_ledger_number, error)
-func (cmt *ChainTxMgr) CallMint(mp *agreement.MintParameter) ([]byte, *big.Int, error) {
+func (ctm *ChainTxMgr) CallMint(mp *agreement.MintParameter) ([]byte, *big.Int, error) {
 	// Send the real Mint Tx to Ethereum
-	tx_id, ledger_number, err := cmt.chainWorker.DoMint(mp)
+	tx_id, ledger_number, err := ctm.chainWorker.DoMint(mp)
 	if err != nil {
 		logger.Errorf("failed to call mint() on chain: err=%v", err)
 		return nil, nil, err
@@ -250,7 +255,7 @@ func (cmt *ChainTxMgr) CallMint(mp *agreement.MintParameter) ([]byte, *big.Int, 
 // Set Tx to the mgrdb, and it is "pending" status
 // TODO: Tx may actually be "limbo" status after success submission.
 // TODO: Need a second around of scan to change it from "limbo" to "pending".
-func (cmt *ChainTxMgr) SetMintToBeMonitored(mp *agreement.MintParameter, txId []byte, sentAt *big.Int, status chaintxmgrdb.MonitoredTxStatus) error {
+func (ctm *ChainTxMgr) SetMintToBeMonitored(mp *agreement.MintParameter, txId []byte, sentAt *big.Int, status chaintxmgrdb.MonitoredTxStatus) error {
 	// Set the mint to be monitored in mgr db
 	monitoredTx := chaintxmgrdb.MonitoredTx{
 		TxIdentifier:                txId,
@@ -259,22 +264,231 @@ func (cmt *ChainTxMgr) SetMintToBeMonitored(mp *agreement.MintParameter, txId []
 		FoundBlockchainLedgerNumber: nil,
 		TxStatus:                    status,
 	}
-	return cmt.setMonitoredTx(&monitoredTx)
+	return ctm.setMonitoredTx(&monitoredTx)
+}
+
+func (ctm *ChainTxMgr) SetPrepareToBeMonitored(pp *agreement.PrepareParameter, txId []byte, sentAt *big.Int, status chaintxmgrdb.MonitoredTxStatus) error {
+	// Set the mint to be monitored in mgr db
+	monitoredTx := chaintxmgrdb.MonitoredTx{
+		TxIdentifier:                txId,
+		RefIdentifier:               pp.RequestTxHash.Bytes(),
+		SentBlockchainLedgerNumber:  common.BigIntClone(sentAt),
+		FoundBlockchainLedgerNumber: nil,
+		TxStatus:                    status,
+	}
+	return ctm.setMonitoredTx(&monitoredTx)
 }
 
 // Set a Tx to be monitored in mgr db
-func (cmt *ChainTxMgr) setMonitoredTx(tx *chaintxmgrdb.MonitoredTx) error {
-	return cmt.mgrdb.InsertMonitoredTx(tx)
+func (ctm *ChainTxMgr) setMonitoredTx(tx *chaintxmgrdb.MonitoredTx) error {
+	return ctm.mgrdb.InsertMonitoredTx(tx)
+}
+
+// Find not prepared redeems from the database
+func (ctm *ChainTxMgr) QueryUnPrepared() ([]*state.Redeem, error) {
+	redeems, err := ctm.statedb.GetRedeemsByStatus(state.RedeemStatusRequested)
+	if err != nil {
+		logger.Errorf("failed to get redeems by status: err=%v", err)
+		return nil, err
+	}
+	return redeems, nil
+}
+
+// Filter out those redeems that are already prepared (tracked in mgr db)
+func (ctm *ChainTxMgr) FilterUnPrepared(redeems []*state.Redeem) ([]*state.Redeem, error) {
+	// Filter out those already prepared
+	_unprepared := []*state.Redeem{}
+	for _, redeem := range redeems {
+		_refId := redeem.RequestTxHash.Bytes() // Use reqTxHash as the reference id
+		_hits, err := ctm.mgrdb.GetMonitoredTxByRefIdentifier(_refId)
+		if err != nil {
+			logger.Errorf("failed to get monitored tx by ref id: err=%v", err)
+			continue
+		}
+		if len(_hits) == 0 {
+			_unprepared = append(_unprepared, redeem)
+		}
+	}
+	return _unprepared, nil
+}
+
+// Double check the redeem's prepare on chain, drop off those already prepared (success on chain)
+func (ctm *ChainTxMgr) IsDoublePrepare(redeem *state.Redeem) (bool, error) {
+	// Check if the redeem is already prepared on chain
+	found, err := ctm.chainWorker.IsPrepared(redeem.RequestTxHash)
+	if err != nil {
+		logger.Errorf("failed to check if is prepared: err=%v", err)
+		return false, err
+	}
+	if found {
+		logger.Debug("already prepared, skip preparing")
+		return true, nil
+	} else {
+		return false, nil
+	}
+}
+
+// Prepare the RedeemPrepare Tx needed parameters.
+func (ctm *ChainTxMgr) PreparePrepare(ctx context.Context, redeem *state.Redeem) (*agreement.PrepareParameter, error) {
+	// Query the BTC UTXO Responder for UTXO outpoints
+	// request spendable outpoints from btc wallet
+	_channel_outpoints := make(chan []agreement.BtcOutpoint, 1)
+	err := ctm.btcUTXOResponder.Request(
+		redeem.RequestTxHash.Bytes(),
+		redeem.Amount,
+		_channel_outpoints,
+	)
+	if err != nil {
+		logger.WithField("err", err).Error("failed to request spendable UTXO outpoints")
+		return nil, fmt.Errorf("ERR_BTC_UTXO_REQUEST: %v", err)
+	}
+
+	_outpoints, err := ctm.waitForOutPoints(ctx, _channel_outpoints)
+	if err != nil {
+		return nil, err
+	}
+	logger.WithField("num", len(_outpoints)).Info("UTXO outpoints received")
+
+	// Stuff the PrepareParameter
+	pp := &agreement.PrepareParameter{
+		RequestTxHash: redeem.RequestTxHash,
+		Requester:     redeem.Requester,
+		Receiver:      redeem.Receiver,
+		Amount:        common.BigIntClone(redeem.Amount),
+	}
+	pp.OutpointTxIds, pp.OutpointIdxs = agreement.ConvertOutpoints(_outpoints)
+
+	// Generate msg hash before requesting signature
+	msgHash := pp.GenerateMsgHash()
+
+	// request signature from schnorr signer over the msg hash
+	_channel := make(chan *agreement.SignatureRequest, 1)
+	err = ctm.schnorrParty.SignAsync(
+		&agreement.SignatureRequest{
+			Id:          redeem.RequestTxHash,
+			SigningHash: msgHash,
+		},
+		_channel,
+	)
+	if err != nil {
+		logger.Errorf("failed to request signature with err=%v", err)
+		return nil, err
+	}
+	// wait...
+	req, err := ctm.waitAndVerifySignature(ctx, msgHash, _channel)
+	if err != nil {
+		return nil, err
+	}
+	logger.Info("schnorr signature requested & received")
+
+	// Stuff the prepare parameter
+	pp.Rx = common.BigIntClone(req.Rx)
+	pp.S = common.BigIntClone(req.S)
+
+	return pp, nil
+}
+
+// Call the actual prepareRedeem() function on chain
+// Return the (tx_id, sent_at_ledger_number, error)
+func (ctm *ChainTxMgr) CallPrepare(pp *agreement.PrepareParameter) ([]byte, *big.Int, error) {
+	// Send the real Prepare Tx to Ethereum
+	tx_id, ledger_number, err := ctm.chainWorker.DoPrepare(pp)
+	if err != nil {
+		logger.Errorf("failed to call prepareRedeem() on chain: err=%v", err)
+		return nil, nil, err
+	}
+
+	logger.WithField("prepareTx", common.ByteSliceToPureHexStr(tx_id)).Info("Prepare tx sent")
+	return tx_id, ledger_number, nil
+}
+
+func (ctm *ChainTxMgr) procedurePrepare(ctx context.Context) error {
+	// 0. Aquire necessary locks
+	// 1. Find unprepared redeems from state db
+	// 2. Filter those already prepared (tracked in mgr db)
+	// 3. for each redeem, Check if the redeem is already prepared on chain
+	// 4. for each redeem, Prepare redeem params (this step contains the schnorr signature request)
+	// 5. for each redeem, Call prepareRedeem() function on chain
+	// 6. for each redeem, Set Tx to the mgrdb, and it is "pending" status
+
+	// 0. Aquire necessary locks
+	ctm.mgrdbLock.Lock()
+	defer ctm.mgrdbLock.Unlock()
+
+	ctm.redeemLock.Lock()
+	defer ctm.redeemLock.Unlock()
+
+	// 1. Find unprepared redeems from state db
+	redeems, err := ctm.QueryUnPrepared()
+	if err != nil {
+		logger.Errorf("failed to query unprepared redeems: err=%v", err)
+		return err
+	}
+
+	// 2. Filter those already prepared (tracked in mgr db)
+	redeems_clean, err := ctm.FilterUnPrepared(redeems)
+	if err != nil {
+		logger.Errorf("failed to filter unprepared redeems against mgrdb: err=%v", err)
+		return err
+	}
+
+	if len(redeems_clean) == 0 {
+		logger.Debug("no new redeems to process")
+		return nil
+	}
+
+	for _, redeem := range redeems_clean {
+		// 3. Check if the redeem is already prepared on chain
+		found, err := ctm.IsDoublePrepare(redeem)
+		if err != nil {
+			logger.Errorf("failed to check if prepared: err=%v", err)
+			continue
+		}
+		if found {
+			continue
+		}
+
+		// 4. Prepare redeem params (this step contains the schnorr signature request)
+		pp, err := ctm.PreparePrepare(ctx, redeem)
+		if err != nil {
+			logger.Errorf("failed to prepare redeem params: err=%v", err)
+			continue
+		}
+
+		tx_id, ledger_number, err := ctm.CallPrepare(pp)
+		if err != nil {
+			logger.Errorf("failed to call prepareRedeem() on chain: err=%v", err)
+			continue
+		}
+
+		// Extra: if the ledger_number is nil, we try the <best effort> to set it
+		if ledger_number == nil {
+			latest_ledger_number, err := ctm.chainWorker.GetLatestLedgerNumber()
+			if err != nil {
+				logger.Errorf("failed to get latest ledger number: err=%v", err)
+			} else {
+				if latest_ledger_number != nil {
+					ledger_number = latest_ledger_number
+				} else {
+					logger.Errorf("latest ledger number is nil")
+				}
+			}
+		}
+
+		// 6. Set Tx to the mgrdb, and it is "pending" status
+		err = ctm.SetPrepareToBeMonitored(pp, tx_id, ledger_number, chaintxmgrdb.Pending)
+		if err != nil {
+			logger.Errorf("failed to set mint to be monitored in mgrdb: err=%v", err)
+			continue
+		}
+	}
+	return nil
 }
 
 // Wait for Schnorr Signature.
 // Then verify Signature.
-func (cmt *ChainTxMgr) waitAndVerifySignature(
-	ctx context.Context,
-	signingHash [32]byte,
-	ch <-chan *agreement.SignatureRequest,
-) (*agreement.SignatureRequest, error) {
-	newCtx, cancel := context.WithTimeout(ctx, cmt.cfg.TimeoutOnWaitingForSignature)
+func (ctm *ChainTxMgr) waitAndVerifySignature(ctx context.Context, msgHash [32]byte, ch <-chan *agreement.SignatureRequest) (*agreement.SignatureRequest, error) {
+	newCtx, cancel := context.WithTimeout(ctx, ctm.cfg.TimeoutOnWaitingForSignature)
 	defer cancel()
 
 	for {
@@ -282,10 +496,29 @@ func (cmt *ChainTxMgr) waitAndVerifySignature(
 		case <-newCtx.Done():
 			return nil, ctx.Err()
 		case req := <-ch:
-			if ok := common.Verify(cmt.pubKey[:], signingHash[:], req.Rx, req.S); !ok {
+			if ok := common.Verify(ctm.pubKey[:], msgHash[:], req.Rx, req.S); !ok {
 				return req, fmt.Errorf("ERR_BAD_SIGNATURE: signature verification failed")
 			}
 			return req, nil
+		}
+	}
+}
+
+// Query & Wait for BTC UTXO outpoints.
+// If not enough outpoints returned, there can be error.
+func (ctm *ChainTxMgr) waitForOutPoints(ctx context.Context, ch <-chan []agreement.BtcOutpoint) ([]agreement.BtcOutpoint, error) {
+	newCtx, cancel := context.WithTimeout(ctx, ctm.cfg.TimeoutOnWaitingForOutpoints)
+	defer cancel()
+
+	for {
+		select {
+		case <-newCtx.Done():
+			return nil, newCtx.Err()
+		case outpoints := <-ch:
+			if len(outpoints) == 0 {
+				return nil, fmt.Errorf("ERR_EMPTY_OUTPOINTS: no outpoints returned")
+			}
+			return outpoints, nil
 		}
 	}
 }
@@ -305,4 +538,14 @@ type MgrWorker interface {
 	// If ledger number field is really unknown, set to nil.
 	// Return the (mint_tx_hash, sent_at_ledger_number, error)
 	DoMint(mint *agreement.MintParameter) ([]byte, *big.Int, error)
+
+	// Call the smart contract and verify if the redeem is already prepared on chain
+	// The query uses the redeem's request tx id (prevent double prepare check)
+	IsPrepared(requestTxId [32]byte) (bool, error)
+
+	// Call the actual prepare() on smart contract on chain
+	// Note: this function shall return the approximate ledger number when this tx is submitted to blockchain.
+	// If ledger number field is really unknown, set to nil.
+	// Return the (prepare_tx_hash, sent_at_ledger_number, error)
+	DoPrepare(prepare *agreement.PrepareParameter) ([]byte, *big.Int, error)
 }

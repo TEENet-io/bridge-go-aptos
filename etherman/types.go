@@ -34,12 +34,12 @@ type RequestParams struct {
 
 // Real params to call Ethereum contract Redeem's Prepare()
 type PrepareParams struct {
-	RequestTxHash ethcommon.Hash // eth transaction id
+	RequestTxHash ethcommon.Hash // [32]byte
 	Requester     []byte         // [20]byte = eth address, [32]byte = aptos address
-	Receiver      string         // btc address
+	Receiver      string         // btc address, cannot be represented in bytes...
 	Amount        *big.Int
-	OutpointTxIds []ethcommon.Hash // btc_tx_id(s) to be spent
-	OutpointIdxs  []uint16         // corresponding output vout to btc_tx_id(s)
+	OutpointTxIds []ethcommon.Hash // [32]byte = btc_tx_id
+	OutpointIdxs  []uint16         // number, corresponding output vout to btc_tx_id(s)
 	Rx            *big.Int
 	S             *big.Int
 }
