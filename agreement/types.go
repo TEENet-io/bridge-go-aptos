@@ -154,3 +154,12 @@ const (
 	Timeout  MonitoredTxStatus = "timeout"  // For too long a time, it is not success or reverted.
 	Reorg    MonitoredTxStatus = "reorg"    // blockchain re-orged (rarely used, not used in program yet)
 )
+
+func UtilContains(slice []MonitoredTxStatus, item MonitoredTxStatus) bool {
+	for _, v := range slice {
+		if v == item {
+			return true
+		}
+	}
+	return false
+}

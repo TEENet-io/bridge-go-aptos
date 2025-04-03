@@ -37,7 +37,8 @@ type ChainTxMgrDB interface {
 	GetMonitoredTxByRefIdentifier(refIdentifier []byte) ([]*MonitoredTx, error)
 
 	// Get Tx(s) by status
-	GetMonitoredTxByStatus(status agreement.MonitoredTxStatus) ([]*MonitoredTx, error)
+	// You can feed in a list of statuses like ['limbo', 'reverted']
+	GetMonitoredTxByStatus(status []agreement.MonitoredTxStatus) ([]*MonitoredTx, error)
 
 	// Update refIdentifier
 	UpdateRef(identifier []byte, refIdentifier []byte) error
@@ -49,5 +50,5 @@ type ChainTxMgrDB interface {
 	UpdateFound(identifier []byte, foundAt *big.Int) error
 
 	// Update Status
-	UpdateStatus(identifier []byte, status MonitoredTx) error
+	UpdateTxStatus(identifier []byte, status agreement.MonitoredTxStatus) error
 }
