@@ -30,6 +30,10 @@ func HexStrToHash(hexStr string) ethcommon.Hash {
 	return ethcommon.HexToHash(hexStr)
 }
 
+func Bytes32ToHexStr(bytes32 [32]byte) string {
+	return ethcommon.Bytes2Hex(bytes32[:])
+}
+
 // ArrayHexStrToHashes converts an array of hex strings to ethcommon.Hash array
 func ArrayHexStrToHashes(hexStrs []string) []ethcommon.Hash {
 	hashes := make([]ethcommon.Hash, len(hexStrs))
