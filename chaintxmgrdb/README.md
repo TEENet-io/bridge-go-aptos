@@ -19,4 +19,4 @@ ChainTxMgrDB shall be supported by **ANY** database implementation. The recommen
 
 `types.go`: define the types and interface of such db.
 
-`sqlite_chaintxmgrdb.go`: the sqlite implementation of such db.
+`sqlite_chaintxmgrdb.go`: the sqlite implementation of such db. The class is `SQLiteChainTxMgrDB`.
