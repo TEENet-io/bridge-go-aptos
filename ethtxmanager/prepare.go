@@ -182,6 +182,7 @@ func (txmgr *EthTxManager) createRedeemPrepareTx(
 	return &_hash, nil
 }
 
+// Create RedeemPrepare Tx needed params from state.redeem object.
 func createPrepareParams(redeem *state.Redeem) *etherman.PrepareParams {
 	outpointTxIds := []ethcommon.Hash{}
 	outpointIdxs := []uint16{}

@@ -35,14 +35,14 @@ var (
 )
 
 type Redeem struct {
-	RequestTxHash ethcommon.Hash
-	PrepareTxHash ethcommon.Hash
+	RequestTxHash ethcommon.Hash // [32]byte
+	PrepareTxHash ethcommon.Hash // [32]byte
 	BtcTxId       ethcommon.Hash // [32]byte
 	Requester     []byte         // [20]byte = ethereum address, [32]byte = aptos address
-	Receiver      string         // receiver btc address
+	Receiver      string         // receiver btc address, cannot be represented in bytes..
 	Amount        *big.Int
 	Outpoints     []agreement.BtcOutpoint
-	Status        RedeemStatus
+	Status        RedeemStatus // string
 }
 
 // Created a new Redeem object when user requests.
