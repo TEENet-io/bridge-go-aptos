@@ -26,6 +26,9 @@ type ChainTxMgrConfig struct {
 	TimeoutOnWaitingForOutpoints time.Duration
 
 	// Timeout Ledger version number (or block number)
+	// The Tx is considered "Timeout" after such period has passed and not mined.
+	// Whether re-send or just drop the Tx is another story.
+	// But we need to know and mark it clearly.
 	TimeoutTxLedgerNumber *big.Int
 }
 
@@ -63,13 +66,18 @@ func (ctm *ChainTxMgr) Loop(ctx context.Context) error {
 			if mint_err != nil {
 				logger.Errorf("failed to process mint: err=%v", mint_err)
 			}
-			// do the redeemPrepare
 
+			// do the redeemPrepare procedure
 			prepare_err := ctm.procedurePrepare(ctx)
 			if prepare_err != nil {
 				logger.Errorf("failed to process prepare: err=%v", prepare_err)
 			}
-			// do the Tx status monitoring
+
+			// do the Tx status tracking procedure
+			mark_err := ctm.procedureMarkTxStatus()
+			if mark_err != nil {
+				logger.Errorf("failed to process mark tx status: err=%v", mark_err)
+			}
 		}
 	}
 }
@@ -481,6 +489,80 @@ func (ctm *ChainTxMgr) procedurePrepare(ctx context.Context) error {
 			logger.Errorf("failed to set mint to be monitored in mgrdb: err=%v", err)
 			continue
 		}
+	}
+	return nil
+}
+
+// This procedure tracks the Tx status on chain
+// Then mark accordingly.
+// If a Tx takes too long to be included, it will also marking it as timeout status.
+// But it doesn't deal with timeout, it is another story.
+func (ctm *ChainTxMgr) procedureMarkTxStatus() error {
+	// 0. Aquire necessary locks
+	// 1. Get all pending txs from mgr db
+	// 2. For each pending tx, check the tx status on chain
+	// 3. Update the tx status in mgr db
+	// 4. If the tx takes too long to be accepted to blockchain, we consider it is timeout.
+
+	// 0. Aquire necessary locks
+	ctm.mgrdbLock.Lock()
+	defer ctm.mgrdbLock.Unlock()
+
+	// 1. Get all limbo/pending txs from mgr db
+	pending_statuses := []agreement.MonitoredTxStatus{agreement.Limbo, agreement.Pending}
+	pendingTxs, err := ctm.mgrdb.GetMonitoredTxByStatus(pending_statuses)
+	if err != nil {
+		logger.Errorf("failed to get monitored tx by status: err=%v", err)
+		return err
+	}
+
+	if len(pendingTxs) == 0 {
+		logger.Debug("no pending txs to process")
+		return nil
+	}
+
+	for _, pendingTx := range pendingTxs {
+		txId := pendingTx.TxIdentifier
+
+		// 2. For each pending tx, check the tx status on chain
+		status, err := ctm.chainWorker.GetTxStatus(txId)
+		if err != nil {
+			logger.Errorf("failed to get tx status on chain: err=%v", err)
+			continue
+		}
+
+		pendingTx.TxStatus = status
+
+		// 3. Update the tx status in mgr db
+		err = ctm.mgrdb.UpdateTxStatus(txId, status)
+		if err != nil {
+			logger.Errorf("failed to update tx status in mgr db: err=%v", err)
+			continue
+		}
+
+		// 4. If the tx takes too long to be accepted to blockchain, we consider it is timeout.
+		included_statuses := []agreement.MonitoredTxStatus{agreement.Success, agreement.Reverted}
+		if !agreement.UtilContains(included_statuses, status) {
+			latestLedgerNumber, err := ctm.chainWorker.GetLatestLedgerNumber()
+			if err != nil {
+				logger.Errorf("failed to get latest ledger number: err=%v", err)
+				continue
+			}
+
+			if latestLedgerNumber != nil && pendingTx.SentBlockchainLedgerNumber != nil {
+				expireThreshold := new(big.Int).Add(pendingTx.SentBlockchainLedgerNumber, ctm.cfg.TimeoutTxLedgerNumber)
+				if expireThreshold.Cmp(latestLedgerNumber) <= 0 { // eg. expireThreshold = 100; latestLedgerNumber = 120
+					pendingTx.TxStatus = agreement.Timeout
+					err = ctm.mgrdb.UpdateTxStatus(txId, agreement.Timeout)
+					if err != nil {
+						logger.Errorf("failed to update tx status to timeout in mgr db: err=%v", err)
+						continue
+					}
+					logger.WithField("txId", common.ByteSliceToPureHexStr(txId)).Info("Tx marked as timeout")
+				}
+			}
+		}
+
 	}
 	return nil
 }
