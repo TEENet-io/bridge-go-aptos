@@ -141,3 +141,16 @@ func ConvertOutpoints(bop []BtcOutpoint) ([]common.Hash, []uint16) {
 
 	return outpointTxIds, outpointIdxs
 }
+
+// Enum for the status of the tx submitted to the blockchain.
+type MonitoredTxStatus string
+
+const (
+	MalForm  MonitoredTxStatus = "malform"  // mal-form Tx, cannot be accepted by blockchain.
+	Limbo    MonitoredTxStatus = "limbo"    // Tx sent, but not found anywhere.
+	Pending  MonitoredTxStatus = "pending"  // pending in the blockchain's mempool, not executed, yet.
+	Success  MonitoredTxStatus = "success"  // Tx success, included in the blockchain ledger.
+	Reverted MonitoredTxStatus = "reverted" // Tx execution failed, wanted change doesn't apply to blockchain.
+	Timeout  MonitoredTxStatus = "timeout"  // For too long a time, it is not success or reverted.
+	Reorg    MonitoredTxStatus = "reorg"    // blockchain re-orged (rarely used, not used in program yet)
+)

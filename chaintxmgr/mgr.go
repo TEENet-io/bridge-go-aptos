@@ -149,7 +149,7 @@ func (ctm *ChainTxMgr) procedureMint(ctx context.Context) error {
 		}
 
 		// 6. Set Tx to the mgrdb, and it is "pending" status
-		err = ctm.SetMintToBeMonitored(_mint_params, tx_id, ledger_number, chaintxmgrdb.Pending)
+		err = ctm.SetMintToBeMonitored(_mint_params, tx_id, ledger_number, agreement.Pending)
 		if err != nil {
 			logger.Errorf("failed to set mint to be monitored in mgrdb: err=%v", err)
 			continue
@@ -255,7 +255,7 @@ func (ctm *ChainTxMgr) CallMint(mp *agreement.MintParameter) ([]byte, *big.Int, 
 // Set Tx to the mgrdb, and it is "pending" status
 // TODO: Tx may actually be "limbo" status after success submission.
 // TODO: Need a second around of scan to change it from "limbo" to "pending".
-func (ctm *ChainTxMgr) SetMintToBeMonitored(mp *agreement.MintParameter, txId []byte, sentAt *big.Int, status chaintxmgrdb.MonitoredTxStatus) error {
+func (ctm *ChainTxMgr) SetMintToBeMonitored(mp *agreement.MintParameter, txId []byte, sentAt *big.Int, status agreement.MonitoredTxStatus) error {
 	// Set the mint to be monitored in mgr db
 	monitoredTx := chaintxmgrdb.MonitoredTx{
 		TxIdentifier:                txId,
@@ -267,7 +267,7 @@ func (ctm *ChainTxMgr) SetMintToBeMonitored(mp *agreement.MintParameter, txId []
 	return ctm.setMonitoredTx(&monitoredTx)
 }
 
-func (ctm *ChainTxMgr) SetPrepareToBeMonitored(pp *agreement.PrepareParameter, txId []byte, sentAt *big.Int, status chaintxmgrdb.MonitoredTxStatus) error {
+func (ctm *ChainTxMgr) SetPrepareToBeMonitored(pp *agreement.PrepareParameter, txId []byte, sentAt *big.Int, status agreement.MonitoredTxStatus) error {
 	// Set the mint to be monitored in mgr db
 	monitoredTx := chaintxmgrdb.MonitoredTx{
 		TxIdentifier:                txId,
@@ -476,7 +476,7 @@ func (ctm *ChainTxMgr) procedurePrepare(ctx context.Context) error {
 		}
 
 		// 6. Set Tx to the mgrdb, and it is "pending" status
-		err = ctm.SetPrepareToBeMonitored(pp, tx_id, ledger_number, chaintxmgrdb.Pending)
+		err = ctm.SetPrepareToBeMonitored(pp, tx_id, ledger_number, agreement.Pending)
 		if err != nil {
 			logger.Errorf("failed to set mint to be monitored in mgrdb: err=%v", err)
 			continue
@@ -548,4 +548,9 @@ type MgrWorker interface {
 	// If ledger number field is really unknown, set to nil.
 	// Return the (prepare_tx_hash, sent_at_ledger_number, error)
 	DoPrepare(prepare *agreement.PrepareParameter) ([]byte, *big.Int, error)
+
+	// Check Tx Status on Chain
+	// Each transaction is to commit a change to blockchain,
+	// Naturally, the status of the transaction can be 'success' or 'reverted'
+	GetTxStatus(txId []byte) (agreement.MonitoredTxStatus, error)
 }
