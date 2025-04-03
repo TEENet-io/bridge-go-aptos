@@ -27,7 +27,7 @@ type ChainSync struct {
 }
 
 func NewChainSync(cfg *ChainSyncConfig, syncWorker SyncWorker) (*ChainSync, error) {
-	blkNumberStored, err := cfg.st.GetEthFinalizedBlockNumber()
+	blkNumberStored, err := cfg.st.GetBlockchainFinalizedBlockNumber()
 	if err != nil {
 		logger.Error("failed to get eth finalized block number from database when initializing eth synchronizer")
 		return nil, err
@@ -104,17 +104,4 @@ func (cs *ChainSync) Loop(ctx context.Context) error {
 			cs.lastChecked = new(big.Int).Set(newFinalized)
 		}
 	}
-}
-
-// Chain's Sync Worker, do the dirty job.
-type SyncWorker interface {
-	// The worker shall implment this function.
-	// on ETH it is the finalized block number.
-	// on aptos it is newest ledger version?
-	GetNewestLedgerFinalizedNumber() (*big.Int, error)
-
-	// Fetch Interested events from the blockchain.
-	// Notice, the events shall ordered from old -> new.
-	// Otherwise the bridge process will have logic bugs.
-	GetTimeOrderedEvents(oldNum *big.Int, newNum *big.Int) ([]agreement.MintedEvent, []agreement.RedeemRequestedEvent, []agreement.RedeemPreparedEvent, error)
 }

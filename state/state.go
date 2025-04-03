@@ -117,7 +117,7 @@ func (st *State) Start(ctx context.Context) error {
 
 			handleNewBlockNumber := func() error {
 				// Get the stored last finalized block number
-				lastFinalized, err := st.GetEthFinalizedBlockNumber()
+				lastFinalized, err := st.GetBlockchainFinalizedBlockNumber()
 				if err != nil {
 					newLogger.Errorf("failed to get last finalized block number: err=%v", err)
 					return ErrGetEthFinalizedBlockNumber
@@ -274,7 +274,7 @@ func (st *State) Start(ctx context.Context) error {
 }
 
 // Fetch latest finalized eth block number from statedb
-func (st *State) GetEthFinalizedBlockNumber() (*big.Int, error) {
+func (st *State) GetBlockchainFinalizedBlockNumber() (*big.Int, error) {
 	if v := st.cache.lastEthFinalized.Load(); v != nil {
 		return new(big.Int).SetBytes(v.([]byte)), nil
 	}

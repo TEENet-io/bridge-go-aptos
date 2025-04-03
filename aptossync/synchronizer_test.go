@@ -139,7 +139,7 @@ func TestAptosSync(t *testing.T) {
 	fmt.Println("st.preparedEv:", st.preparedEv)
 	fmt.Println("================================================")
 	// 验证最后的版本号被更新
-	lastVersion, err := st.GetEthFinalizedBlockNumber()
+	lastVersion, err := st.GetBlockchainFinalizedBlockNumber()
 	fmt.Println("lastVersion:", lastVersion)
 	fmt.Println("err:", err)
 }

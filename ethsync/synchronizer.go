@@ -37,7 +37,7 @@ func New(
 		return nil, ErrChainIDUnmatched(cfg.EthChainID, chainID)
 	}
 
-	blkNumberStored, err := st.GetEthFinalizedBlockNumber()
+	blkNumberStored, err := st.GetBlockchainFinalizedBlockNumber()
 	if err != nil {
 		logger.Error("failed to get eth finalized block number from database when initializing eth synchronizer")
 		return nil, err
