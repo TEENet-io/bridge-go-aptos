@@ -8,8 +8,8 @@ import (
 type MonitoredTx struct {
 	TxIdentifier                []byte            // The Tx ID been tracked, this is the primary key. No duplication allowed!
 	RefIdentifier               []byte            // Reference Identifier associated with this Tx
-	SentBlockchainLedgerNumber  *big.Int          // The Tx is sent at this point (blocknumber/ledger number/timestamp)
-	FoundBlockchainLedgerNumber *big.Int          // The Tx is found at this point (either success, reverted)
+	SentBlockchainLedgerNumber  *big.Int          // default nil, The Tx is sent at this point (blocknumber/ledger number/timestamp)
+	FoundBlockchainLedgerNumber *big.Int          // default nil, The Tx is found at this point (either success, reverted)
 	TxStatus                    MonitoredTxStatus // See below
 }
 
@@ -34,7 +34,7 @@ type ChainTxMgrDB interface {
 
 	// Insert Monitored Tx into DB
 	// error = 1) duplicate insertion (same TxIdentifier), 2) database error, etc ...
-	InsertMonitoredTx(MonitoredTx) error
+	InsertMonitoredTx(tx *MonitoredTx) error
 
 	// Delete by Tx id
 	DeleteMonitoredTxByTxHash(identifier []byte) error

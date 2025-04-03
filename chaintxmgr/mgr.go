@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"sync"
 	"time"
 
 	"github.com/TEENet-io/bridge-go/agreement"
@@ -33,12 +34,13 @@ type ChainTxMgr struct {
 	mgrdb            chaintxmgrdb.ChainTxMgrDB    // interface
 	schnorrParty     agreement.SchnorrAsyncSigner // interface
 	btcUTXOResponder agreement.BtcUTXOResponder   // interface
+	pubKey           [32]byte                     // // Public Key for Schnorr signature verification, 32 byte
 
-	// Public Key for Schnorr signature verification
-	pubKey [32]byte // public key is of 32 byte
+	chainWorker MgrWorker // Chain Worker (do the interaction with chain)
 
-	// Worker on the chain (do the interaction)
-	chainWorker MgrWorker
+	mgrdbLock  sync.Mutex // Prevent race condition, both read/write lock
+	mintLock   sync.Mutex // Prevent race condition
+	redeemLock sync.Map   // Prevent race condition
 }
 
 // The Big Loop!
@@ -54,11 +56,86 @@ func (ctm *ChainTxMgr) Loop(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-tickerInterval.C:
-			// do the mint
+
+			// do the mint procedure
+			mint_err := ctm.procedureMint(ctx)
+			if mint_err != nil {
+				logger.Errorf("failed to process mint: err=%v", mint_err)
+			}
 			// do the redeemPrepare
 			// do the Tx status
 		}
 	}
+}
+
+func (ctm *ChainTxMgr) procedureMint(ctx context.Context) error {
+	// 0. Aquire necessary locks
+	// 1. Find mints from state db
+	// 2. Filter those already minted (tracked in mgr db)
+	// 3. for each mint, Check if the mint is already minted on chain
+	// 4. for each mint, Prepare mint params (this step contains the schnorr signature request)
+	// 5. for each mint, Call mint() function on chain
+	// 6. for each mint, Set Tx to the mgrdb, and it is "pending" status
+
+	// 0. Aquire necessary locks
+	ctm.mgrdbLock.Lock()
+	defer ctm.mgrdbLock.Unlock()
+
+	ctm.mintLock.Lock()
+	defer ctm.mintLock.Unlock()
+
+	// 1. Find mints from state db
+	mints, err := ctm.QueryMints()
+	if err != nil {
+		logger.Errorf("failed to query mints: err=%v", err)
+		return err
+	}
+
+	// 2. Filter those already minted (tracked in mgr db)
+	mints_clean, err := ctm.FilterMints(mints)
+	if err != nil {
+		logger.Errorf("failed to filter mints against mgrdb: err=%v", err)
+		return err
+	}
+
+	if len(mints_clean) == 0 {
+		logger.Debug("no new mints to process")
+		return nil
+	}
+
+	for _, mint := range mints_clean {
+		// 3. Check if the mint is already minted on chain
+		found, err := ctm.IsDoubleMint(mint)
+		if err != nil {
+			logger.Errorf("failed to check if minted: err=%v", err)
+			continue
+		}
+		if found {
+			continue
+		}
+
+		// 4. Prepare mint params (this step contains the schnorr signature request)
+		_mint_params, err := ctm.PrepareMint(ctx, mint)
+		if err != nil {
+			logger.Errorf("failed to prepare mint params: err=%v", err)
+			continue
+		}
+
+		// 5. Call mint() function on chain
+		tx_id, ledger_number, err := ctm.CallMint(_mint_params)
+		if err != nil {
+			logger.Errorf("failed to call mint() on chain: err=%v", err)
+			continue
+		}
+
+		// 6. Set Tx to the mgrdb, and it is "pending" status
+		err = ctm.SetMintToBeMonitored(_mint_params, tx_id, ledger_number, chaintxmgrdb.Pending)
+		if err != nil {
+			logger.Errorf("failed to set mint to be monitored in mgrdb: err=%v", err)
+			continue
+		}
+	}
+	return nil
 }
 
 // Find "new" mints from state db
@@ -141,17 +218,42 @@ func (cmt *ChainTxMgr) PrepareMint(ctx context.Context, mint *state.Mint) (*agre
 	return mp, nil
 }
 
-func (cmt *ChainTxMgr) CallMint() {}
+// Call the actual mint() function on chain
+// Return the (tx_id, error)
+func (cmt *ChainTxMgr) CallMint(mp *agreement.MintParameter) ([]byte, *big.Int, error) {
+	// Send the real Mint Tx to Ethereum
+	tx_id, ledger_number, err := cmt.chainWorker.DoMint(mp)
+	if err != nil {
+		logger.Errorf("failed to call mint() on chain: err=%v", err)
+		return nil, nil, err
+	}
 
-func (cmt *ChainTxMgr) SetMintToBeMonitored() {}
+	logger.WithField("mintTx", common.ByteSliceToPureHexStr(tx_id)).Info("Mint tx sent")
+	return tx_id, ledger_number, nil
+}
+
+// Set Tx to the mgrdb, and it is "pending" status
+// TODO: Tx may actually be "limbo" status after success submission.
+// TODO: Need a second around of scan to change it from "limbo" to "pending".
+func (cmt *ChainTxMgr) SetMintToBeMonitored(mp *agreement.MintParameter, txId []byte, sentAt *big.Int, status chaintxmgrdb.MonitoredTxStatus) error {
+	// Set the mint to be monitored in mgr db
+	monitoredTx := chaintxmgrdb.MonitoredTx{
+		TxIdentifier:                txId,
+		RefIdentifier:               mp.BtcTxId.Bytes(),
+		SentBlockchainLedgerNumber:  common.BigIntClone(sentAt),
+		FoundBlockchainLedgerNumber: nil,
+		TxStatus:                    status,
+	}
+	return cmt.setMonitoredTx(&monitoredTx)
+}
 
 // Set a Tx to be monitored in mgr db
-func (cmt *ChainTxMgr) setMonitoredTx(tx chaintxmgrdb.MonitoredTx) error {
+func (cmt *ChainTxMgr) setMonitoredTx(tx *chaintxmgrdb.MonitoredTx) error {
 	return cmt.mgrdb.InsertMonitoredTx(tx)
 }
 
 // Wait for Schnorr Signature.
-// Then verify Signature
+// Then verify Signature.
 func (cmt *ChainTxMgr) waitAndVerifySignature(
 	ctx context.Context,
 	signingHash [32]byte,
@@ -175,7 +277,17 @@ func (cmt *ChainTxMgr) waitAndVerifySignature(
 
 // Mgr's worker on chain, do the dirty job.
 type MgrWorker interface {
-	// Verify if the mint is already minted on chain
+	// Get the latest ledger number from chain (block number on eth, ledger version number on aptos)
+	// This number marks the latest height (advancement) of blockchain.
+	GetLatestLedgerNumber() (*big.Int, error)
+
+	// Call the smart contract and verify if the mint is already minted on chain
 	// The query uses the mint's BTC tx id (prevent double mint check)
 	IsMinted(btcTxId [32]byte) (bool, error)
+
+	// Call the actual mint() on smart contract on chain
+	// Note: this function shall return the approximate ledger number when this tx is submitted to blockchain.
+	// If ledger number field is unknown, set to nil.
+	// Return the (mint_tx_hash, sent_at_ledger_number, error)
+	DoMint(mint *agreement.MintParameter) ([]byte, *big.Int, error)
 }
