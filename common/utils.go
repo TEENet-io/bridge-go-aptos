@@ -25,6 +25,20 @@ func HexStrToBytes32(hexStr string) [32]byte {
 	return bytes32
 }
 
+// HexStrToHash converts a hex string to ethcommon.Hash
+func HexStrToHash(hexStr string) ethcommon.Hash {
+	return ethcommon.HexToHash(hexStr)
+}
+
+// ArrayHexStrToHashes converts an array of hex strings to ethcommon.Hash array
+func ArrayHexStrToHashes(hexStrs []string) []ethcommon.Hash {
+	hashes := make([]ethcommon.Hash, len(hexStrs))
+	for i, hexStr := range hexStrs {
+		hashes[i] = HexStrToHash(hexStr)
+	}
+	return hashes
+}
+
 // HexStrToBigInt converts a hex string (with/without prefix 0x) to *big.Int
 func HexStrToBigInt(hexStr string) *big.Int {
 	bigInt, ok := new(big.Int).SetString(Trim0xPrefix(hexStr), 16)

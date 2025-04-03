@@ -1,15 +1,16 @@
 package main
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"math/big"
 	"net/http"
-	"io/ioutil"
+	"strconv"
+
 	"github.com/aptos-labs/aptos-go-sdk"
 	"github.com/aptos-labs/aptos-go-sdk/bcs"
-	"strconv"
-	"encoding/hex"
 )
 
 // CheckTWBTCBalance checks the TWBTC token balance for an account
@@ -26,7 +27,7 @@ func CheckTWBTCBalance(client *aptos.Client, address aptos.AccountAddress, modul
 	}
 
 	resourceType := fmt.Sprintf("0x1::coin::CoinStore<%s::btc_tokenv3::BTC>", moduleAddr.String())
-	
+
 	var balance *big.Int = big.NewInt(0)
 	for _, resource := range resources {
 		if resource.Type == resourceType {
@@ -44,8 +45,6 @@ func CheckTWBTCBalance(client *aptos.Client, address aptos.AccountAddress, modul
 	return balance, nil
 }
 
-
-
 func initTWBTC(client *aptos.Client, account aptos.TransactionSigner, moduleAddress string) (string, error) {
 	address := aptos.AccountAddress{}
 	err := address.ParseStringRelaxed(moduleAddress)
@@ -61,7 +60,7 @@ func initTWBTC(client *aptos.Client, account aptos.TransactionSigner, moduleAddr
 			},
 			Function: "initialize_module",
 			ArgTypes: []aptos.TypeTag{},
-			Args: [][]byte{},
+			Args:     [][]byte{},
 		},
 	},
 	)
@@ -102,7 +101,6 @@ func initTWBTC(client *aptos.Client, account aptos.TransactionSigner, moduleAddr
 	return txnHash, nil
 }
 
-
 func initBridge(client *aptos.Client, account aptos.TransactionSigner, moduleAddress string, feeAccount aptos.AccountAddress, fee uint64) (string, error) {
 	address := aptos.AccountAddress{}
 	err := address.ParseStringRelaxed(moduleAddress)
@@ -113,19 +111,19 @@ func initBridge(client *aptos.Client, account aptos.TransactionSigner, moduleAdd
 	if err != nil {
 		return "", fmt.Errorf("解析地址失败: %v", err)
 	}
-	
+
 	// Convert feeAccount.Address to []byte
 	feeAccountBytes, err := bcs.Serialize(&feeAccount)
 	if err != nil {
 		return "", fmt.Errorf("序列化费用账户地址失败: %v", err)
 	}
-	
+
 	// Convert fee to []byte
 	feeBytes, err := bcs.SerializeU64(fee)
 	if err != nil {
 		return "", fmt.Errorf("序列化费用失败: %v", err)
 	}
-	
+
 	rawTxn, err := client.BuildTransaction(account.AccountAddress(), aptos.TransactionPayload{
 		Payload: &aptos.EntryFunction{
 			Module: aptos.ModuleId{
@@ -157,21 +155,20 @@ func initBridge(client *aptos.Client, account aptos.TransactionSigner, moduleAdd
 		panic("Failed to wait for transaction:" + err.Error())
 	}
 
-	// 验证交易是否成功	
+	// 验证交易是否成功
 	txnInfo, err := client.TransactionByHash(txnHash)
 	if err != nil {
 		return "", fmt.Errorf("获取交易信息失败: %v", err)
 	}
 	userTxn, err := txnInfo.UserTransaction()
 	if err != nil {
-		return "", fmt.Errorf("解析用户交易信息失败: %v", err)	
+		return "", fmt.Errorf("解析用户交易信息失败: %v", err)
 	}
 	if userTxn.Success {
 		return txnHash, nil
 	} else {
 		return "", fmt.Errorf("交易执行失败: %s", userTxn.VmStatus)
 	}
-
 
 	return txnHash, nil
 
@@ -184,6 +181,8 @@ func registerTWBTC(client *aptos.Client, account aptos.TransactionSigner, module
 		return "", fmt.Errorf("解析地址失败: %v", err)
 	}
 
+	// 根据合约，registerv2需要两个参数：admin和account
+	// 这里admin是调用者，account是接收者
 	receiverAddressBytes, err := bcs.Serialize(&receiverAddress)
 	if err != nil {
 		return "", fmt.Errorf("序列化接收方地址失败: %v", err)
@@ -197,7 +196,7 @@ func registerTWBTC(client *aptos.Client, account aptos.TransactionSigner, module
 			},
 			Function: "registerv2",
 			ArgTypes: []aptos.TypeTag{},
-			Args: [][]byte{receiverAddressBytes},
+			Args:     [][]byte{receiverAddressBytes}, // 传入接收者地址作为第二个参数，第一个参数是调用者自己
 		},
 	},
 	)
@@ -235,50 +234,38 @@ func registerTWBTC(client *aptos.Client, account aptos.TransactionSigner, module
 	} else {
 		return "", fmt.Errorf("交易执行失败: %s", userTxn.VmStatus)
 	}
-
-	return txnHash, nil
-
-
 }
 
-
-func mintTWBTC(client *aptos.Client, account aptos.TransactionSigner, moduleAddress string, receiverAddress aptos.AccountAddress, amount uint64, btc_tx_id string) (string, error) {
+func mintTWBTC(client *aptos.Client, account aptos.TransactionSigner, moduleAddress string, receiverAddress aptos.AccountAddress, amount uint64, btc_tx_id string) (MintParams, error) {
 	address := aptos.AccountAddress{}
 	err := address.ParseStringRelaxed(moduleAddress)
 	if err != nil {
-		return "", fmt.Errorf("解析地址失败: %v", err)
+		return MintParams{}, fmt.Errorf("解析地址失败: %v", err)
 	}
 
 	// btc_tx_id: String,
 	// receiver: address,
 	// amount: u64,
 
-
-	// 正确的BCS编码方式 - 首先需要编码字符串长度，然后是字符串内容
 	btc_tx_id_len := len(btc_tx_id)
 	btc_tx_id_bytes := make([]byte, 0)
 
-	// 添加字符串长度(使用LEB128编码)
 	if btc_tx_id_len < 128 {
 		btc_tx_id_bytes = append(btc_tx_id_bytes, byte(btc_tx_id_len))
 	} else {
-		// 处理更长的字符串...
-		// 这里简化处理，实际上应该使用LEB128编码
 		encodedLen := byte(btc_tx_id_len) | 0x80
 		btc_tx_id_bytes = append(btc_tx_id_bytes, encodedLen, byte(btc_tx_id_len>>7))
 	}
 
-	// 添加字符串内容
 	btc_tx_id_bytes = append(btc_tx_id_bytes, []byte(btc_tx_id)...)
 
-
 	receiverAddressBytes, err := bcs.Serialize(&receiverAddress)
-	if err != nil {	
-		return "", fmt.Errorf("序列化接收方地址失败: %v", err)
+	if err != nil {
+		return MintParams{}, fmt.Errorf("序列化接收方地址失败: %v", err)
 	}
 	amountBytes, err := bcs.SerializeU64(amount)
 	if err != nil {
-		return "", fmt.Errorf("序列化金额失败: %v", err)
+		return MintParams{}, fmt.Errorf("序列化金额失败: %v", err)
 	}
 
 	rawTxn, err := client.BuildTransaction(account.AccountAddress(), aptos.TransactionPayload{
@@ -289,7 +276,7 @@ func mintTWBTC(client *aptos.Client, account aptos.TransactionSigner, moduleAddr
 			},
 			Function: "mint",
 			ArgTypes: []aptos.TypeTag{},
-			Args: [][]byte{btc_tx_id_bytes, receiverAddressBytes, amountBytes},
+			Args:     [][]byte{btc_tx_id_bytes, receiverAddressBytes, amountBytes},
 		},
 	},
 	)
@@ -306,30 +293,13 @@ func mintTWBTC(client *aptos.Client, account aptos.TransactionSigner, moduleAddr
 		panic("Failed to submit transaction:" + err.Error())
 	}
 	txnHash := submitResult.Hash
-
-	_, err = client.WaitForTransaction(txnHash)
-	if err != nil {
-		panic("Failed to wait for transaction:" + err.Error())
-	}
-
-	// 验证交易是否成功
-	txnInfo, err := client.TransactionByHash(txnHash)
-	if err != nil {
-		return "", fmt.Errorf("获取交易信息失败: %v", err)
-	}
-	userTxn, err := txnInfo.UserTransaction()
-	if err != nil {
-		return "", fmt.Errorf("解析用户交易信息失败: %v", err)
-	}
-	if userTxn.Success {
-		return txnHash, nil
-	} else {
-		return "", fmt.Errorf("交易执行失败: %s", userTxn.VmStatus)
-	}
-
-	return txnHash, nil
+	var mintParams MintParams
+	mintParams.BtcTxId = btc_tx_id_bytes
+	mintParams.Amount = amount
+	mintParams.Receiver = receiverAddress.String()
+	mintParams.Signature = string_to_bytes(txnHash) // TODO 这里是txhash还是签名啊
+	return mintParams, nil
 }
-
 
 func string_to_bytes(str string) []byte {
 	len := len(str)
@@ -342,164 +312,177 @@ func string_to_bytes(str string) []byte {
 	}
 	bytes = append(bytes, []byte(str)...)
 
-	
 	return bytes
 }
 
 // 修改 redeemPrepare 函数签名，使其接受 [][32]byte 和 []uint16 类型参数
-func redeemPrepare(client *aptos.Client, account aptos.TransactionSigner, moduleAddress string, 
-                  redeem_request_tx_hash string, requester string, receiverAddress string, 
-                  amount uint64, outpointTxIds [][32]byte, outpointIdxs []uint16) (string, error) {
-    address := aptos.AccountAddress{}
-    err := address.ParseStringRelaxed(moduleAddress)
-    if err != nil {
-        return "", fmt.Errorf("解析模块地址失败: %v", err)
-    }
-    
-    txHashBytes := serializeString(redeem_request_tx_hash)
-    
-    requesterAddr := aptos.AccountAddress{}
-    err = requesterAddr.ParseStringRelaxed(requester)
-    if err != nil {
-        return "", fmt.Errorf("解析requester地址失败: %v", err)
-    }
-    requesterBytes, err := bcs.Serialize(&requesterAddr)
-    if err != nil {
-        return "", fmt.Errorf("序列化requester地址失败: %v", err)
-    }
-    
-    receiverBytes := serializeString(receiverAddress)
-    
-    amountBytes, err := bcs.SerializeU64(amount)
-    if err != nil {
-        return "", fmt.Errorf("序列化金额失败: %v", err)
-    }
-    
-    stringTxIds := make([]string, len(outpointTxIds))
-    for i, txid := range outpointTxIds {
-        stringTxIds[i] = hex.EncodeToString(txid[:])
-    }
-    outpointTxIdsBytes := serializeStringVector(stringTxIds)
-    
-    uint64Idxs := make([]uint64, len(outpointIdxs))
-    for i, idx := range outpointIdxs {
-        uint64Idxs[i] = uint64(idx)
-    }
-    outpointIdxsBytes := serializeU64Vector(uint64Idxs)
-    
-    // 构建交易
-    rawTxn, err := client.BuildTransaction(account.AccountAddress(), aptos.TransactionPayload{
-        Payload: &aptos.EntryFunction{
-            Module: aptos.ModuleId{
-                Address: address,
-                Name:    "btc_bridgev3",
-            },
-            Function: "redeem_prepare",
-            ArgTypes: []aptos.TypeTag{},
-            Args:     [][]byte{txHashBytes, requesterBytes, receiverBytes, amountBytes, outpointTxIdsBytes, outpointIdxsBytes},
-        },
-    })
-    
-    if err != nil {
-        return "", fmt.Errorf("构建交易失败: %v", err)
-    }
-    
-    signedTxn, err := rawTxn.SignedTransaction(account)
-    if err != nil {
-        return "", fmt.Errorf("签名交易失败: %v", err)
-    }
-    
-    submitResult, err := client.SubmitTransaction(signedTxn)
-    if err != nil {
-        return "", fmt.Errorf("提交交易失败: %v", err)
-    }
-    
-    txnHash := submitResult.Hash
-    
-    _, err = client.WaitForTransaction(txnHash)
-    if err != nil {
-        return "", fmt.Errorf("等待交易确认失败: %v", err)
-    }
-    
-    // 验证交易是否成功
-    txnInfo, err := client.TransactionByHash(txnHash)
-    if err != nil {
-        return "", fmt.Errorf("获取交易信息失败: %v", err)
-    }
-    
-    userTxn, err := txnInfo.UserTransaction()
-    if err != nil {
-        return "", fmt.Errorf("解析用户交易信息失败: %v", err)
-    }
-    
-    if userTxn.Success {
-        return txnHash, nil
-    } else {
-        return "", fmt.Errorf("交易执行失败: %s", userTxn.VmStatus)
-    }
-}
-
-func serializeString(s string) []byte {
-    strLen := len(s)
-    result := make([]byte, 0, strLen+1)
-    
-    if strLen < 128 {
-        result = append(result, byte(strLen))
-    } else {
-        result = append(result, byte(strLen&0x7F|0x80), byte(strLen>>7))
-    }
-    
-    result = append(result, []byte(s)...)
-    return result
-}
-
-func serializeStringVector(strings []string) []byte {
-    result := make([]byte, 0)
-    
-    vecLen := len(strings)
-    if vecLen < 128 {
-        result = append(result, byte(vecLen))
-    } else {
-        result = append(result, byte(vecLen&0x7F|0x80), byte(vecLen>>7))
-    }
-    
-    // 序列化每个字符串
-    for _, s := range strings {
-        result = append(result, serializeString(s)...)
-    }
-    
-    return result
-}
-
-func serializeU64Vector(nums []uint64) []byte {
-    result := make([]byte, 0)
-    
-    vecLen := len(nums)
-    if vecLen < 128 {
-        result = append(result, byte(vecLen))
-    } else {
-        result = append(result, byte(vecLen&0x7F|0x80), byte(vecLen>>7))
-    }
-    
-    for _, num := range nums {
-        numBytes, _ := bcs.SerializeU64(num)
-        result = append(result, numBytes...)
-    }
-    
-    return result
-}
-
-func redeemRequest(client *aptos.Client, account aptos.TransactionSigner, moduleAddress string, receiverAddress string, amount uint64) (string, error) {
+func redeemPrepare(client *aptos.Client, account aptos.TransactionSigner, moduleAddress string,
+	redeem_request_tx_hash string, requester string, receiverAddress string,
+	amount uint64, outpointTxIds [][32]byte, outpointIdxs []uint16) (PrepareParams, error) {
 	address := aptos.AccountAddress{}
 	err := address.ParseStringRelaxed(moduleAddress)
 	if err != nil {
-		return "", fmt.Errorf("解析地址失败: %v", err)
+		return PrepareParams{}, fmt.Errorf("解析模块地址失败: %v", err)
+	}
+
+	txHashBytes := serializeString(redeem_request_tx_hash)
+
+	requesterAddr := aptos.AccountAddress{}
+	err = requesterAddr.ParseStringRelaxed(requester)
+	if err != nil {
+		return PrepareParams{}, fmt.Errorf("解析requester地址失败: %v", err)
+	}
+	requesterBytes, err := bcs.Serialize(&requesterAddr)
+	if err != nil {
+		return PrepareParams{}, fmt.Errorf("序列化requester地址失败: %v", err)
+	}
+
+	receiverBytes := serializeString(receiverAddress)
+
+	amountBytes, err := bcs.SerializeU64(amount)
+	if err != nil {
+		return PrepareParams{}, fmt.Errorf("序列化金额失败: %v", err)
+	}
+
+	stringTxIds := make([]string, len(outpointTxIds))
+	for i, txid := range outpointTxIds {
+		stringTxIds[i] = hex.EncodeToString(txid[:])
+	}
+	outpointTxIdsBytes := serializeStringVector(stringTxIds)
+
+	uint64Idxs := make([]uint64, len(outpointIdxs))
+	for i, idx := range outpointIdxs {
+		uint64Idxs[i] = uint64(idx)
+	}
+	outpointIdxsBytes := serializeU64Vector(uint64Idxs)
+
+	// 构建交易
+	rawTxn, err := client.BuildTransaction(account.AccountAddress(), aptos.TransactionPayload{
+		Payload: &aptos.EntryFunction{
+			Module: aptos.ModuleId{
+				Address: address,
+				Name:    "btc_bridgev3",
+			},
+			Function: "redeem_prepare",
+			ArgTypes: []aptos.TypeTag{},
+			Args:     [][]byte{txHashBytes, requesterBytes, receiverBytes, amountBytes, outpointTxIdsBytes, outpointIdxsBytes},
+		},
+	})
+
+	if err != nil {
+		return PrepareParams{}, fmt.Errorf("构建交易失败: %v", err)
+	}
+
+	signedTxn, err := rawTxn.SignedTransaction(account)
+	if err != nil {
+		return PrepareParams{}, fmt.Errorf("签名交易失败: %v", err)
+	}
+
+	submitResult, err := client.SubmitTransaction(signedTxn)
+	if err != nil {
+		return PrepareParams{}, fmt.Errorf("提交交易失败: %v", err)
+	}
+	txnHash := submitResult.Hash
+	var redeemPrepareParams PrepareParams
+	redeemPrepareParams.RequestTxHash = redeem_request_tx_hash
+	redeemPrepareParams.Requester = requester
+	redeemPrepareParams.Receiver = receiverAddress
+	redeemPrepareParams.Amount = amount
+
+	// 重用已经创建的stringTxIds，不要重新声明
+	redeemPrepareParams.OutpointTxIds = stringTxIds
+	redeemPrepareParams.OutpointIdxs = outpointIdxs
+	redeemPrepareParams.Signature = string_to_bytes(txnHash)
+
+	return redeemPrepareParams, nil
+
+	// 不需要验证交易是否成功，直接返回
+	// txnHash := submitResult.Hash
+
+	// // _, err = client.WaitForTransaction(txnHash)
+	// // if err != nil {
+	// //     return nil, fmt.Errorf("等待交易确认失败: %v", err)
+	// // }
+
+	// // // 验证交易是否成功
+	// // txnInfo, err := client.TransactionByHash(txnHash)
+	// // if err != nil {
+	// //     return nil, fmt.Errorf("获取交易信息失败: %v", err)
+	// // }
+
+	// // userTxn, err := txnInfo.UserTransaction()
+	// // if err != nil {
+	// //     return nil, fmt.Errorf("解析用户交易信息失败: %v", err)
+	// // }
+
+	// // if userTxn.Success {
+
+	// //     return txnHash, nil
+	// // } else {
+	// //     return nil, fmt.Errorf("交易执行失败: %s", userTxn.VmStatus)
+	// // }
+}
+
+func serializeString(s string) []byte {
+	strLen := len(s)
+	result := make([]byte, 0, strLen+1)
+
+	if strLen < 128 {
+		result = append(result, byte(strLen))
+	} else {
+		result = append(result, byte(strLen&0x7F|0x80), byte(strLen>>7))
+	}
+
+	result = append(result, []byte(s)...)
+	return result
+}
+
+func serializeStringVector(strings []string) []byte {
+	result := make([]byte, 0)
+
+	vecLen := len(strings)
+	if vecLen < 128 {
+		result = append(result, byte(vecLen))
+	} else {
+		result = append(result, byte(vecLen&0x7F|0x80), byte(vecLen>>7))
+	}
+
+	// 序列化每个字符串
+	for _, s := range strings {
+		result = append(result, serializeString(s)...)
+	}
+
+	return result
+}
+
+func serializeU64Vector(nums []uint64) []byte {
+	result := make([]byte, 0)
+
+	vecLen := len(nums)
+	if vecLen < 128 {
+		result = append(result, byte(vecLen))
+	} else {
+		result = append(result, byte(vecLen&0x7F|0x80), byte(vecLen>>7))
+	}
+
+	for _, num := range nums {
+		numBytes, _ := bcs.SerializeU64(num)
+		result = append(result, numBytes...)
+	}
+
+	return result
+}
+
+func redeemRequest(client *aptos.Client, account aptos.TransactionSigner, moduleAddress string, receiverAddress string, amount uint64) (RequestParams, error) {
+	address := aptos.AccountAddress{}
+	err := address.ParseStringRelaxed(moduleAddress)
+	if err != nil {
+		return RequestParams{}, fmt.Errorf("解析地址失败: %v", err)
 	}
 	amountBytes, err := bcs.SerializeU64(amount)
 	if err != nil {
-		return "", fmt.Errorf("序列化金额失败: %v", err)
+		return RequestParams{}, fmt.Errorf("序列化金额失败: %v", err)
 	}
-	
 
 	receiverStrLen := len(receiverAddress)
 	receiverBytes := make([]byte, 0)
@@ -534,51 +517,37 @@ func redeemRequest(client *aptos.Client, account aptos.TransactionSigner, module
 	if err != nil {
 		panic("Failed to sign transaction:" + err.Error())
 	}
-	submitResult, err := client.SubmitTransaction(signedTxn)
+	_, err = client.SubmitTransaction(signedTxn)
 	if err != nil {
 		panic("Failed to submit transaction:" + err.Error())
 	}
-	txnHash := submitResult.Hash
-
-	_, err = client.WaitForTransaction(txnHash)
-	if err != nil {
-		panic("Failed to wait for transaction:" + err.Error())
-	}
-	// 验证交易是否成功
-	txnInfo, err := client.TransactionByHash(txnHash)
-	if err != nil {
-		return "", fmt.Errorf("获取交易信息失败: %v", err)
-	}
-	userTxn, err := txnInfo.UserTransaction()
-	if err != nil {
-		return "", fmt.Errorf("解析用户交易信息失败: %v", err)
-	}
-	if userTxn.Success {
-		return txnHash, nil
-	} else {
-		return "", fmt.Errorf("交易执行失败: %s", userTxn.VmStatus)
+	// txnHash := submitResult.Hash
+	// fmt.P("txnHash:", txnHash)
+	redeemRequestParams := RequestParams{
+		Amount:   amount,
+		Receiver: receiverAddress,
 	}
 
+	// _, err = client.WaitForTransaction(txnHash)
+	// if err != nil {
+	// 	panic("Failed to wait for transaction:" + err.Error())
+	// }
+	// // 验证交易是否成功
+	// txnInfo, err := client.TransactionByHash(txnHash)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("获取交易信息失败: %v", err)
+	// }
+	// userTxn, err := txnInfo.UserTransaction()
+	// if err != nil {
+	// 	return nil, fmt.Errorf("解析用户交易信息失败: %v", err)
+	// }
+	// if userTxn.Success {
+	// 	return txnHash, nil
+	// } else {
+	// 	return nil, fmt.Errorf("交易执行失败: %s", userTxn.VmStatus)
+	// }
 
-
-	return txnHash, nil
-}
-
-// RedeemRequestEvent 对应 btc_bridgev3::RedeemRequestEvent
-type RedeemRequestEvent struct {
-	Sender   string `json:"sender"`
-	Amount   uint64 `json:"amount"`
-	Receiver string `json:"receiver"`
-}
-
-// RedeemPrepareEvent 对应 btc_bridgev3::RedeemPrepareEvent
-type RedeemPrepareEvent struct {
-	EthTxHash      string   `json:"eth_tx_hash"`
-	Requester      string   `json:"requester"`
-	Receiver       string   `json:"receiver"`
-	Amount         uint64   `json:"amount"`
-	OutpointTxIds  []string `json:"outpoint_tx_ids"`
-	OutpointIdxs   []uint64 `json:"outpoint_idxs"`
+	return redeemRequestParams, nil
 }
 
 // GetBridgeConfig 获取桥的配置信息
@@ -596,7 +565,6 @@ func GetBridgeConfig(client *aptos.Client, moduleAddress string) (map[string]int
 
 	return resource, nil
 }
-
 
 func GetBridgeEvents(client *aptos.Client, moduleAddress string, eventType string) (map[string]interface{}, error) {
 	address := aptos.AccountAddress{}
@@ -617,15 +585,12 @@ func GetBridgeEvents(client *aptos.Client, moduleAddress string, eventType strin
 	}
 
 	eventsMap, ok := eventsData.(map[string]interface{})
-	if !ok {	
+	if !ok {
 		return nil, fmt.Errorf("资源数据格式不正确")
 	}
 
 	return eventsMap, nil
 }
-
-
-
 
 // https://api.devnet.aptoslabs.com/v1/accounts/0x1319db9743efbef92e2ed32e122a4690f466fbbb8e34cd6ccffb93e8cb68447d/events/0x1319db9743efbef92e2ed32e122a4690f466fbbb8e34cd6ccffb93e8cb68447d::btc_bridgev3::BridgeEvents/redeem_request_events?start=1
 // GetEvents 获取事件
@@ -703,20 +668,20 @@ func GetEvents(client *aptos.Client, moduleAddress string, events_field string, 
 
 	// 使用硬编码的API URL
 	baseURL := "https://fullnode.devnet.aptoslabs.com" // 默认使用devnet
-	
+
 	// 正确构建事件API路径
-	fullURL := fmt.Sprintf("%s/v1/accounts/%s/events/%s/%s", 
+	fullURL := fmt.Sprintf("%s/v1/accounts/%s/events/%s/%s",
 		baseURL,
 		accountAddress.String(),
 		resourceType,
 		events_field)
-	
+
 	// 添加查询参数
 	req, err := http.NewRequest("GET", fullURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("创建HTTP请求失败: %v", err)
 	}
-	
+
 	q := req.URL.Query()
 	if limit > 0 {
 		q.Add("limit", fmt.Sprintf("%d", limit))
@@ -725,7 +690,7 @@ func GetEvents(client *aptos.Client, moduleAddress string, events_field string, 
 		q.Add("start", fmt.Sprintf("%d", start))
 	}
 	req.URL.RawQuery = q.Encode()
-	
+
 	// 发送请求
 	httpClient := &http.Client{}
 	resp, err := httpClient.Do(req)
@@ -733,56 +698,67 @@ func GetEvents(client *aptos.Client, moduleAddress string, events_field string, 
 		return nil, fmt.Errorf("发送HTTP请求失败: %v", err)
 	}
 	defer resp.Body.Close()
-	
+
 	// 读取响应
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("读取响应失败: %v", err)
 	}
-	
+
 	// 检查响应状态码
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("API请求失败: 状态码 %d, 响应体: %s", resp.StatusCode, string(body))
 	}
-	
+
 	// 解析响应
 	var events []map[string]interface{}
-	
+
 	err = json.Unmarshal(body, &events)
 	if err != nil {
 		return nil, fmt.Errorf("解析响应失败: %v", err)
 	}
-	
+
 	return events, nil
 }
 
-//https://api.devnet.aptoslabs.com/v1/accounts/0x1319db9743efbef92e2ed32e122a4690f466fbbb8e34cd6ccffb93e8cb68447d/events/0x1319db9743efbef92e2ed32e122a4690f466fbbb8e34cd6ccffb93e8cb68447d::btc_bridgev3::BridgeEvents/redeem_prepare_events?limit=1&start=0
-// GetRedeemPrepareEvents 获取赎回准备事件
-func GetRedeemPrepareEvents(client *aptos.Client, moduleAddress string, limit uint64, start uint64) ([]RedeemPrepareEvent, error) {
+// https://api.devnet.aptoslabs.com/v1/accounts/0x1319db9743efbef92e2ed32e122a4690f466fbbb8e34cd6ccffb93e8cb68447d/events/0x1319db9743efbef92e2ed32e122a4690f466fbbb8e34cd6ccffb93e8cb68447d::btc_bridgev3::BridgeEvents/redeem_prepare_events?limit=1&start=0
+// GetRedeemPreparedEvents 获取赎回准备事件
+// // 赎回准备事件
+//
+//	type RedeemPreparedEvent struct {
+//		TxVersion     string     // Aptos交易版本号
+//		EthTxHash     string     // 请求交易哈希
+//		Requester     string     // 请求者地址
+//		Receiver      string     // 接收者比特币地址
+//		Amount        uint64     // 金额
+//		OutpointTxIds []string   // 比特币UTXO交易ID列表
+//		OutpointIdxs  []uint16   // 对应的输出索引
+//	}
+func GetRedeemPreparedEvents(client *aptos.Client, moduleAddress string, limit uint64, start uint64) ([]RedeemPreparedEvent, error) {
 	events, err := GetEvents(client, moduleAddress, "redeem_prepare_events", limit, start)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	type EventResponse struct {
-		Version        string `json:"version"`
-		Guid           struct {
+		Version string `json:"version"`
+		Guid    struct {
 			CreationNumber string `json:"creation_number"`
 			AccountAddress string `json:"account_address"`
 		} `json:"guid"`
 		SequenceNumber string `json:"sequence_number"`
 		Type           string `json:"type"`
 		Data           struct {
-			Amount         string   `json:"amount"`
-			EthTxHash      string   `json:"eth_tx_hash"`
-			OutpointIdxs   []string `json:"outpoint_idxs"`
-			OutpointTxIds  []string `json:"outpoint_tx_ids"`
-			Receiver       string   `json:"receiver"`
-			Requester      string   `json:"requester"`
+			Amount        string   `json:"amount"`
+			EthTxHash     string   `json:"eth_tx_hash"`
+			OutpointIdxs  []string `json:"outpoint_idxs"`
+			OutpointTxIds []string `json:"outpoint_tx_ids"`
+			Receiver      string   `json:"receiver"`
+			Requester     string   `json:"requester"`
 		} `json:"data"`
 	}
-	
-	var prepareEvents []RedeemPrepareEvent
+
+	var prepareEvents []RedeemPreparedEvent
 	for _, event := range events {
 		// 将map转换为JSON
 		eventData, err := json.Marshal(event)
@@ -796,38 +772,46 @@ func GetRedeemPrepareEvents(client *aptos.Client, moduleAddress string, limit ui
 			return nil, fmt.Errorf("parse event data failed: %v", err)
 		}
 
-		// 将数据转换为RedeemPrepareEvent
-		var prepareEvent RedeemPrepareEvent
+		// 将数据转换为RedeemPreparedEvent
+		var prepareEvent RedeemPreparedEvent
+		prepareEvent.TxVersion = eventResponse.Version
 		prepareEvent.EthTxHash = eventResponse.Data.EthTxHash
 		prepareEvent.Requester = eventResponse.Data.Requester
 		prepareEvent.Receiver = eventResponse.Data.Receiver
 		prepareEvent.OutpointTxIds = eventResponse.Data.OutpointTxIds
-		
 		// 将amount从字符串转换为uint64
 		amount, err := strconv.ParseUint(eventResponse.Data.Amount, 10, 64)
 		if err != nil {
 			return nil, fmt.Errorf("parse amount failed: %v", err)
 		}
 		prepareEvent.Amount = amount
-		
-		// 将outpoint_idxs从字符串数组转换为uint64数组
-		outpointIdxs := make([]uint64, len(eventResponse.Data.OutpointIdxs))
+
+		// 将outpoint_idxs从字符串数组转换为uint16数组
+		outpointIdxs := make([]uint16, len(eventResponse.Data.OutpointIdxs))
 		for i, idxStr := range eventResponse.Data.OutpointIdxs {
-			idx, err := strconv.ParseUint(idxStr, 10, 64)
+			idx, err := strconv.ParseUint(idxStr, 10, 16)
 			if err != nil {
 				return nil, fmt.Errorf("parse outpoint_idxs failed: %v", err)
 			}
-			outpointIdxs[i] = idx
+			outpointIdxs[i] = uint16(idx)
 		}
 		prepareEvent.OutpointIdxs = outpointIdxs
 
 		prepareEvents = append(prepareEvents, prepareEvent)
 	}
-	
-	// fmt.Println("prepareEvents", prepareEvents)
+
 	return prepareEvents, nil
 }
+
 // GetRedeemRequestEvents 获取赎回请求事件
+// 赎回请求事件
+//
+//	type RedeemRequestEvent struct {
+//		TxVersion    string     // Aptos交易版本号
+//		Sender       string     // 发送者Aptos地址
+//		Receiver     string     // 接收者比特币地址
+//		Amount       uint64     // 金额
+//	}
 func GetRedeemRequestEvents(client *aptos.Client, moduleAddress string, limit uint64, start uint64) ([]RedeemRequestEvent, error) {
 	events, err := GetEvents(client, moduleAddress, "redeem_request_events", limit, start)
 	if err != nil {
@@ -835,8 +819,8 @@ func GetRedeemRequestEvents(client *aptos.Client, moduleAddress string, limit ui
 	}
 
 	type EventResponse struct {
-		Version        string `json:"version"`
-		Guid           struct {
+		Version string `json:"version"`
+		Guid    struct {
 			CreationNumber string `json:"creation_number"`
 			AccountAddress string `json:"account_address"`
 		} `json:"guid"`
@@ -865,9 +849,10 @@ func GetRedeemRequestEvents(client *aptos.Client, moduleAddress string, limit ui
 
 		// 将数据转换为RedeemRequestEvent
 		var redeemEvent RedeemRequestEvent
+		redeemEvent.TxVersion = eventResponse.Version
 		redeemEvent.Sender = eventResponse.Data.Sender
 		redeemEvent.Receiver = eventResponse.Data.Receiver
-		
+
 		// 将amount从字符串转换为uint64
 		amount, err := strconv.ParseUint(eventResponse.Data.Amount, 10, 64)
 		if err != nil {
@@ -882,3 +867,67 @@ func GetRedeemRequestEvents(client *aptos.Client, moduleAddress string, limit ui
 	return redeemEvents, nil
 }
 
+// IsPrepared checks if a redemption is prepared
+func IsPrepared(client *aptos.Client, moduleAddress string, txHash string) (bool, error) {
+	address := aptos.AccountAddress{}
+	err := address.ParseStringRelaxed(moduleAddress)
+	if err != nil {
+		return false, fmt.Errorf("解析模块地址失败: %v", err)
+	}
+
+	// 获取桥配置资源
+	resourceType := fmt.Sprintf("%s::btc_bridgev3::PreparedRedeems", address.String())
+	resource, err := client.AccountResource(address, resourceType)
+	if err != nil {
+		return false, fmt.Errorf("获取PreparedRedeems资源失败: %v", err)
+	}
+
+	// 检查交易哈希是否在已准备列表中
+	if data, ok := resource["data"].(map[string]interface{}); ok {
+		fmt.Println("data", data)
+		if prepared, ok := data["prepared"].([]interface{}); ok {
+			for _, hash := range prepared {
+				if hash.(string) == txHash {
+					return true, nil
+				}
+			}
+		}
+	}
+
+	return false, nil
+}
+
+// IsMinted 检查比特币交易是否已铸币
+func IsMinted(client *aptos.Client, moduleAddress string, btcTxId string) (bool, error) {
+	address := aptos.AccountAddress{}
+	err := address.ParseStringRelaxed(moduleAddress)
+	if err != nil {
+		return false, fmt.Errorf("解析模块地址失败: %v", err)
+	}
+
+	// 获取已使用的比特币交易ID资源
+	resourceType := fmt.Sprintf("%s::btc_bridgev3::UsedBtcTxIds", address.String())
+	resource, err := client.AccountResource(address, resourceType)
+	if err != nil {
+		return false, fmt.Errorf("获取UsedBtcTxIds资源失败: %v", err)
+	}
+
+	// 检查交易ID是否在used列表中
+	if data, ok := resource["data"].(map[string]interface{}); ok {
+		if used, ok := data["used"].([]interface{}); ok {
+			for _, id := range used {
+				if id.(string) == btcTxId {
+					return true, nil
+				}
+			}
+		}
+	}
+
+	return false, nil
+}
+
+// IsUsed 检查比特币交易是否已使用
+func IsUsed(client *aptos.Client, moduleAddress string, btcTxId string) (bool, error) {
+	// 在Aptos中，IsMinted和IsUsed功能相同，都是检查交易ID是否已使用
+	return IsMinted(client, moduleAddress, btcTxId)
+}

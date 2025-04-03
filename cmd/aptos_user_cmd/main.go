@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"crypto/rand"
 	"fmt"
 	"math/big"
 	"os"
@@ -10,31 +11,28 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+
 	"github.com/spf13/viper"
-	"crypto/rand"
-	
+
 	"github.com/aptos-labs/aptos-go-sdk"
 )
 
-
 // 日志信息输出函数，带颜色
-func logInfo(message string) { 
+func logInfo(message string) {
 	fmt.Printf("\x1b[36m%s\x1b[0m\n", message)
 }
 
-func logSuccess(message string) { 
+func logSuccess(message string) {
 	fmt.Printf("\x1b[32m%s\x1b[0m\n", message)
 }
 
-func logError(message string) { 
+func logError(message string) {
 	fmt.Printf("\x1b[31m%s\x1b[0m\n", message)
 }
 
-func logWarning(message string) { 
+func logWarning(message string) {
 	fmt.Printf("\x1b[33m%s\x1b[0m\n", message)
 }
-
-
 
 // 打印主菜单选项
 func printMainMenu() {
@@ -50,6 +48,9 @@ func printMainMenu() {
 	fmt.Println("9) redeemRequest")
 	fmt.Println("10) redeemPrepare")
 	fmt.Println("11) queryEvents")
+	fmt.Println("12) check if redemption is prepared")
+	fmt.Println("13) check if redemption is minted")
+	fmt.Println("14) check if redemption is used")
 	fmt.Println("0) exit")
 	fmt.Print("Please enter the option number: ")
 }
@@ -70,19 +71,19 @@ func main() {
 	// Read configuration from regtest.yaml
 	configFile := "./regtest.yaml"
 	viper.SetConfigFile(configFile)
-	
+
 	err := viper.ReadInConfig()
 	if err != nil {
 		logWarning(fmt.Sprintf("WARNING: Failed to read config file %s: %v", configFile, err))
 		logWarning("Some features will be unavailable. Please create the config file and restart the program.")
 	}
-	
+
 	// Define config structure
 	var config struct {
 		PrivateKey    string
 		ModuleAddress string
 	}
-	
+
 	// Extract values from viper if config was loaded successfully
 	if err == nil {
 		config.PrivateKey = viper.GetString("APTOS_CORE_ACCOUNT_PRIV")
@@ -168,28 +169,28 @@ func main() {
 			fmt.Print("Enter the recipient address: ")
 			scanner.Scan()
 			recipient := strings.TrimSpace(scanner.Text())
-			
+
 			fmt.Print("Enter the amount (APT): ")
 			scanner.Scan()
 			amountStr := strings.TrimSpace(scanner.Text())
-			
+
 			// Convert APT to Octas (1 APT = 10^8 Octas)
 			amount, success := new(big.Float).SetString(amountStr)
 			if !success {
 				logError(fmt.Sprintf("Invalid amount: %s", amountStr))
 				continue
 			}
-			
+
 			// Convert to Octas (integer)
 			amount = amount.Mul(amount, big.NewFloat(100000000))
 			amountInt, _ := amount.Int(nil)
-			
+
 			txHash, err := sendAPT(ctx, client, account, recipient, amountInt)
 			if err != nil {
 				logError(fmt.Sprintf("Failed to send APT: %v", err))
 				continue
 			}
-			
+
 			logSuccess(fmt.Sprintf("Successfully sent %s APT to address %s", amountStr, recipient))
 			logSuccess(fmt.Sprintf("Transaction hash: %s", txHash))
 
@@ -210,7 +211,7 @@ func main() {
 				logError("Address cannot be empty")
 				continue
 			}
-			
+
 			err := getFaucetAPT(ctx, client, addressStr)
 			if err != nil {
 				logError(fmt.Sprintf("Failed to get APT from faucet: %v", err))
@@ -227,7 +228,7 @@ func main() {
 				logError("Module address is not set, cannot perform this operation")
 				continue
 			}
-			
+
 			fmt.Print("Enter the address to check (leave blank to use current account): ")
 			scanner.Scan()
 			addressStr := strings.TrimSpace(scanner.Text())
@@ -237,34 +238,33 @@ func main() {
 				logError("No address provided and no account loaded")
 				continue
 			}
-			
+
 			address := aptos.AccountAddress{}
 			err := address.ParseStringRelaxed(addressStr)
 			if err != nil {
 				logError(fmt.Sprintf("Failed to parse address: %v", err))
 				continue
 			}
-			
+
 			balance, err := CheckTWBTCBalance(client, address, moduleAddress)
 			if err != nil {
 				logError(fmt.Sprintf("Failed to check TWBTC balance: %v", err))
 				continue
 			}
-			
-			fmt.Printf("TWBTC balance for address %s: %s Satoshis\n", addressStr, balance.String())
 
+			fmt.Printf("TWBTC balance for address %s: %s Satoshis\n", addressStr, balance.String())
 
 		case "6": // Initialize TWBTC
 			if moduleAddress == "" {
 				logError("Module address is not set, cannot perform this operation")
 				continue
 			}
-			
+
 			if account == nil {
 				logError("Need to load account to perform this operation")
 				continue
 			}
-			
+
 			txHash, err := initTWBTC(client, account, moduleAddress)
 			if err != nil {
 				logError(fmt.Sprintf("Failed to initialize TWBTC: %v", err))
@@ -272,39 +272,39 @@ func main() {
 			}
 			logSuccess("Successfully initialized TWBTC")
 			logSuccess(fmt.Sprintf("Transaction hash: %s", txHash))
-			
+
 		case "7": // Initialize bridge
 			if moduleAddress == "" {
 				logError("Module address is not set, cannot perform this operation")
 				continue
 			}
-			
+
 			if account == nil {
 				logError("Need to load account to perform this operation")
 				continue
 			}
-			
+
 			fmt.Print("Enter the fee account address: ")
 			scanner.Scan()
 			feeAccountStr := strings.TrimSpace(scanner.Text())
-			
+
 			fmt.Print("Enter the fee (satoshi): ")
 			scanner.Scan()
 			feeStr := strings.TrimSpace(scanner.Text())
-			
+
 			feeAccountAddress := aptos.AccountAddress{}
 			err := feeAccountAddress.ParseStringRelaxed(feeAccountStr)
 			if err != nil {
 				logError(fmt.Sprintf("Failed to parse fee account address: %v", err))
 				continue
 			}
-			
+
 			fee, err := strconv.ParseUint(feeStr, 10, 64)
 			if err != nil {
 				logError(fmt.Sprintf("Failed to parse fee: %v", err))
 				continue
 			}
-			
+
 			txHash, err := initBridge(client, account, moduleAddress, feeAccountAddress, fee)
 			if err != nil {
 				logError(fmt.Sprintf("Failed to initialize bridge: %v", err))
@@ -312,29 +312,29 @@ func main() {
 			}
 			logSuccess("Successfully initialized bridge")
 			logSuccess(fmt.Sprintf("Transaction hash: %s", txHash))
-			
+
 		case "8": // Register account TWBTC
 			if moduleAddress == "" {
 				logError("Module address is not set, cannot perform this operation")
 				continue
 			}
-			
+
 			if account == nil {
 				logError("Need to load account to perform this operation")
 				continue
 			}
-			
+
 			fmt.Print("Enter the recipient address: ")
 			scanner.Scan()
 			receiverStr := strings.TrimSpace(scanner.Text())
-			
+
 			receiverAddress := aptos.AccountAddress{}
 			err := receiverAddress.ParseStringRelaxed(receiverStr)
 			if err != nil {
 				logError(fmt.Sprintf("Failed to parse recipient address: %v", err))
 				continue
 			}
-			
+
 			txHash, err := registerTWBTC(client, account, moduleAddress, receiverAddress)
 			if err != nil {
 				logError(fmt.Sprintf("Failed to register TWBTC: %v", err))
@@ -342,32 +342,32 @@ func main() {
 			}
 			logSuccess("Successfully registered TWBTC")
 			logSuccess(fmt.Sprintf("Transaction hash: %s", txHash))
-			
+
 		case "9": // Initiate redemption request
 			if moduleAddress == "" {
 				logError("Module address is not set, cannot perform this operation")
 				continue
 			}
-			
+
 			if account == nil {
 				logError("Need to load account to perform this operation")
 				continue
 			}
-			
+
 			fmt.Print("Enter the BTC receiver address: ")
 			scanner.Scan()
 			receiverStr := strings.TrimSpace(scanner.Text())
-			
+
 			fmt.Print("Enter the redemption amount (satoshi): ")
 			scanner.Scan()
 			amountStr := strings.TrimSpace(scanner.Text())
-			
+
 			amount, err := strconv.ParseUint(amountStr, 10, 64)
 			if err != nil {
 				logError(fmt.Sprintf("Failed to parse amount: %v", err))
 				continue
 			}
-			
+
 			txHash, err := redeemRequest(client, account, moduleAddress, receiverStr, amount)
 			if err != nil {
 				logError(fmt.Sprintf("Failed to redeem request: %v", err))
@@ -375,13 +375,13 @@ func main() {
 			}
 			logSuccess(fmt.Sprintf("Successfully sent redemption request for %d Satoshis to BTC address %s", amount, receiverStr))
 			logSuccess(fmt.Sprintf("Transaction hash: %s", txHash))
-			
+
 		case "10": // Redeem prepare
 			if moduleAddress == "" {
 				logError("Module address is not set, cannot perform this operation")
 				continue
 			}
-			
+
 			if account == nil {
 				logError("Need to load account to perform this operation")
 				continue
@@ -390,7 +390,7 @@ func main() {
 			fmt.Print("Enter the redeem request tx hash: ")
 			scanner.Scan()
 			redeemRequestTxHash := strings.TrimSpace(scanner.Text())
-			
+
 			fmt.Print("Enter the requester address: ")
 			scanner.Scan()
 			requesterStr := strings.TrimSpace(scanner.Text())
@@ -398,7 +398,7 @@ func main() {
 			fmt.Print("Enter the BTC receiver address: ")
 			scanner.Scan()
 			receiverStr := strings.TrimSpace(scanner.Text())
-			
+
 			fmt.Print("Enter the redemption amount (satoshi): ")
 			scanner.Scan()
 			amountStr := strings.TrimSpace(scanner.Text())
@@ -408,12 +408,12 @@ func main() {
 				logError(fmt.Sprintf("Failed to parse amount: %v", err))
 				continue
 			}
-			
+
 			// Generate random outpoint transaction IDs and indices
 			outpointNum := 1 // Using just one outpoint for simplicity
 			outpointTxIds := make([][32]byte, outpointNum)
 			outpointIdxs := make([]uint16, outpointNum)
-			
+
 			// Generate random transaction ID and index
 			for i := 0; i < outpointNum; i++ {
 				// Generate random bytes for transaction ID
@@ -424,7 +424,7 @@ func main() {
 					continue
 				}
 				copy(outpointTxIds[i][:], randBytes)
-				
+
 				// Generate random index between 0 and 10
 				// Generate a random number between 0 and 9 for the index
 				randIdxBytes := make([]byte, 2)
@@ -436,13 +436,13 @@ func main() {
 				// Use modulo to get a number between 0 and 9
 				outpointIdxs[i] = uint16(int(randIdxBytes[0]) % 10)
 			}
-			
+
 			// Log the generated values
 			logInfo("Generated random BTC transaction ID for outpoint:")
 			for i, txid := range outpointTxIds {
 				logInfo(fmt.Sprintf("  Outpoint %d: %x (index: %d)", i, txid, outpointIdxs[i]))
 			}
-			
+
 			txHash, err := redeemPrepare(client, account, moduleAddress, redeemRequestTxHash, requesterStr, receiverStr, amount, outpointTxIds, outpointIdxs)
 			if err != nil {
 				logError(fmt.Sprintf("Failed to redeem prepare: %v", err))
@@ -450,20 +450,20 @@ func main() {
 			}
 			logSuccess(fmt.Sprintf("Successfully prepared redemption for %d Satoshis to BTC address %s", amount, receiverStr))
 			logSuccess(fmt.Sprintf("Transaction hash: %s", txHash))
-			
+
 		case "11": // Query events
 			if moduleAddress == "" {
 				logError("Module address is not set, cannot perform this operation")
 				continue
 			}
-			
+
 			fmt.Println("\n===== Event Query Options =====")
 			fmt.Println("1) Query redeem request events")
 			fmt.Println("2) Query redeem prepare events")
 			fmt.Print("Please select the event type to query: ")
 			scanner.Scan()
 			eventTypeStr := strings.TrimSpace(scanner.Text())
-			
+
 			eventType := 0
 			if eventTypeStr != "" {
 				var err error
@@ -476,7 +476,7 @@ func main() {
 				logError("Must select event type")
 				continue
 			}
-			
+
 			fmt.Print("Limit (default 10): ")
 			scanner.Scan()
 			limitStr := strings.TrimSpace(scanner.Text())
@@ -502,7 +502,7 @@ func main() {
 					continue
 				}
 			}
-			
+
 			switch eventType {
 			case 1:
 				result, err := GetRedeemRequestEvents(client, moduleAddress, limit, start)
@@ -512,7 +512,7 @@ func main() {
 				}
 				fmt.Println(result)
 			case 2:
-				result, err := GetRedeemPrepareEvents(client, moduleAddress, limit, start)
+				result, err := GetRedeemPreparedEvents(client, moduleAddress, limit, start)
 				if err != nil {
 					logError(fmt.Sprintf("Failed to get redeem prepare events: %v", err))
 					continue
@@ -521,7 +521,58 @@ func main() {
 			default:
 				logError("Invalid event type selection")
 			}
-			
+
+		case "12": // Check if redemption is prepared
+			if moduleAddress == "" {
+				logError("Module address is not set, cannot perform this operation")
+				continue
+			}
+
+			fmt.Print("Enter the redeem request tx hash: ")
+			scanner.Scan()
+			redeemRequestTxHash := strings.TrimSpace(scanner.Text())
+
+			prepared, err := IsPrepared(client, moduleAddress, redeemRequestTxHash)
+			if err != nil {
+				logError(fmt.Sprintf("Failed to check if redemption is prepared: %v", err))
+				continue
+			}
+			fmt.Println(prepared)
+
+		case "13": // Check if redemption is minted
+			if moduleAddress == "" {
+				logError("Module address is not set, cannot perform this operation")
+				continue
+			}
+
+			fmt.Print("Enter the BTC transaction ID: ")
+			scanner.Scan()
+			btcTxId := strings.TrimSpace(scanner.Text())
+
+			minted, err := IsMinted(client, moduleAddress, btcTxId)
+			if err != nil {
+				logError(fmt.Sprintf("Failed to check if redemption is minted: %v", err))
+				continue
+			}
+			fmt.Println(minted)
+
+		case "14": // Check if redemption is used
+			if moduleAddress == "" {
+				logError("Module address is not set, cannot perform this operation")
+				continue
+			}
+
+			fmt.Print("Enter the BTC transaction ID: ")
+			scanner.Scan()
+			btcTxId := strings.TrimSpace(scanner.Text())
+
+			used, err := IsUsed(client, moduleAddress, btcTxId)
+			if err != nil {
+				logError(fmt.Sprintf("Failed to check if redemption is used: %v", err))
+				continue
+			}
+			fmt.Println(used)
+
 		default:
 			logError("Invalid option, please try again")
 		}
