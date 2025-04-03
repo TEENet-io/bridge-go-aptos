@@ -1,3 +1,4 @@
+// TODO: Improve the log (add params)
 package chaintxmgr
 
 import (
@@ -38,7 +39,7 @@ type ChainTxMgr struct {
 
 	chainWorker MgrWorker // Chain Worker (do the interaction with chain)
 
-	mgrdbLock  sync.Mutex // Prevent race condition, both read/write lock
+	mgrdbLock  sync.Mutex // Prevent race condition, both read/write lock to db.
 	mintLock   sync.Mutex // Prevent race condition
 	redeemLock sync.Map   // Prevent race condition
 }
@@ -126,6 +127,20 @@ func (ctm *ChainTxMgr) procedureMint(ctx context.Context) error {
 		if err != nil {
 			logger.Errorf("failed to call mint() on chain: err=%v", err)
 			continue
+		}
+
+		// Extra: if the ledger_number is nil, we try the <best effort> to set it
+		if ledger_number == nil {
+			latest_ledger_number, err := ctm.chainWorker.GetLatestLedgerNumber()
+			if err != nil {
+				logger.Errorf("failed to get latest ledger number: err=%v", err)
+			} else {
+				if latest_ledger_number != nil {
+					ledger_number = latest_ledger_number
+				} else {
+					logger.Errorf("latest ledger number is nil")
+				}
+			}
 		}
 
 		// 6. Set Tx to the mgrdb, and it is "pending" status
@@ -219,7 +234,7 @@ func (cmt *ChainTxMgr) PrepareMint(ctx context.Context, mint *state.Mint) (*agre
 }
 
 // Call the actual mint() function on chain
-// Return the (tx_id, error)
+// Return the (tx_id, sent_at_ledger_number, error)
 func (cmt *ChainTxMgr) CallMint(mp *agreement.MintParameter) ([]byte, *big.Int, error) {
 	// Send the real Mint Tx to Ethereum
 	tx_id, ledger_number, err := cmt.chainWorker.DoMint(mp)
@@ -287,7 +302,7 @@ type MgrWorker interface {
 
 	// Call the actual mint() on smart contract on chain
 	// Note: this function shall return the approximate ledger number when this tx is submitted to blockchain.
-	// If ledger number field is unknown, set to nil.
+	// If ledger number field is really unknown, set to nil.
 	// Return the (mint_tx_hash, sent_at_ledger_number, error)
 	DoMint(mint *agreement.MintParameter) ([]byte, *big.Int, error)
 }
