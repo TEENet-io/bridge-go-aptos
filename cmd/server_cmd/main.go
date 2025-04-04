@@ -30,26 +30,27 @@ func main() {
 
 	// See if file exists
 	if !cmd.FileExists(_config_file) {
-		fmt.Printf("Bridge server configuration file not found: %s\n", _config_file)
+		fmt.Printf("Failed to find bridge server configuration file: %s\n", _config_file)
 		return
 	}
-
 	// Read from config file.
 	success := initializeViper(_config_file)
 	if !success {
 		return
 	}
-
+	fmt.Printf("Successfully initialized viper\n")
 	// Make the configuration
 	bsc := PrepareBridgeServerConfig()
 	if bsc == nil {
 		fmt.Printf("Error loading bridge server configuration\n")
 		return
 	}
+	fmt.Printf("Successfully prepared bridge server configuration\n")
 
 	logger.Info("Starting bridge server... press Ctrl+C to kill the server")
 	// Start server and block.
 	cmd.StartBridgeServerAndWait(bsc)
+	fmt.Printf("Bridge server started\n")
 }
 
 func initializeViper(filePath string) bool {
@@ -134,11 +135,17 @@ func PrepareBridgeServerConfig() *cmd.BridgeServerConfig {
 	// *** end of preparing objects ***
 
 	return &cmd.BridgeServerConfig{
+
+		// aptos side
+		AptosRpcUrl:          viper.GetString("APTOS_RPC_URL"),
+		AptosCoreAccountPriv: viper.GetString("APTOS_CORE_ACCOUNT_PRIV"),
+		AptosModuleAddress:   viper.GetString("APTOS_MODULE_ADDRESS"),
+
 		// eth side
-		EthRpcUrl:          viper.GetString("ETH_RPC_URL"),
-		EthCoreAccountPriv: viper.GetString("ETH_CORE_ACCOUNT_PRIV"),
-		EthRetroScanBlk:    viper.GetInt64("ETH_RETRO_SCAN_BLK"),
-		MSchnorrSigner:     schnorrSigner,
+		// EthRpcUrl:          viper.GetString("ETH_RPC_URL"),
+		// EthCoreAccountPriv: viper.GetString("ETH_CORE_ACCOUNT_PRIV"),
+		// EthRetroScanBlk:    viper.GetInt64("ETH_RETRO_SCAN_BLK"),
+		MSchnorrSigner: schnorrSigner,
 		// state side
 		DbFilePath: viper.GetString("DB_FILE_PATH"),
 		// btc side
