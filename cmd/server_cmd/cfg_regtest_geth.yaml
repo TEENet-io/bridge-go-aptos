@@ -1,9 +1,9 @@
 # Example configuration file for the bridge server
 
 # ETH
-ETH_RPC_URL: "http://localhost:8545" # http://" + SERVER + ":" + PORT
-ETH_CORE_ACCOUNT_PRIV: "dbcec79f3490a6d5d162ca2064661b85c40c93672968bfbd906b952e38c3e8de" # address: 0x85b427C84731bC077BA5A365771D2b64c5250Ac8
-ETH_RETRO_SCAN_BLK: 13370 # -1: honor statedb last scanned blk, >0 Synchronizer shall start from this block number.
+# ETH_RPC_URL: "http://localhost:8545" # http://" + SERVER + ":" + PORT
+# ETH_CORE_ACCOUNT_PRIV: "dbcec79f3490a6d5d162ca2064661b85c40c93672968bfbd906b952e38c3e8de" # address: 0x85b427C84731bC077BA5A365771D2b64c5250Ac8
+# ETH_RETRO_SCAN_BLK: 13370 # -1: honor statedb last scanned blk, >0 Synchronizer shall start from this block number.
 
 # DB
 DB_FILE_PATH: "local_test_bridge.db" # Use full path or just the file name to imply current path.
@@ -22,7 +22,7 @@ BTC_CORE_ACCOUNT_ADDR: "mvqq54khZQta7zDqFGoyN7BVK7Li4Xwnih" # bridge's address (
 # Both Local Signer and Remote Signer are supported.
 # Local signer: Use the local BTC_CORE_ACCOUNT to initiate a single-key signer.
 # Remote signer: Use the cert you provied to connect to the remote signer.
-USE_REMOTE_SIGNER: true # If false, then a local signer is created and used upon start.
+USE_REMOTE_SIGNER: false # If false, then a local signer is created and used upon start.
 REMOTE_SIGNER_USER_ID: 0
 REMOTE_SIGNER_NAME: "client0"
 REMOTE_SIGNER_CERT: "client0.crt"
@@ -38,5 +38,15 @@ HTTP_PORT: "8080"
 # Extra
 # If you use pre-deployed bridge and twBTC, you set these two addresses.
 # Otherwise (if strings are empty), the server will deploy new bridge and twBTC upon start.
-PREDEFINED_BRIDGE_ADDRESS: "0xc5294C7F72114Ae9BE38E067b7b379837b5D0172"
-PREDEFINED_TWBTC_ADDRESS: "0xFce9B51e90ff060bF4A226af39B1983f9a88CD18"
+# PREDEFINED_BRIDGE_ADDRESS: "0xc5294C7F72114Ae9BE38E067b7b379837b5D0172"
+# PREDEFINED_TWBTC_ADDRESS: "0xFce9B51e90ff060bF4A226af39B1983f9a88CD18"
+
+
+
+# Aptos
+APTOS_RPC_URL: "https://fullnode.devnet.aptoslabs.com"
+APTOS_CORE_ACCOUNT_PRIV: "0x26f032ddd97e788550f65b8d20f9d037c4330fa27f6f92247f55bd11940774ed" # user's
+APTOS_MODULE_ADDRESS: "0xfbfe84d58d9ef1366f295066dbf1767f53d52d319843800c63c5e32d66411864"
+
+
+
