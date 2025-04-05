@@ -1,7 +1,7 @@
 # A BTC-Aptos token bridge built on TEENet
 This repository hosts a BTC-Aptos token bridge, developed for the Aptos EVERMORE Hackerhouse 2025.
 
-[DEMO VIDOE](https://drive.google.com/file/d/11CrX4p3qFoZ-3wmhb-0xQbMv0rZzUvGm/view?usp=sharing)
+[DEMO VIDEO](https://drive.google.com/file/d/11CrX4p3qFoZ-3wmhb-0xQbMv0rZzUvGm/view?usp=sharing)
 
 ## About TEENet
 [TEENet](https://teenet.io) is a next-generation infrastructure for decentralized applications (dApps), built on the latest Trusted Execution Environment (TEE) technology. It is designed to eliminate security risks introduced by human involvement in the operation of dApps. TEENet provides:
@@ -14,10 +14,8 @@ This token bridge was developed as a demo for the hackathon event and runs on a 
 ### Aptos smart contracts
 Two smart contracts have been developed and deployed on the Aptos Devnet:
 
-* [Wrapped BTC Token Contract](https://github.com/laalaguer/bridge-go-aptos/blob/main/aptos_contract/contract/sources/btc_token.move)
-  This contract represents the wrapped BTC token on Aptos. It includes `mint` and `burn` functions, both of which can only be called by the bridge admin account hosted by the bridge backend.
-* [Bridge Contract](https://github.com/laalaguer/bridge-go-aptos/blob/main/aptos_contract/contract/sources/btc_bridge.move)
-  This contract handles the bridging logic on Aptos and includes the following key methods:
+* [Wrapped BTC Token Contract](https://github.com/laalaguer/bridge-go-aptos/blob/main/aptos_contract/contract/sources/btc_token.move): This contract represents the wrapped BTC token on Aptos. It includes `mint` and `burn` functions, both of which can only be called by the bridge admin account hosted by the bridge backend.
+* [Bridge Contract](https://github.com/laalaguer/bridge-go-aptos/blob/main/aptos_contract/contract/sources/btc_bridge.move): This contract handles the bridging logic on Aptos and includes the following key methods:
   * `mint`: Called by the bridge backend to issue wrapped BTC tokens to the user after detecting a BTC deposit.
   * `redeemRequest`: Called by users to initiate a BTC withdrawal from Aptos.
   * `redeemPrepare`: Called by the bridge backend to lock UTXOs and ensure the withdrawal process is secure and double-spend resistant.
