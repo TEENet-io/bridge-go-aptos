@@ -1,13 +1,14 @@
-package main
+package aptosman
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"strings"
-	"encoding/hex"
-	"github.com/aptos-labs/aptos-go-sdk/bcs"
+
 	"github.com/aptos-labs/aptos-go-sdk"
+	"github.com/aptos-labs/aptos-go-sdk/bcs"
 	"github.com/aptos-labs/aptos-go-sdk/crypto"
 )
 
@@ -24,10 +25,10 @@ func checkAPTBalance(ctx context.Context, client *aptos.Client, addressStr strin
 	if err != nil {
 		return nil, fmt.Errorf("Failed to get APT balance: %v", err)
 	}
-	
+
 	// Convert to big.Int
 	balanceBigInt := new(big.Int).SetUint64(balance)
-	
+
 	return balanceBigInt, nil
 }
 
@@ -67,8 +68,8 @@ func sendAPT(ctx context.Context, client *aptos.Client, senderAccount *aptos.Acc
 	if err != nil {
 		return "", fmt.Errorf("Failed to parse user transaction info: %v", err)
 	}
-	
-	// fmt.Printf("交易详情:\n状态: %v\nVM状态: %s\n哈希: %s\n版本: %d\n", 
+
+	// fmt.Printf("交易详情:\n状态: %v\nVM状态: %s\n哈希: %s\n版本: %d\n",
 	// 	userTxn.Success, userTxn.Hash, userTxn.Version)
 	if userTxn.Success {
 		return resp.Hash, nil
@@ -84,16 +85,16 @@ func createAptosAccount(ctx context.Context, client *aptos.Client) (*aptos.Accou
 	if err != nil {
 		return nil, fmt.Errorf("Failed to generate Ed25519 private key: %v", err)
 	}
-	
+
 	// Create account from private key
 	account, err := aptos.NewAccountFromSigner(privateKey)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to create account from private key: %v", err)
 	}
-	
+
 	fmt.Printf("Created Aptos account address: %s\n", account.Address.String())
 	fmt.Printf("Created Aptos account private key: %x\n", privateKey.Bytes())
-	
+
 	return account, nil
 }
 
@@ -105,7 +106,7 @@ func getFaucetAPT(ctx context.Context, client *aptos.Client, addressStr string) 
 	if err != nil {
 		return fmt.Errorf("Failed to parse address: %v", err)
 	}
-	
+
 	// Use client's Fund method to get APT from faucet sample from ./aptos-go-sdk/examples/multi_agent/main.go
 	const fundAmount = 100_000_000 // Same amount as in the example
 	err = client.Fund(address, fundAmount)
@@ -124,13 +125,10 @@ func printAPTBalance(ctx context.Context, client *aptos.Client, addressStr strin
 	if err != nil {
 		return err
 	}
-	
+
 	fmt.Printf("APT balance for address %s: %s\n", addressStr, balance.String())
 	return nil
 }
-
-
-
 
 // Create Aptos client
 func createClient() (*aptos.Client, error) {
@@ -169,6 +167,7 @@ func createAccountFromPrivateKey(privateKeyHex string) (*aptos.Account, error) {
 
 	return account, nil
 }
+
 // APTOS build and submit transaction
 func buildAndSubmitTransaction(
 	ctx context.Context,
@@ -183,18 +182,18 @@ func buildAndSubmitTransaction(
 	if len(parts) != 3 {
 		return "", fmt.Errorf("Invalid function format, should be 'address::module::function'")
 	}
-	
+
 	address := aptos.AccountAddress{}
 	err := address.ParseStringRelaxed(parts[0])
 	if err != nil {
 		return "", fmt.Errorf("Failed to parse address: %v", err)
 	}
-	
+
 	moduleId := aptos.ModuleId{
 		Address: address,
 		Name:    parts[1],
 	}
-	
+
 	var typeTags []aptos.TypeTag
 	for _, typeArg := range typeArgs {
 		typeTag, err := aptos.ParseTypeTag(typeArg)
@@ -203,12 +202,12 @@ func buildAndSubmitTransaction(
 		}
 		typeTags = append(typeTags, *typeTag)
 	}
-	
+
 	var argsBytes [][]byte
 	for _, arg := range args {
 		var argBytes []byte
 		var err error
-		
+
 		switch v := arg.(type) {
 		case string:
 			if strings.HasPrefix(v, "0x") {
@@ -231,13 +230,13 @@ func buildAndSubmitTransaction(
 		default:
 			return "", fmt.Errorf("Unsupported parameter type: %T", arg)
 		}
-		
+
 		if err != nil {
 			return "", fmt.Errorf("Failed to serialize parameter: %v", err)
 		}
 		argsBytes = append(argsBytes, argBytes)
 	}
-	
+
 	// Build transaction payload
 	payload := aptos.TransactionPayload{
 		Payload: &aptos.EntryFunction{

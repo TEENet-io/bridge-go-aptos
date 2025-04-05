@@ -15,6 +15,19 @@ const (
 	DEVNET  = "devnet"
 )
 
+// Create Aptos client
+func createSimAptosClient() (*aptos.Client, error) {
+	// Get network configuration from environment variable, default to devnet
+	networkConfig := aptos.DevnetConfig // TODO mainnet
+
+	// Create client
+	client, err := aptos.NewClient(networkConfig)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to create client: %v", err)
+	}
+	return client, nil
+}
+
 var (
 	// 10 BTC addresses (to simulate receiver of redeem)
 	btcAddrs = []string{
@@ -90,7 +103,7 @@ func NewSimAptosman_from_privateKey(privateKey string) (*SimAptosman, error) {
 	// 创建 Aptosman 配置
 	cfg := &AptosmanConfig{
 		Network:       DEVNET,
-		ModuleAddress: "0x1319db9743efbef92e2ed32e122a4690f466fbbb8e34cd6ccffb93e8cb68447d",
+		ModuleAddress: "0xfbfe84d58d9ef1366f295066dbf1767f53d52d319843800c63c5e32d66411864",
 		URL:           "https://fullnode.testnet.aptoslabs.com",
 	}
 

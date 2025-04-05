@@ -53,11 +53,11 @@ type RedeemRequestedEvent struct {
 
 // 赎回准备事件
 type RedeemPreparedEvent struct {
-	RequestTxHash string   // Aptos交易版本号
-	PrepareTxHash string   // 请求交易哈希
-	Requester     string   // 请求者地址
-	Receiver      string   // 接收者比特币地址
-	Amount        uint64   // 金额
-	OutpointTxIds []string // 比特币UTXO交易ID列表
-	OutpointIdxs  []uint16 // 对应的输出索引
+	RequestTxHash string
+	PrepareTxHash string
+	Requester     string
+	Receiver      string
+	Amount        uint64
+	OutpointTxIds []string
+	OutpointIdxs  []uint16
 }

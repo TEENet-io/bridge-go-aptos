@@ -49,7 +49,7 @@ func TestAptosSync(t *testing.T) {
 	st := NewMockState()
 	// 创建模拟Aptosman
 	mockAptosman := new(MockAptosman)
-	mockAptosman_1, err := aptosman.NewSimAptosman_from_privateKey("0x1319db9743efbef92e2ed32e122a4690f466fbbb8e34cd6ccffb93e8cb68447d")
+	mockAptosman_1, err := aptosman.NewSimAptosman_from_privateKey("0xfbfe84d58d9ef1366f295066dbf1767f53d52d319843800c63c5e32d66411864")
 	if err != nil {
 		t.Fatalf("failed to create mock aptosman: %v", err)
 	}

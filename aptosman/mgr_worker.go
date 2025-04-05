@@ -44,7 +44,6 @@ func (w *AptosMgrWorker) DoMint(mint *agreement.MintParameter) ([]byte, *big.Int
 		Amount:   mint.Amount.Uint64(),
 		Receiver: string(mint.Receiver),
 	}
-
 	// 执行铸币
 	txHash, err := w.aptosman.Mint(params)
 	if err != nil {

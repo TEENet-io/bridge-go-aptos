@@ -7,9 +7,11 @@ import (
 	"math/big"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/TEENet-io/bridge-go/agreement"
 	"github.com/aptos-labs/aptos-go-sdk"
 	"github.com/aptos-labs/aptos-go-sdk/bcs"
 	"github.com/btcsuite/btcd/chaincfg"
@@ -88,6 +90,11 @@ func (aptman *Aptosman) GetLatestFinalizedVersion() (uint64, error) {
 	return status, nil
 }
 
+func (aptman *Aptosman) GetPublicKey() (string, error) {
+	pk := aptman.account.AccountAddress()
+	return pk.String(), nil
+}
+
 // GetModuleEvents 获取一定范围内模块的事件
 func (aptman *Aptosman) GetModuleEvents(startVersion, endVersion uint64) (
 	[]MintedEvent,
@@ -97,18 +104,22 @@ func (aptman *Aptosman) GetModuleEvents(startVersion, endVersion uint64) (
 ) {
 	mintEvents, err := aptman.getMintEvents(startVersion, endVersion)
 	if err != nil {
-		return nil, nil, nil, err
+		logger.WithError(err).Error("failed to get mint events")
+		return []MintedEvent{}, []RedeemRequestedEvent{}, []RedeemPreparedEvent{}, err
 	}
 
 	redeemRequestedEvents, err := aptman.getRedeemRequestedEvents(startVersion, endVersion)
 	if err != nil {
-		return nil, nil, nil, err
+		logger.WithError(err).Error("failed to get redeem requested events")
+		return []MintedEvent{}, []RedeemRequestedEvent{}, []RedeemPreparedEvent{}, err
 	}
 
 	redeemPreparedEvents, err := aptman.getRedeemPreparedEvents(startVersion, endVersion)
 	if err != nil {
-		return nil, nil, nil, err
+		logger.WithError(err).Error("failed to get redeem prepared events")
+		return []MintedEvent{}, []RedeemRequestedEvent{}, []RedeemPreparedEvent{}, err
 	}
+	logger.WithField("asdsadsada", endVersion).Info("debug1231211111")
 
 	return mintEvents, redeemRequestedEvents, redeemPreparedEvents, nil
 }
@@ -160,162 +171,77 @@ func (aptman *Aptosman) getRedeemRequestedEvents(startVersion, endVersion uint64
 		}
 		redeemRequestedEvents = append(redeemRequestedEvents, redeemEvent)
 	}
+	logger.WithField("redeemRequestedEvents", redeemRequestedEvents).Info("redeemRequestedEvents")
 
 	return redeemRequestedEvents, nil
 }
 
 // 获取赎回准备事件
 func (aptman *Aptosman) getRedeemPreparedEvents(startVersion, endVersion uint64) ([]RedeemPreparedEvent, error) {
-	// eventHandle := fmt.Sprintf("%s::btc_bridgev3::BridgeEvents/redeem_prepare_events", aptman.moduleAddress.String())
 	eventHandle := "redeem_prepare_events"
 	events, err := aptman.GetEvents(eventHandle, startVersion, endVersion)
 	if err != nil {
-		return nil, fmt.Errorf("获取赎回准备事件失败: %v", err)
+		return []RedeemPreparedEvent{}, fmt.Errorf("获取赎回准备事件失败: %v", err)
+	}
+	if len(events) == 0 {
+		return []RedeemPreparedEvent{}, nil
 	}
 
 	var redeemPreparedEvents []RedeemPreparedEvent
 	for _, event := range events {
 		var prepareEvent RedeemPreparedEvent
-		if data, ok := event["data"].(map[string]interface{}); ok {
-			prepareEvent.RequestTxHash = event["version"].(string)
-			prepareEvent.PrepareTxHash = data["eth_tx_hash"].(string)
-			prepareEvent.Requester = data["requester"].(string)
-			prepareEvent.Receiver = data["receiver"].(string)
-			if amountStr, ok := data["amount"].(string); ok {
-				prepareEvent.Amount, _ = parseUint64(amountStr)
-			}
+		data, ok := event["data"].(map[string]interface{})
+		if !ok {
+			continue
+		}
 
-			// 处理数组类型字段
-			if txIds, ok := data["outpoint_tx_ids"].([]interface{}); ok {
-				for _, txid := range txIds {
-					prepareEvent.OutpointTxIds = append(prepareEvent.OutpointTxIds, txid.(string))
-				}
-			}
+		// 获取版本号作为RequestTxHash
+		if version, ok := event["version"].(string); ok {
+			prepareEvent.RequestTxHash = version
+		}
 
-			if idxs, ok := data["outpoint_idxs"].([]interface{}); ok {
-				for _, idx := range idxs {
-					idxVal, _ := parseUint16(idx.(string))
-					prepareEvent.OutpointIdxs = append(prepareEvent.OutpointIdxs, idxVal)
+		// 解析其他字段
+		if txHash, ok := data["RequestTxhash"].(string); ok {
+			prepareEvent.PrepareTxHash = txHash
+		}
+		if requester, ok := data["Requester"].(string); ok {
+			prepareEvent.Requester = requester
+		}
+		if receiver, ok := data["Receiver"].(string); ok {
+			prepareEvent.Receiver = receiver
+		}
+		if amountStr, ok := data["Amount"].(string); ok {
+			prepareEvent.Amount, _ = parseUint64(amountStr)
+		}
+
+		// 处理OutpointTxIds数组
+		if txIds, ok := data["OutpointTxIds"].([]interface{}); ok {
+			for _, txid := range txIds {
+				if txidStr, ok := txid.(string); ok {
+					prepareEvent.OutpointTxIds = append(prepareEvent.OutpointTxIds, txidStr)
 				}
 			}
 		}
+
+		// 处理OutpointIdxs数组
+		if idxs, ok := data["OutpointIdxs"].([]interface{}); ok {
+			for _, idx := range idxs {
+				switch v := idx.(type) {
+				case float64:
+					prepareEvent.OutpointIdxs = append(prepareEvent.OutpointIdxs, uint16(v))
+				case string:
+					if idxVal, err := parseUint16(v); err == nil {
+						prepareEvent.OutpointIdxs = append(prepareEvent.OutpointIdxs, idxVal)
+					}
+				}
+			}
+		}
+
 		redeemPreparedEvents = append(redeemPreparedEvents, prepareEvent)
 	}
 
 	return redeemPreparedEvents, nil
 }
-
-// func (aptman *Aptosman) TWBTCApprove(amount uint64) (string, error) {
-// 	aptman.mu.Lock()
-// 	defer aptman.mu.Unlock()
-
-// 	// 序列化金额
-// 	amountBytes, err := bcs.SerializeU64(amount)
-// 	if err != nil {
-// 		return "", fmt.Errorf("序列化金额失败: %v", err)
-// 	}
-
-// 	// 创建目标地址对象
-// 	targetAddress := aptman.moduleAddress
-
-// 	// 正确序列化地址对象
-// 	targetAddressBytes, err := bcs.Serialize(&targetAddress)
-// 	if err != nil {
-// 		return "", fmt.Errorf("序列化目标地址失败: %v", err)
-// 	}
-
-// 	// 构建交易Payload
-// 	payload := aptos.TransactionPayload{
-// 		Payload: &aptos.EntryFunction{
-// 			Module: aptos.ModuleId{
-// 				Address: aptman.moduleAddress,
-// 				Name:    "btc_tokenv3",
-// 			},
-// 			Function: "transfer",
-// 			ArgTypes: []aptos.TypeTag{},
-// 			Args: [][]byte{
-// 				targetAddressBytes, // 使用正确序列化的地址
-// 				amountBytes,
-// 			},
-// 		},
-// 	}
-
-// 	// 构建并提交交易
-// 	rawTxn, err := aptman.aptosClient.BuildTransaction(aptman.account.AccountAddress(), payload)
-// 	if err != nil {
-// 		return "", fmt.Errorf("构建交易失败: %v", err)
-// 	}
-
-// 	signedTxn, err := rawTxn.SignedTransaction(aptman.account)
-// 	if err != nil {
-// 		return "", fmt.Errorf("签名交易失败: %v", err)
-// 	}
-
-// 	submitResult, err := aptman.aptosClient.SubmitTransaction(signedTxn)
-// 	if err != nil {
-// 		return "", fmt.Errorf("提交交易失败: %v", err)
-// 	}
-
-// 	txnHash := submitResult.Hash
-
-// 	fmt.Println("txnHash:", txnHash)
-// 	// 等待交易完成
-// 	_, err = aptman.aptosClient.WaitForTransaction(txnHash)
-// 	if err != nil {
-// 		return "", fmt.Errorf("等待交易完成失败: %v", err)
-// 	}
-
-// 	// 验证交易是否成功
-// 	txnInfo, err := aptman.aptosClient.TransactionByHash(txnHash)
-// 	if err != nil {
-// 		return "", fmt.Errorf("获取交易信息失败: %v", err)
-// 	}
-
-// 	userTxn, err := txnInfo.UserTransaction()
-// 	if err != nil {
-// 		return "", fmt.Errorf("解析用户交易信息失败: %v", err)
-// 	}
-
-// 	if userTxn.Success {
-// 		return txnHash, nil
-// 	} else {
-// 		return "", fmt.Errorf("交易执行失败: %s", userTxn.VmStatus)
-// 	}
-// }
-
-// func (aptman *Aptosman) mint_tokens(addrStr string, amount uint64) (uint64, error) {
-// 	aptman.mu.Lock()
-// 	defer aptman.mu.Unlock()
-
-// 	receiverAddr := aptos.AccountAddress{}
-// 	err := receiverAddr.ParseStringRelaxed(addrStr)
-// 	if err != nil {
-// 		return "", fmt.Errorf("解析接收者地址失败: %v", err)
-// 	}
-
-// 	amountBytes, err := bcs.SerializeU64(amount)
-// 	if err != nil {
-// 		return "", fmt.Errorf("序列化金额失败: %v", err)
-// 	}
-
-// 	payload := aptos.TransactionPayload{
-// 		Payload: &aptos.EntryFunction{
-// 			Module: aptos.ModuleId{
-// 				Address: aptman.moduleAddress,
-// 				Name:    "btc_tokenv3",
-// 			},
-// 			Function: "mint_tokens",
-// 			ArgTypes: []aptos.TypeTag{},
-// 			Args: [][]byte{
-// 				receiverBytes,
-// 				amountBytes,
-// 			},
-// 		},
-// 	}
-
-// 	rawTxn, err := aptman.aptosClient.BuildTransaction(aptman.account.AccountAddress(), payload)
-
-// }
 
 // 铸造TWBTC代币
 func (aptman *Aptosman) Mint(params *MintParams) (string, error) {
@@ -339,7 +265,7 @@ func (aptman *Aptosman) Mint(params *MintParams) (string, error) {
 		btc_tx_id_bytes = append(btc_tx_id_bytes, encodedLen, byte(btc_tx_id_len>>7))
 	}
 
-	btc_tx_id_bytes = append(btc_tx_id_bytes, []byte(params.BtcTxId)...)
+	btc_tx_id_bytes = append(btc_tx_id_bytes, params.BtcTxId...)
 
 	receiverBytes, err := bcs.Serialize(&receiverAddr)
 	if err != nil {
@@ -390,6 +316,7 @@ func (aptman *Aptosman) Mint(params *MintParams) (string, error) {
 		return "", fmt.Errorf("等待交易确认失败: %v", err)
 	}
 	// TODO check resullt
+	// logger.WithField("txHash", submitResult.Hash).Info("txHash")
 	return submitResult.Hash, nil
 }
 
@@ -683,9 +610,9 @@ func (aptman *Aptosman) IsUsed(btcTxId string) (bool, error) {
 	return aptman.IsMinted(btcTxId)
 }
 
-// https://api.devnet.aptoslabs.com/v1/accounts/0x1319db9743efbef92e2ed32e122a4690f466fbbb8e34cd6ccffb93e8cb68447d/events/0x1319db9743efbef92e2ed32e122a4690f466fbbb8e34cd6ccffb93e8cb68447d::btc_bridgev3::BridgeEvents/redeem_request_events?start=1
+// https://api.devnet.aptoslabs.com/v1/accounts/0xfbfe84d58d9ef1366f295066dbf1767f53d52d319843800c63c5e32d66411864/events/0xfbfe84d58d9ef1366f295066dbf1767f53d52d319843800c63c5e32d66411864::btc_bridgev3::BridgeEvents/redeem_request_events?start=1
 
-// https://fullnode.devnet.aptoslabs.com/v1/accounts/0x1319db9743efbef92e2ed32e122a4690f466fbbb8e34cd6ccffb93e8cb68447d/events/0x1319db9743efbef92e2ed32e122a4690f466fbbb8e34cd6ccffb93e8cb68447d::btc_bridgev3::BridgeEvents/mint_events
+// https://fullnode.devnet.aptoslabs.com/v1/accounts/0xfbfe84d58d9ef1366f295066dbf1767f53d52d319843800c63c5e32d66411864/events/0xfbfe84d58d9ef1366f295066dbf1767f53d52d319843800c63c5e32d66411864::btc_bridgev3::BridgeEvents/mint_events
 // GetEvents 获取事件
 func (aptman *Aptosman) GetEvents(events_field string, limit uint64, start uint64) ([]map[string]interface{}, error) {
 	address := aptos.AccountAddress{}
@@ -852,4 +779,111 @@ func (aptman *Aptosman) NewSyncWorker() *AptosSyncWorker {
 // NewMgrWorker 创建一个新的管理工作器
 func (aptman *Aptosman) NewMgrWorker() *AptosMgrWorker {
 	return NewAptosMgrWorker(aptman)
+}
+func (w *AptosSyncWorker) DoMint(params *agreement.MintParameter) ([]byte, *big.Int, error) {
+	// 添加日志查看原始数据
+	logger.WithFields(logger.Fields{
+		"original_receiver": fmt.Sprintf("%x", params.Receiver),
+		"receiver_len":      len(params.Receiver),
+	}).Info("Original receiver data")
+
+	receiverHex := aptos.BytesToHex(params.Receiver)
+	expectedAddress := "0xfbfe84d58d9ef1366f295066dbf1767f53d52d319843800c63c5e32d66411864"
+
+	if receiverHex != expectedAddress {
+		logger.WithFields(logger.Fields{
+			"original": receiverHex,
+			"override": expectedAddress,
+		}).Info("Overriding receiver address")
+		receiverHex = expectedAddress
+	}
+
+	// 转换 BtcTxId 为正确的格式
+	btcTxIdHex := fmt.Sprintf("0x%x", params.BtcTxId[:])
+
+	mintParams := &MintParams{
+		BtcTxId:  []byte(btcTxIdHex), // Convert string to []byte
+		Amount:   params.Amount.Uint64(),
+		Receiver: receiverHex,
+	}
+
+	// 添加日志查看转换后的数据
+	logger.WithFields(logger.Fields{
+		"converted_receiver": mintParams.Receiver,
+		"btc_tx_id":          fmt.Sprintf("%x", mintParams.BtcTxId),
+		"amount":             mintParams.Amount,
+	}).Info("Converted mint params")
+
+	// 调用 Aptosman 的 Mint 方法
+	txHash, err := w.aptosman.Mint(mintParams)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to mint: %v", err)
+	}
+
+	// 获取当前的账本版本号
+	version, err := w.aptosman.GetLatestFinalizedVersion()
+	if err != nil {
+		return []byte(txHash), nil, fmt.Errorf("mint succeeded but failed to get ledger version: %v", err)
+	}
+
+	return []byte(txHash), big.NewInt(int64(version)), nil
+}
+
+func (w *AptosSyncWorker) DoPrepare(params *agreement.PrepareParameter) ([]byte, *big.Int, error) {
+	logger.WithField("DoPrepare", "start").Info("DoPrepare")
+	prepareParams := &PrepareParams{
+		RequestTxHash: string(params.RequestTxHash[:]),
+		Amount:        params.Amount.Uint64(),
+		Receiver:      string(params.Receiver),
+	}
+
+	// 调用 Aptosman 的 Prepare 方法
+	txHash, err := w.aptosman.RedeemPrepare(w.aptosman.account, prepareParams)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to prepare: %v", err)
+	}
+
+	// 获取当前的账本版本号
+	version, err := w.aptosman.GetLatestFinalizedVersion()
+	if err != nil {
+		return []byte(txHash), nil, fmt.Errorf("prepare succeeded but failed to get ledger version: %v", err)
+	}
+
+	return []byte(txHash), big.NewInt(int64(version)), nil
+}
+
+// GetTxStatus 获取交易状态
+func (w *AptosSyncWorker) GetTxStatus(txId []byte) (agreement.MonitoredTxStatus, *big.Int, error) {
+	txHash := string(txId)
+	tx, err := w.aptosman.aptosClient.WaitForTransaction(txHash, 100*time.Millisecond, 5*time.Second)
+	if err != nil {
+		if strings.Contains(err.Error(), "timeout") {
+			return agreement.Timeout, nil, nil
+		}
+		if strings.Contains(err.Error(), "not found") {
+			return agreement.Limbo, nil, nil
+		}
+		return agreement.MalForm, nil, err
+	}
+	version := big.NewInt(int64(tx.Version))
+	if tx.Success {
+		return agreement.Success, version, nil
+	}
+	return agreement.Reverted, version, nil
+}
+
+func (w *AptosSyncWorker) GetLatestLedgerNumber() (*big.Int, error) {
+	version, err := w.aptosman.GetLatestFinalizedVersion()
+	if err != nil {
+		return nil, err
+	}
+	return big.NewInt(int64(version)), nil
+}
+
+func (w *AptosSyncWorker) IsMinted(btcTxId [32]byte) (bool, error) {
+	return w.aptosman.IsMinted(string(btcTxId[:]))
+}
+
+func (w *AptosSyncWorker) IsPrepared(txHash [32]byte) (bool, error) {
+	return w.aptosman.IsPrepared(string(txHash[:]))
 }

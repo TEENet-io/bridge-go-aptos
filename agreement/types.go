@@ -82,9 +82,9 @@ type SignatureRequest struct {
 type MintParameter struct {
 	BtcTxId  common.Hash // bitcoin transaction hash is always 32 byte
 	Amount   *big.Int
-	Receiver []byte   // ethereum address
-	Rx       *big.Int // part of schnorr signature
-	S        *big.Int // part of schnorr signature
+	Receiver []byte // ethereum address
+	// Rx       *big.Int // part of schnorr signature
+	// S        *big.Int // part of schnorr signature
 }
 
 // The msg-hash for sign

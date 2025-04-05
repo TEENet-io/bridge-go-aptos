@@ -166,6 +166,7 @@ func (st *State) Start(ctx context.Context) error {
 			newLogger := logger.WithField(
 				"reqTx", ev.RequestTxHash.String(),
 			)
+			logger.WithField("newRedeemRequestedEvCh", ev).Info("newRedeemRequestedEvCh")
 
 			handleRedeemRequestEvent := func() error {
 				// Check if the redeem already exists
