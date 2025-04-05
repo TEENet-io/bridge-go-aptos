@@ -24,7 +24,9 @@ Two smart contracts have been developed and deployed on the Aptos Devnet:
 
 ### Prerequisites
 - Aptos CLI Tool (Installation guide available at: https://aptos.dev/en/build/cli)
-- Go environment (for testing)
+- Go environment >= 1.23 (for testing)
+- Bitcoin tools >=0.21 : (from https://bitcoin.org/en/download), `bitcoin-cli`, `bitcoind`.
+- Optional (bitcoin-testnet-box) (from https://github.com/freewil/bitcoin-testnet-box) for Bitcoin `regtest` network setup.
 
 ### Account Configuration
 1. Initialize an Aptos account using the CLI:

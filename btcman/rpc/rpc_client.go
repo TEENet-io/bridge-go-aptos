@@ -138,7 +138,7 @@ func (r *RpcClient) GetBlocks(n int, offset int) ([]*wire.MsgBlock, error) {
 }
 
 // Get the UTXO(s) of an address.
-// Notice: You need to turn on option -txindex on bitcoin node.
+// Notice: You need to turn on option -txindex on bitcoin node for node to track the UTXO(s).
 // Notice: This is not very accurate, btc nodes tend to forget to track.
 // Notice: This won't scale well once the query goes very large.
 // Notice: You fill in either P2PKH or P2WPKH address, the result is specific to that address type.
@@ -202,7 +202,11 @@ func (r *RpcClient) GetBalance(myAddress btcutil.Address, offset int) (int64, er
 }
 
 // Import a private key to the Bitcoin node's wallet.
-// Note: Only imported private keys are monitored by bitcoin core!
+// This is a deprecated feature in Bitcoin Node >=27 (since they move out of private key model to HD-Wallet Model)
+// In Bitcoin Node <= 0.21, it is the normal behaviour.
+// For btc-node > 27, node software should start btc node with -deprecatedrpc=create_bdb to enable this feature.
+// And when you create a wallet for node, use `createwallet wallet1 false false "" false false`
+// You can leave the lable empty string if just tracking.
 // Note: If the priv key exists, it won't raise exception.
 func (r *RpcClient) ImportPrivateKey(wif *btcutil.WIF, label string) error {
 	err := r.client.ImportPrivKeyRescan(wif, label, true)
@@ -212,7 +216,13 @@ func (r *RpcClient) ImportPrivateKey(wif *btcutil.WIF, label string) error {
 	return nil
 }
 
-// Tell the btc node to track txs about a specific address.
+// Tell the <btc node> to track txs an address.
+// This is a deprecated feature in Bitcoin Node >=27 (since they move out of private key model to HD-Wallet Model)
+// In Bitcoin Node <= 0.21, it is the normal behaviour.
+// For btc-node > 27, node software should start btc node with -deprecatedrpc=create_bdb to enable this feature.
+// And when you create a wallet for node, use `createwallet wallet1 false false "" false false`
+// In btc-node >= 27, Use import descriptor instead.
+// See: https://github.com/bitcoin/bitcoin/issues/29772
 // You can leave the lable empty string if just tracking.
 func (r *RpcClient) ImportAddress(address string, label string) error {
 	err := r.client.ImportAddressRescan(address, label, true)
@@ -224,9 +234,9 @@ func (r *RpcClient) ImportAddress(address string, label string) error {
 
 // Generate a given number of blocks.
 // This function is useful in testing environment.
-// Note: the original r.client.Generate() is deprecated in the library.
 // Return value is a list of block hashes generated.
 func (r *RpcClient) GenerateBlocks(numBlocks int64, coinbase btcutil.Address) ([]*chainhash.Hash, error) {
+	// Note: the original r.client.Generate() is deprecated in the library.
 	blockHashes, err := r.client.GenerateToAddress(numBlocks, coinbase, nil)
 	if err != nil {
 		return nil, err
