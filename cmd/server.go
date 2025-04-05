@@ -7,6 +7,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"math/big"
 	"os"
 	"os/signal"
 	"sync"
@@ -16,12 +17,16 @@ import (
 	"github.com/btcsuite/btcd/chaincfg"
 	logger "github.com/sirupsen/logrus"
 
+	"github.com/TEENet-io/bridge-go/aptosman"
 	"github.com/TEENet-io/bridge-go/btcaction"
 	"github.com/TEENet-io/bridge-go/btcman/assembler"
 	btcrpc "github.com/TEENet-io/bridge-go/btcman/rpc"
 	"github.com/TEENet-io/bridge-go/btcsync"
 	"github.com/TEENet-io/bridge-go/btctxmanager"
 	"github.com/TEENet-io/bridge-go/btcvault"
+	"github.com/TEENet-io/bridge-go/chainsync"
+	"github.com/TEENet-io/bridge-go/chaintxmgr"
+	"github.com/TEENet-io/bridge-go/chaintxmgrdb"
 	"github.com/TEENet-io/bridge-go/etherman"
 	"github.com/TEENet-io/bridge-go/ethsync"
 	"github.com/TEENet-io/bridge-go/ethtxmanager"
@@ -36,7 +41,7 @@ import (
 // So we list them here.
 const (
 	// eth synchronizer config
-	frequencyToCheckEthFinalizedBlock = 5 * time.Second
+	frequencyToCheckEthFinalizedBlock = 1 * time.Second
 
 	// eth tx manager config
 	frequencyToPrepareRedeem      = 5 * time.Second // read db, gather UTXO, prepare & send RedeemPrepare Tx on ETH side.
@@ -54,10 +59,14 @@ const (
 // Its easier to load it from env vars or a config file.
 type BridgeServerConfig struct {
 	// eth side
-	EthRpcUrl          string                        // json rpc url
-	EthCoreAccountPriv string                        // private key of the bridge controlled account
-	EthRetroScanBlk    int64                         // retro scan block, tell Sync() to scan from this block, -1 to honor the valude in statedb.
-	MSchnorrSigner     multisig_client.SchnorrSigner // remote or local both okay. as long as it can sign() and pub()
+	AptosRpcUrl          string // json rpc url
+	AptosCoreAccountPriv string // private key of the bridge controlled account
+	AptosModuleAddress   string // module address
+
+	EthRpcUrl          string // json rpc url
+	EthCoreAccountPriv string // private key of the bridge controlled account
+	// EthRetroScanBlk    int64                         // retro scan block, tell Sync() to scan from this block, -1 to honor the valude in statedb.
+	MSchnorrSigner multisig_client.SchnorrSigner // remote or local both okay. as long as it can sign() and pub()
 	// state side
 	DbFilePath string // db file path
 	// btc side
@@ -99,6 +108,12 @@ type BridgeServer struct {
 	MyBtcVault       *btcvault.TreasureVault
 	MyBtcMgr         *btctxmanager.BtcTxManager
 	MyBtcMonitor     *btcsync.BTCMonitor
+
+	// Aptos side
+	MyAptosMan          *aptosman.Aptosman
+	MyAptosTxMgrDb      chaintxmgrdb.ChainTxMgrDB
+	MyAptosTxMgr        *chaintxmgr.ChainTxMgr
+	MyAptosSynchronizer *chainsync.ChainSync
 }
 
 // NewBridgeServer creates a new bridge server.
@@ -108,11 +123,13 @@ func NewBridgeServer(bsc *BridgeServerConfig, ctx context.Context, wg *sync.Wait
 	// BTC side config
 
 	// 0) connect to btc network
+	fmt.Printf("Connecting to btc rpc server with %s:%s, %s:%s\n", bsc.BtcRpcServer, bsc.BtcRpcPort, bsc.BtcRpcUsername, bsc.BtcRpcPwd)
 	myBtcRpcClient, err := SetupBtcRpc(bsc.BtcRpcServer, bsc.BtcRpcPort, bsc.BtcRpcUsername, bsc.BtcRpcPwd)
 	if err != nil {
 		logger.Fatalf("cannot connect to btc rpc server with %s:%s, %s:%s %v", bsc.BtcRpcServer, bsc.BtcRpcPort, bsc.BtcRpcUsername, bsc.BtcRpcPwd, err)
 		return nil, err
 	}
+	fmt.Printf("Successfully connected to btc rpc server with %s:%s, %s:%s\n", bsc.BtcRpcServer, bsc.BtcRpcPort, bsc.BtcRpcUsername, bsc.BtcRpcPwd)
 
 	// 1) Create a <UTXO vault storage>
 	vaultStorage, err := btcvault.NewVaultSQLiteStorage(bsc.DbFilePath, bsc.BtcCoreAccountAddr)
@@ -125,32 +142,24 @@ func NewBridgeServer(bsc *BridgeServerConfig, ctx context.Context, wg *sync.Wait
 	// This is SHARED between btc monitor and eth tx manager.
 	myBtcVault := btcvault.NewTreasureVault(bsc.BtcCoreAccountAddr, vaultStorage)
 
-	// ETH side config
-
-	// 1) Create the real ethereum chain that is terraformed.
-	eth_core_account, err := etherman.StringToPrivateKey(bsc.EthCoreAccountPriv)
+	// aptos side
+	ServerAptosman, err := aptosman.NewSimAptosman_from_privateKey(bsc.AptosCoreAccountPriv)
 	if err != nil {
-		logger.Fatalf("failed to create core eth account controlled by bridge: %v", err)
+		logger.Fatalf("failed to create core aptos account controlled by bridge: %v", err)
 		return nil, err
 	}
-	realEth, err := etherman.NewRealEthChain(bsc.EthRpcUrl, eth_core_account, bsc.MSchnorrSigner, bsc.PredefinedBridgeContractAddr, bsc.PredefinedTwbtcContractAddr)
-	if err != nil {
-		return nil, err
-	}
-	logger.WithField("address", realEth.BridgeContractAddress.Hex()).Info("Bridge contract address")
-	logger.WithField("address", realEth.TwbtcContractAddress.Hex()).Info("TWBTC contract address")
 
-	// 2) Create the Etherman instance.
-	myEtherman, err := etherman.NewEtherman(&etherman.EthermanConfig{
-		URL:                   bsc.EthRpcUrl,
-		BridgeContractAddress: realEth.BridgeContractAddress,
-		TWBTCContractAddress:  realEth.TwbtcContractAddress,
-	}, realEth.CoreAccount)
+	// // 2) Create the Etherman instance.
+	// myEtherman, err := etherman.NewEtherman(&etherman.EthermanConfig{
+	// 	URL:                   bsc.EthRpcUrl,
+	// 	BridgeContractAddress: realEth.BridgeContractAddress,
+	// 	TWBTCContractAddress:  realEth.TwbtcContractAddress,
+	// }, realEth.CoreAccount)
 
-	if err != nil {
-		logger.Fatalf("failed to create etherman: %v", err)
-		return nil, err
-	}
+	// if err != nil {
+	// 	logger.Fatalf("failed to create etherman: %v", err)
+	// 	return nil, err
+	// }
 
 	// Create sql db, and related state_db, state.
 	sqldb, err := sql.Open("sqlite3", bsc.DbFilePath)
@@ -165,91 +174,163 @@ func NewBridgeServer(bsc *BridgeServerConfig, ctx context.Context, wg *sync.Wait
 		logger.Fatalf("failed to create state db: %v", err)
 		return nil, err
 	}
-
-	// state
-	myState, err := state.New(myStateDb, &state.StateConfig{ChannelSize: 1, UniqueChainId: realEth.ChainId})
+	myState, err := state.New(myStateDb, &state.StateConfig{ChannelSize: 300, UniqueChainId: big.NewInt(1)})
 	if err != nil {
 		logger.Fatalf("failed to create state: %v", err)
 		return nil, err
 	}
+	// // state
+	// myState, err := state.New(myStateDb, &state.StateConfig{ChannelSize: 1, UniqueChainId: realEth.ChainId})
+	// if err != nil {
+	// 	logger.Fatalf("failed to create state: %v", err)
+	// 	return nil, err
+	// }
 
-	// eth_tx_manager_db
-	myEthTxMgrDb, err := ethtxmanager.NewEthTxManagerDB(sqldb)
+	// // eth_tx_manager_db
+	// myEthTxMgrDb, err := ethtxmanager.NewEthTxManagerDB(sqldb)
+	// if err != nil {
+	// 	logger.Fatalf("failed to create eth tx manager db: %v", err)
+	// 	return nil, err
+	// }
+
+	// // aptos_tx_manager_db
+	myAptosTxMgrDb, err := chaintxmgrdb.NewSQLiteChainTxMgrDB(bsc.DbFilePath)
 	if err != nil {
-		logger.Fatalf("failed to create eth tx manager db: %v", err)
+		logger.Fatalf("failed to create aptos tx manager db: %v", err)
 		return nil, err
 	}
 
-	// eth synchronizer
-	// create a eth synchronizer
-	myEthSynchronizer, err := ethsync.New(
-		myEtherman,
-		myState,
-		&ethsync.EthSyncConfig{
+	// aptos synchronizer
+	myAptosSynchronizer, err := chainsync.NewChainSync(
+		&chainsync.ChainSyncConfig{
 			IntervalCheckBlockchain: frequencyToCheckEthFinalizedBlock,
-			BtcChainConfig:          bsc.BtcChainConfig,
-			EthChainID:              realEth.ChainId,
-			EthRetroScanBlkNum:      bsc.EthRetroScanBlk,
+			St:                      myState,
+			ForceScanBlkNum:         0, // TODO
 		},
+		aptosman.NewAptosSyncWorker(ServerAptosman.Aptosman),
 	)
+
 	if err != nil {
-		logger.Fatalf("failed to create eth synchronizer: %v", err)
+		logger.Fatalf("failed to create aptos synchronizer: %v", err)
 		return nil, err
 	}
 
-	_eth_tx_mgr_cfg := &ethtxmanager.EthTxMgrConfig{
-		IntervalToPrepareRedeem:       frequencyToPrepareRedeem,
-		IntervalToMint:                frequencyToMint,
-		IntervalToMonitorPendingTxs:   frequencyToMonitorPendingTxs,
-		TimeoutOnWaitingForSignature:  timeoutOnWaitingForSignature,
-		TimeoutOnWaitingForOutpoints:  timtoutOnWaitingForOutpoints,
-		TimeoutOnMonitoringPendingTxs: timeoutOnMonitoringPendingTxs,
-	}
+	// // eth synchronizer
+	// // create a eth synchronizer
+	// myEthSynchronizer, err := ethsync.New(
+	// 	myEtherman,
+	// 	myState,
+	// 	&ethsync.EthSyncConfig{
+	// 		IntervalCheckBlockchain: frequencyToCheckEthFinalizedBlock,
+	// 		BtcChainConfig:          bsc.BtcChainConfig,
+	// 		EthChainID:              realEth.ChainId,
+	// 		EthRetroScanBlkNum:      bsc.EthRetroScanBlk,
+	// 	},
+	// )
+	// if err != nil {
+	// 	logger.Fatalf("failed to create eth synchronizer: %v", err)
+	// 	return nil, err
+	// }
 
-	// well, eth tx mgr doesn't recognize signer.
-	// wrap the signer into "async schnorr wallet".
+	// _eth_tx_mgr_cfg := &ethtxmanager.EthTxMgrConfig{
+	// 	IntervalToPrepareRedeem:       frequencyToPrepareRedeem,
+	// 	IntervalToMint:                frequencyToMint,
+	// 	IntervalToMonitorPendingTxs:   frequencyToMonitorPendingTxs,
+	// 	TimeoutOnWaitingForSignature:  timeoutOnWaitingForSignature,
+	// 	TimeoutOnWaitingForOutpoints:  timtoutOnWaitingForOutpoints,
+	// 	TimeoutOnMonitoringPendingTxs: timeoutOnMonitoringPendingTxs,
+	// }
+
+	// // well, eth tx mgr doesn't recognize signer.
+	// // wrap the signer into "async schnorr wallet".
 	_schnorrAsyncWallet := signers.NewMockedSchnorrAsyncSigner(bsc.MSchnorrSigner)
 
-	myEthTxMgr, err := ethtxmanager.NewEthTxManager(
-		_eth_tx_mgr_cfg,
-		myEtherman,
+	// myEthTxMgr, err := ethtxmanager.NewEthTxManager(
+	// 	_eth_tx_mgr_cfg,
+	// 	myEtherman,
+	// 	myStateDb,
+	// 	myEthTxMgrDb,
+	// 	_schnorrAsyncWallet,
+	// 	myBtcVault,
+	// )
+	// if err != nil {
+	// 	logger.Fatalf("failed to create eth tx manager: %v", err)
+	// 	return nil, err
+	// }
+
+	_aptos_tx_mgr_cfg := &chaintxmgr.ChainTxMgrConfig{
+		IntervalCheckTime:            frequencyToPrepareRedeem,
+		TimeoutOnWaitingForSignature: timeoutOnWaitingForSignature,
+		TimeoutOnWaitingForOutpoints: timtoutOnWaitingForOutpoints,
+		TimeoutTxLedgerNumber:        big.NewInt(timeoutOnMonitoringPendingTxs),
+	}
+
+	// 创建 Aptos Worker
+	MgrWorker := aptosman.NewAptosSyncWorker(ServerAptosman.Aptosman)
+
+	// 创建 Aptos Tx Manager
+	myAptosTxMgr, err := chaintxmgr.NewChainTxMgr(
+		_aptos_tx_mgr_cfg,
+		MgrWorker,
+		myState,
 		myStateDb,
-		myEthTxMgrDb,
+		myAptosTxMgrDb,
 		_schnorrAsyncWallet,
 		myBtcVault,
+		ServerAptosman.Aptosman,
 	)
 	if err != nil {
-		logger.Fatalf("failed to create eth tx manager: %v", err)
+		logger.Fatalf("failed to create aptos tx manager: %v", err)
 		return nil, err
 	}
 
-	// Important: Turn on eth-side components!
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		err := myState.Start(ctx) // state
-		if err != nil {
-			logger.Fatalf("failed to state eth: %v", err)
-		}
-	}()
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		err := myEthTxMgr.Loop(ctx) // eth-side tx manager
-		if err != nil {
-			logger.Fatalf("failed to mgr eth: %v", err)
-		}
-	}()
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		err := myEthSynchronizer.Loop(ctx) // eth-side synchronizer
-		if err != nil {
-			logger.Fatalf("failed to sync eth: %v", err)
-		}
-	}()
+	// // Important: Turn on eth-side components!
+	// wg.Add(1)
+	// go func() {
+	// 	defer wg.Done()
+	// 	err := myState.Start(ctx) // state
+	// 	if err != nil {
+	// 		logger.Fatalf("failed to state eth: %v", err)
+	// 	}
+	// }()
+	// wg.Add(1)
+	// go func() {
+	// 	defer wg.Done()
+	// 	err := myEthTxMgr.Loop(ctx) // eth-side tx manager
+	// 	if err != nil {
+	// 		logger.Fatalf("failed to mgr eth: %v", err)
+	// 	}
+	// }()
+	// wg.Add(1)
+	// go func() {
+	// 	defer wg.Done()
+	// 	err := myEthSynchronizer.Loop(ctx) // eth-side synchronizer
+	// 	if err != nil {
+	// 		logger.Fatalf("failed to sync eth: %v", err)
+	// 	}
+	// }()
 	// Don't forget to call wg.Wait() in the main routine.
 
+	// 启动 Aptos 同步器
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		err := myAptosSynchronizer.Loop(ctx) // aptos-side synchronizer
+		if err != nil {
+			logger.Fatalf("failed to sync aptos: %v", err)
+		}
+	}()
+	// 启动 Aptos 交易管理器
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		err := myAptosTxMgr.Loop(ctx) // aptos-side tx manager
+		if err != nil {
+			logger.Fatalf("failed to run aptos tx manager: %v", err)
+		}
+	}()
+	// Go back to btc side config:
+	// 3) Create <Btc Tx Manager Storage> (for redeem purpose, useless in deposit)
 	// Go back to btc side config:
 	// 3) Create <Btc Tx Manager Storage> (for redeem purpose, useless in deposit)
 	btcMgrStorage, err := btcaction.NewSQLiteRedeemStorage(bsc.DbFilePath)
@@ -371,19 +452,23 @@ func NewBridgeServer(bsc *BridgeServerConfig, ctx context.Context, wg *sync.Wait
 	// *** End the setup of http server ***
 
 	return &BridgeServer{
-		EthEnv:           realEth,
-		MyEtherman:       myEtherman,
-		MyState:          myState,
-		MyStateDb:        myStateDb,
-		MyEthMgrDb:       myEthTxMgrDb,
-		MyEthTxMgr:       myEthTxMgr,
-		MyEthSync:        myEthSynchronizer,
-		BtcRpcClient:     myBtcRpcClient,
-		MyDepositStorage: depositStorage,
-		MyVaultStorage:   vaultStorage,
-		MyBtcVault:       myBtcVault,
-		MyBtcMgr:         myBtcTxMgr,
-		MyBtcMonitor:     myBtcMonitor,
+		// EthEnv:              realEth,
+		// MyEtherman:          myEtherman,
+		MyState:   myState,
+		MyStateDb: myStateDb,
+		// MyEthMgrDb:          myEthTxMgrDb,
+		// MyEthTxMgr:          myEthTxMgr,
+		// MyEthSync:           myEthSynchronizer,
+		BtcRpcClient:        myBtcRpcClient,
+		MyDepositStorage:    depositStorage,
+		MyVaultStorage:      vaultStorage,
+		MyBtcVault:          myBtcVault,
+		MyBtcMgr:            myBtcTxMgr,
+		MyBtcMonitor:        myBtcMonitor,
+		MyAptosMan:          ServerAptosman.Aptosman,
+		MyAptosTxMgrDb:      myAptosTxMgrDb,
+		MyAptosTxMgr:        myAptosTxMgr,
+		MyAptosSynchronizer: myAptosSynchronizer,
 	}, nil
 }
 

@@ -7,6 +7,7 @@ import (
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
+	logger "github.com/sirupsen/logrus"
 )
 
 func IsValidBtcAddress(address string, cfg *chaincfg.Params) bool {
@@ -34,12 +35,14 @@ func Verify(pub, msg []byte, rx, s *big.Int) bool {
 	pub = append([]byte{0x02}, pub...)
 	pubKey, err := btcec.ParsePubKey(pub)
 	if err != nil {
+		logger.Errorf("failed to parse pubkey: err=%v", err)
 		return false
 	}
 
 	// b (64byte) => signature object
 	sig, err := schnorr.ParseSignature(b[:])
 	if err != nil {
+		logger.Errorf("failed to parse signature: err=%v", err)
 		return false
 	}
 

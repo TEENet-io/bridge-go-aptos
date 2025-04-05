@@ -524,7 +524,7 @@ func TestDeposit(t *testing.T) {
 	if len(utxos) == 0 {
 		t.Fatalf("no utxos to spend, send some bitcoin to address %s first", wallet_addr_str)
 	}
-	logger.WithField("count", len(utxos)).Info("User UTXO(s)")
+	// logger.WithField("count", len(utxos)).Info("User UTXO(s)")
 
 	// List is too long to print
 	// for idx, item := range utxos {
@@ -560,17 +560,17 @@ func TestDeposit(t *testing.T) {
 		t.Fatalf("cannot select enough utxos: %v", err)
 	}
 
-	logger.WithField("count", len(selected_utxos)).Info("User UTXOs selected")
+	// logger.WithField("count", len(selected_utxos)).Info("User UTXOs selected")
 
 	// Craft the [Deposit Tx]
 	// on EVM side: the receiver is env.Chain.Accounts[1].From
 	eth_side_receiver := ethEnv.sim.Chain.Accounts[1].From.String()
 
-	logger.WithFields(logger.Fields{
-		"amount":   deposit_amount,
-		"evm_addr": eth_side_receiver,
-		"evm_id":   EVM_CHAIN_ID_INT64,
-	}).Info("Deposit data")
+	// logger.WithFields(logger.Fields{
+	// 	"amount":   deposit_amount,
+	// 	"evm_addr": eth_side_receiver,
+	// 	"evm_id":   EVM_CHAIN_ID_INT64,
+	// }).Info("Deposit data")
 
 	tx, err := legacy_assembler.MakeBridgeDepositTx(
 		selected_utxos,
@@ -596,7 +596,7 @@ func TestDeposit(t *testing.T) {
 		t.Fatalf("send raw Tx error, %v", err)
 	}
 
-	logger.WithField("txHash", depositBtcTxHash.String()).Info("Tx sent")
+	// logger.WithField("txHash", depositBtcTxHash.String()).Info("Tx sent")
 
 	// Generate enough blocks on BTC blockchain to confirm the [Deposit Tx]
 	p1_addr, _ := assembler.DecodeAddress(p1_legacy_addr_str, assembler.GetRegtestParams())

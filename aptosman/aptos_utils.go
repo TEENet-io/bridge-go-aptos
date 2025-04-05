@@ -601,7 +601,7 @@ func GetBridgeEvents(client *aptos.Client, moduleAddress string, eventType strin
 	return eventsMap, nil
 }
 
-// https://api.devnet.aptoslabs.com/v1/accounts/0x1319db9743efbef92e2ed32e122a4690f466fbbb8e34cd6ccffb93e8cb68447d/events/0x1319db9743efbef92e2ed32e122a4690f466fbbb8e34cd6ccffb93e8cb68447d::btc_bridgev3::BridgeEvents/redeem_request_events?start=1
+// https://api.devnet.aptoslabs.com/v1/accounts/0xfbfe84d58d9ef1366f295066dbf1767f53d52d319843800c63c5e32d66411864/events/0xfbfe84d58d9ef1366f295066dbf1767f53d52d319843800c63c5e32d66411864::btc_bridgev3::BridgeEvents/redeem_request_events?start=1
 // GetEvents 获取事件
 func GetEvents(client *aptos.Client, moduleAddress string, events_field string, limit uint64, start uint64, aptos_url string) ([]map[string]interface{}, error) {
 	address := aptos.AccountAddress{}
@@ -729,7 +729,7 @@ func GetEvents(client *aptos.Client, moduleAddress string, events_field string, 
 	return events, nil
 }
 
-// https://api.devnet.aptoslabs.com/v1/accounts/0x1319db9743efbef92e2ed32e122a4690f466fbbb8e34cd6ccffb93e8cb68447d/events/0x1319db9743efbef92e2ed32e122a4690f466fbbb8e34cd6ccffb93e8cb68447d::btc_bridgev3::BridgeEvents/redeem_prepare_events?limit=1&start=0
+// https://api.devnet.aptoslabs.com/v1/accounts/0xfbfe84d58d9ef1366f295066dbf1767f53d52d319843800c63c5e32d66411864/events/0xfbfe84d58d9ef1366f295066dbf1767f53d52d319843800c63c5e32d66411864::btc_bridgev3::BridgeEvents/redeem_prepare_events?limit=1&start=0
 // GetRedeemPreparedEvents 获取赎回准备事件
 // // 赎回准备事件
 //

@@ -91,7 +91,7 @@ func (txmgr *EthTxManager) createMintTx(
 		return ErrEthermanMint
 	}
 
-	logger.WithField("mintTx", tx.Hash().String()).Info("Mint tx sent")
+	// logger.WithField("mintTx", tx.Hash().String()).Info("Mint tx sent")
 
 	// Save the monitored tx
 	mt := &MonitoredTx{

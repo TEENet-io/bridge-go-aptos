@@ -163,7 +163,7 @@ func (txmgr *EthTxManager) createRedeemPrepareTx(
 	}
 
 	newLogger := logger.WithField("prepareTx", tx.Hash().String())
-	newLogger.Info("prepare redeem tx sent")
+	// newLogger.Info("prepare redeem tx sent")
 
 	mt := &MonitoredTx{
 		TxHash:        tx.Hash(),

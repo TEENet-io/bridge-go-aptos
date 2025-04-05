@@ -100,7 +100,7 @@ func (s *Synchronizer) Loop(ctx context.Context) error {
 	defer func() {
 		logger.Debug("stopping Aptos synchronization")
 	}()
-	ticker := time.NewTicker(s.cfg.IntervalCheckBlockchain)
+	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
 	for {
@@ -115,6 +115,7 @@ func (s *Synchronizer) Loop(ctx context.Context) error {
 				return fmt.Errorf("aptosman is nil")
 			}
 			newFinalized, err := s.aptosman.GetLatestFinalizedVersion()
+			logger.WithField("newFinalizedaaaa", newFinalized).Info("newFinalized")
 			if err != nil {
 				logger.WithError(err).Error("failed to get latest finalized version")
 				return err
@@ -139,7 +140,9 @@ func (s *Synchronizer) Loop(ctx context.Context) error {
 			s.st.GetNewBlockChainFinalizedLedgerNumberChannel() <- big.NewInt(int64(newFinalized))
 			inspecting_version := new(big.Int).Add(s.lastFinalized, big.NewInt(1))
 			for inspecting_version.Cmp(big.NewInt(int64(newFinalized))) != 1 {
+				logger.WithField("inspecting_version", inspecting_version).Info("inspecting_version")
 				minted, requested, prepared, err := s.aptosman.GetModuleEvents(inspecting_version.Uint64(), newFinalized)
+				logger.WithField("prepared", prepared).Info("prepared")
 				if len(minted) > 0 || len(requested) > 0 || len(prepared) > 0 {
 					logger.WithFields(logger.Fields{
 						"version#":  inspecting_version,
@@ -174,13 +177,23 @@ func (s *Synchronizer) Loop(ctx context.Context) error {
 						"receiver(btc)": ev.Receiver,
 						"sender(aptos)": ev.Requester,
 					}).Info("RedeemRequested Event Found")
+
 					amount := new(big.Int).SetUint64(ev.Amount)
+
+					var isValidReceiver bool
+					if s.cfg.BtcChainConfig != nil {
+						isValidReceiver = common.IsValidBtcAddress(ev.Receiver, s.cfg.BtcChainConfig)
+					} else {
+						logger.Warn("BtcChainConfig is nil, skipping address validation")
+						isValidReceiver = false
+					}
+
 					x := &agreement.RedeemRequestedEvent{
 						RequestTxHash:   common.HexStrToBytes32(ev.RequestTxHash),
 						Requester:       []byte(ev.Requester),
 						Amount:          amount,
 						Receiver:        ev.Receiver,
-						IsValidReceiver: common.IsValidBtcAddress(ev.Receiver, s.cfg.BtcChainConfig),
+						IsValidReceiver: isValidReceiver,
 					}
 					s.st.GetNewRedeemRequestedEventChannel() <- x
 				}

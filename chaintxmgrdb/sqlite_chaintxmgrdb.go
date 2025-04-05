@@ -54,9 +54,9 @@ func (s *SQLiteChainTxMgrDB) init() error {
 }
 
 // Implementation of the interface
-func (s *SQLiteChainTxMgrDB) Close() error {
-	return s.db.Close()
-}
+// func (s *SQLiteChainTxMgrDB) Close() error {
+// 	return s.db.Close()
+// }
 
 func (s *SQLiteChainTxMgrDB) InsertMonitoredTx(tx *MonitoredTx) error {
 	query := `

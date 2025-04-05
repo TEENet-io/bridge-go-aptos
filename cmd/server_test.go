@@ -268,7 +268,7 @@ func TestEndtoEnd(t *testing.T) {
 	if len(utxos) == 0 {
 		t.Fatalf("no utxos to spend, send some bitcoin to address %s first", wallet_addr_str)
 	}
-	logger.WithField("count", len(utxos)).Info("User UTXO(s)")
+	// logger.WithField("count", len(utxos)).Info("User UTXO(s)")
 
 	// List is too long to print
 	// for idx, item := range utxos {
@@ -304,7 +304,7 @@ func TestEndtoEnd(t *testing.T) {
 		t.Fatalf("cannot select enough utxos: %v", err)
 	}
 
-	logger.WithField("count", len(selected_utxos)).Info("User UTXOs selected")
+	// logger.WithField("count", len(selected_utxos)).Info("User UTXOs selected")
 
 	// Craft the [Deposit Tx]
 	eth_side_receiver := ETH_USER_ADDR
@@ -339,7 +339,7 @@ func TestEndtoEnd(t *testing.T) {
 		t.Fatalf("send raw Tx error, %v", err)
 	}
 
-	logger.WithField("txHash", depositBtcTxHash.String()).Info("Tx sent")
+	// logger.WithField("txHash", depositBtcTxHash.String()).Info("Tx sent")
 
 	// Generate enough blocks on BTC blockchain to confirm the [Deposit Tx]
 	p1_addr, _ := assembler.DecodeAddress(coinbase_legacy_addr_str, assembler.GetRegtestParams())

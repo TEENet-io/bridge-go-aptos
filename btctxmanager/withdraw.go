@@ -156,7 +156,7 @@ func (m *BtcTxManager) WithdrawBTC(redeem *state.Redeem) (*chainhash.Hash, error
 		return nil, err
 	}
 
-	logger.WithField("btc_tx_id", txHash.String()).Info("BTC Redeem Tx Sent")
+	// logger.WithField("btc_tx_id", txHash.String()).Info("BTC Redeem Tx Sent")
 
 	return txHash, nil
 }

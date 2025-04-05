@@ -99,10 +99,10 @@ func NewRealEthChain(
 		if err != nil {
 			return nil, err
 		}
-		logger.WithFields(logger.Fields{
-			"bridge_addr": bridgeAddress.Hex(),
-			"deploy_tx":   deployTx.Hash().Hex(),
-		}).Info("Bridge contract deploy Tx sent")
+		// logger.WithFields(logger.Fields{
+		// 	"bridge_addr": bridgeAddress.Hex(),
+		// 	"deploy_tx":   deployTx.Hash().Hex(),
+		// }).Info("Bridge contract deploy Tx sent")
 
 		// Wait for the deployment transaction to be mined
 		_, err = bind.WaitDeployed(context.Background(), client, deployTx)

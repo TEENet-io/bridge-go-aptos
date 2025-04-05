@@ -1,5 +1,12 @@
 package aptosman
 
+import (
+	"fmt"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
+
 // import (
 // 	"crypto/ed25519"
 // 	"testing"
@@ -88,11 +95,30 @@ package aptosman
 // 	assert.NotEmpty(t, txHash)
 // 	fmt.Println("success RedeemPrepare")
 
-// 	// 验证赎回是否已准备
-// 	prepared, err := aptosman.IsPrepared(params.RequestTxHash)
-// 	assert.NoError(t, err)
-// 	assert.True(t, prepared)
-// }
+//		// 验证赎回是否已准备
+//		prepared, err := aptosman.IsPrepared(params.RequestTxHash)
+//		assert.NoError(t, err)
+//		assert.True(t, prepared)
+//	}
+var TEST_ADMIN_ACCOUNT_ADDRESS = "0x26f032ddd97e788550f65b8d20f9d037c4330fa27f6f92247f55bd11940774ed"
+
+func TestRedeemRequest(t *testing.T) {
+	env, err := NewSimAptosman_from_privateKey(TEST_ADMIN_ACCOUNT_ADDRESS)
+	assert.NoError(t, err)
+	aptosman := env.Aptosman
+
+	requestParams := &RequestParams{
+		Amount:   uint64(1000000),
+		Receiver: "mvqq54khZQta7zDqFGoyN7BVK7Li4Xwnih",
+	}
+
+	txHash, err := aptosman.RedeemRequest(env.Aptosman.account, requestParams)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, txHash)
+	fmt.Println("success RedeemRequest")
+	fmt.Println("txHash:", txHash)
+
+}
 
 // func TestIsMinted(t *testing.T) {
 // 	env, err := NewSimAptosman_from_privateKey(TEST_ADMIN_ACCOUNT_ADDRESS)
@@ -100,19 +126,18 @@ package aptosman
 // 	aptosman := env.Aptosman
 
 // 	// 准备铸币参数
-// 	btcTxId := []byte("btc_tx_id_tesassadsaaaaat")
+// 	btcTxId := []byte("02723a1c68c90aef65704cc789fb574122f6edbbc0aa96e997a09e071df72ae1")
 // 	params := &MintParams{
 // 		BtcTxId:  btcTxId,
-// 		Amount:   uint64(100),
-// 		Receiver: "0x456", // 示例接收者地址
+// 		Amount:   uint64(100000000),
+// 		Receiver: "0xdbf1767f53d52d319843800c63c5e32d66411864", // 示例接收者地址
 // 	}
-// 	fmt.Println("success Prepare MintParams")
 
 // 	// 执行铸币
 // 	txHash, err := aptosman.Mint(params)
 // 	assert.NoError(t, err)
 // 	assert.NotEmpty(t, txHash)
-// 	fmt.Println("success Mint")
+// 	logger.WithField("txHash", txHash).Info("txHash")
 
 // 	// 验证铸币状态
 // 	minted, err := aptosman.IsMinted(string(btcTxId))
@@ -130,7 +155,7 @@ package aptosman
 // 	mintParams := &MintParams{
 // 		BtcTxId:  btcTxId,
 // 		Amount:   uint64(1000),
-// 		Receiver: "0x1319db9743efbef92e2ed32e122a4690f466fbbb8e34cd6ccffb93e8cb68447d", // 示例接收者地址
+// 		Receiver: "0xfbfe84d58d9ef1366f295066dbf1767f53d52d319843800c63c5e32d66411864", // 示例接收者地址
 // 	}
 // 	_, err = env.Aptosman.Mint(mintParams)
 // 	assert.NoError(t, err)
@@ -163,7 +188,7 @@ package aptosman
 // 	for _, event := range mintEvents {
 // 		if event.BtcTxId == string(btcTxId) {
 // 			assert.Equal(t, uint64(1000), event.Amount)
-// 			assert.Equal(t, "0x1319db9743efbef92e2ed32e122a4690f466fbbb8e34cd6ccffb93e8cb68447d", event.Receiver)
+// 			assert.Equal(t, "0xfbfe84d58d9ef1366f295066dbf1767f53d52d319843800c63c5e32d66411864", event.Receiver)
 // 			found = true
 // 			break
 // 		}
@@ -252,7 +277,7 @@ package aptosman
 // 	// 创建Aptosman配置
 // 	cfg := &AptosmanConfig{
 // 		URL:           "https://fullnode.devnet.aptoslabs.com", // 使用本地模拟环境URL
-// 		ModuleAddress: "0x1319db9743efbef92e2ed32e122a4690f466fbbb8e34cd6ccffb93e8cb68447d",
+// 		ModuleAddress: "0xfbfe84d58d9ef1366f295066dbf1767f53d52d319843800c63c5e32d66411864",
 // 		Network:       "devnet",
 // 	}
 

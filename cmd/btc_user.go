@@ -69,7 +69,7 @@ func NewBtcUser(buc *BtcUserConfig, registerAddress bool) (*BtcUser, error) {
 	}
 
 	_user_addr := _legacy_signer.P2PKH.EncodeAddress()
-	logger.WithField("P2PKH_addr", _user_addr).Info("user btc signer")
+	// logger.WithField("P2PKH_addr", _user_addr).Info("user btc signer")
 
 	if _user_addr != buc.BtcCoreAccountAddr {
 		logger.WithFields(logger.Fields{
@@ -114,7 +114,7 @@ func (bu *BtcUser) GetUtxos() ([]utxo.UTXO, error) {
 	if len(utxos) == 0 {
 		logger.WithField("user_address", bu.MyLegacySigner.P2PKH.EncodeAddress()).Info("no utxos to spend, send some bitcoin to this address first")
 	}
-	logger.WithField("count", len(utxos)).Info("User UTXO(s)")
+	// logger.WithField("count", len(utxos)).Info("User UTXO(s)")
 	return utxos, nil
 }
 
@@ -127,18 +127,18 @@ func (bu *BtcUser) GetBalance() (int64, error) {
 		}).Error("cannot retrieve balance from rpc")
 		return 0, err
 	}
-	logger.WithField("balance", balance).Info("User Balance")
+	// logger.WithField("balance", balance).Info("User Balance")
 	return balance, nil
 }
 
 // amount: satoshi
 // fee: satoshi
 func (bu *BtcUser) DepositToBridge(amount int64, feeAmount int64, bridgeAddress string, evmAddr string, evmChainId int) (string, error) {
-	logger.WithFields(logger.Fields{
-		"amount":   amount,
-		"evm_addr": evmAddr,
-		"evm_id":   evmChainId,
-	}).Info("Deposit data")
+	// logger.WithFields(logger.Fields{
+	// 	"amount":   amount,
+	// 	"evm_addr": evmAddr,
+	// 	"evm_id":   evmChainId,
+	// }).Info("Deposit data")
 
 	// safe guard: check if user has enough balance to make a deposit.
 	balance, err := bu.GetBalance()
@@ -165,7 +165,7 @@ func (bu *BtcUser) DepositToBridge(amount int64, feeAmount int64, bridgeAddress 
 		logger.WithField("error", err).Error("cannot select enough utxos for deposit")
 		return "", err
 	}
-	logger.WithField("count", len(selected_utxos)).Info("User UTXOs selected")
+	// logger.WithField("count", len(selected_utxos)).Info("User UTXOs selected")
 
 	// Craft [Deposit Tx]
 	tx, err := bu.MyAssembler.MakeBridgeDepositTx(
@@ -182,10 +182,10 @@ func (bu *BtcUser) DepositToBridge(amount int64, feeAmount int64, bridgeAddress 
 		return "", err
 	}
 
-	logger.WithFields(logger.Fields{
-		"TxIn":  len(tx.TxIn),
-		"TxOut": len(tx.TxOut),
-	}).Info("Crafted deposit Tx")
+	// logger.WithFields(logger.Fields{
+	// 	"TxIn":  len(tx.TxIn),
+	// 	"TxOut": len(tx.TxOut),
+	// }).Info("Crafted deposit Tx")
 
 	// Send [Deposit Tx] via RPC
 	depositBtcTxHash, err := bu.BtcRpcClient.SendRawTx(tx)
@@ -194,15 +194,15 @@ func (bu *BtcUser) DepositToBridge(amount int64, feeAmount int64, bridgeAddress 
 		return "", err
 	}
 
-	logger.WithField("BTC_TX_ID", depositBtcTxHash.String()).Info("Tx sent")
+	// logger.WithField("BTC_TX_ID", depositBtcTxHash.String()).Info("Tx sent")
 	return depositBtcTxHash.String(), nil
 }
 
 func (bu *BtcUser) TransferOut(amount int64, feeAmount int64, receiverAddr string) (string, error) {
-	logger.WithFields(logger.Fields{
-		"amount":       amount,
-		"receiverAddr": receiverAddr,
-	}).Info("Transfer btc")
+	// logger.WithFields(logger.Fields{
+	// 	"amount":       amount,
+	// 	"receiverAddr": receiverAddr,
+	// }).Info("Transfer btc")
 
 	// safe guard: check if user has enough balance to make a transfer.
 	balance, err := bu.GetBalance()
@@ -229,7 +229,7 @@ func (bu *BtcUser) TransferOut(amount int64, feeAmount int64, receiverAddr strin
 		logger.WithField("error", err).Error("cannot select enough utxos for transfer")
 		return "", err
 	}
-	logger.WithField("count", len(selected_utxos)).Info("User UTXOs selected")
+	// logger.WithField("count", len(selected_utxos)).Info("User UTXOs selected")
 
 	// Craft [Transfer Tx]
 	tx, err := bu.MyAssembler.MakeTransferOutTx(receiverAddr, amount, bu.MyUserConfig.BtcCoreAccountAddr, feeAmount, selected_utxos)
@@ -238,10 +238,10 @@ func (bu *BtcUser) TransferOut(amount int64, feeAmount int64, receiverAddr strin
 		return "", err
 	}
 
-	logger.WithFields(logger.Fields{
-		"TxIn":  len(tx.TxIn),
-		"TxOut": len(tx.TxOut),
-	}).Info("Crafted transfer Tx")
+	// logger.WithFields(logger.Fields{
+	// 	"TxIn":  len(tx.TxIn),
+	// 	"TxOut": len(tx.TxOut),
+	// }).Info("Crafted transfer Tx")
 
 	// Send [Transfer Tx] via RPC
 	transferBtcTxHash, err := bu.BtcRpcClient.SendRawTx(tx)
@@ -250,7 +250,7 @@ func (bu *BtcUser) TransferOut(amount int64, feeAmount int64, receiverAddr strin
 		return "", err
 	}
 
-	logger.WithField("BTC_TX_ID", transferBtcTxHash.String()).Info("Tx sent")
+	// logger.WithField("BTC_TX_ID", transferBtcTxHash.String()).Info("Tx sent")
 	return transferBtcTxHash.String(), nil
 }
 

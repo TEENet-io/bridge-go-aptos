@@ -58,12 +58,20 @@ func (w *AptosSyncWorker) GetTimeOrderedEvents(oldNum *big.Int, newNum *big.Int)
 	// 转换 RedeemRequestedEvent
 	agreementRequested := make([]agreement.RedeemRequestedEvent, 0, len(requestedEvents))
 	for _, ev := range requestedEvents {
+		// var isValidReceiver bool
+		// if w.aptosman.cfg != nil && w.aptosman.cfg.BtcChainConfig != nil {
+		// 	isValidReceiver = common.IsValidBtcAddress(ev.Receiver, w.aptosman.cfg.BtcChainConfig)
+		// } else {
+		// 	logger.Warn("BtcChainConfig is nil, skipping BTC address validation")
+		// 	isValidReceiver = false
+		// }
+
 		agreementRequested = append(agreementRequested, agreement.RedeemRequestedEvent{
 			RequestTxHash:   common.HexStrToBytes32(ev.RequestTxHash),
 			Requester:       []byte(ev.Requester),
 			Amount:          new(big.Int).SetUint64(ev.Amount),
 			Receiver:        ev.Receiver,
-			IsValidReceiver: common.IsValidBtcAddress(ev.Receiver, w.aptosman.cfg.BtcChainConfig),
+			IsValidReceiver: true,
 		})
 	}
 

@@ -1,0 +1,20 @@
+[package]
+name = "BtcBridgeContract"
+version = "1.0.0"
+authors = [""]
+upgrade_policy = "compatible"
+
+[addresses]
+my_address = "0xfbfe84d58d9ef1366f295066dbf1767f53d52d319843800c63c5e32d66411864"
+std = "0x1"
+aptos_std = "0x1"
+aptos_framework = "0x1"
+
+[dev-addresses]
+my_address = "0x42"
+
+[dependencies]
+AptosFramework = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "aptos-move/framework/aptos-framework", rev = "main" }
+
+[dev-dependencies]
+

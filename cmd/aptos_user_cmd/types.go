@@ -1,4 +1,4 @@
-package main
+package aptosman
 
 // 铸币参数
 type MintParams struct {

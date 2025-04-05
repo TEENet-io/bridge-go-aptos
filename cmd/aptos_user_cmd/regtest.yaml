@@ -5,7 +5,7 @@ APTOS_RPC_USERNAME: "admin1"
 APTOS_RPC_PWD: "123"
 APTOS_CHAIN_CONFIG: "regtest" # mainnet, testnet
 APTOS_CORE_ACCOUNT_PRIV: "0xa55ec7c0295b4a56c19e00778c1606eb51ca425b9c0e9107d7373b91469553a4" # user's private key
-APTOS_CORE_ACCOUNT_ADDR: "0x1319db9743efbef92e2ed32e122a4690f466fbbb8e34cd6ccffb93e8cb68447d" # user's address
+APTOS_CORE_ACCOUNT_ADDR: "0xfbfe84d58d9ef1366f295066dbf1767f53d52d319843800c63c5e32d66411864" # user's address
 APTOS_NODE_URL: "https://fullnode.devnet.aptoslabs.com"
 
 # Extra
@@ -13,5 +13,5 @@ REGISTER_USER_ON_CHAIN: true # if in local testing setup, true; if public btc no
 
 
 # PRIVATE_KEY=0xa55ec7c0295b4a56c19e00778c1606eb51ca425b9c0e9107d7373b91469553a4
-# MODULE_PUBLISHER_ACCOUNT_ADDRESS=0x1319db9743efbef92e2ed32e122a4690f466fbbb8e34cd6ccffb93e8cb68447d
+# MODULE_PUBLISHER_ACCOUNT_ADDRESS=0xfbfe84d58d9ef1366f295066dbf1767f53d52d319843800c63c5e32d66411864
 # APTOS_NODE_URL=https://fullnode.devnet.aptoslabs.com
